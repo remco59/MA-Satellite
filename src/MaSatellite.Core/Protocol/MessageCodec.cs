@@ -21,6 +21,15 @@ public sealed record StreamEndMessage(StreamEnd End) : ServerMessage;
 
 public sealed record GroupUpdateMessage(JsonElement Delta) : ServerMessage;
 
+/// <summary>Encrypted protocol: the server's purpose for this connection (<c>server/activate</c>). <see cref="ActiveRoles"/> is null when omitted.</summary>
+public sealed record ServerActivateMessage(IReadOnlyList<string> Activities, IReadOnlyList<string>? ActiveRoles, string? PairingMethod, string? PairingFormat) : ServerMessage;
+
+public sealed record ServerUnpairMessage : ServerMessage;
+
+public sealed record ServerPairFinalizeMessage : ServerMessage;
+
+public sealed record PairAbortMessage(string Reason) : ServerMessage;
+
 public sealed record UnknownServerMessage(string Type) : ServerMessage;
 
 public static class MessageCodec
@@ -90,6 +99,14 @@ public static class MessageCodec
                     "stream/clear" => new StreamClearMessage(new StreamClear(StrArray(payload, "roles"))),
                     "stream/end" => new StreamEndMessage(new StreamEnd(StrArray(payload, "roles"))),
                     "group/update" => new GroupUpdateMessage(payload),
+                    "server/activate" => new ServerActivateMessage(
+                        StrArray(payload, "activities") ?? Array.Empty<string>(),
+                        StrArray(payload, "active_roles"),
+                        Obj(payload, "pairing") is { } pr ? Str(pr, "method") : null,
+                        Obj(payload, "pairing") is { } pf ? Str(pf, "format") : null),
+                    "server/unpair" => new ServerUnpairMessage(),
+                    "server/pair-finalize" => new ServerPairFinalizeMessage(),
+                    "pair/abort" => new PairAbortMessage(Str(payload, "reason") ?? string.Empty),
                     _ => new UnknownServerMessage(type),
                 };
             }
@@ -112,7 +129,7 @@ public static class MessageCodec
             Str(p, "command") ?? string.Empty,
             Int(p, "volume"),
             Bool(p, "mute"),
-            Int(p, "static_delay_ms")));
+            Int(p, "static_delay_ms") ?? Int(p, "output_delay_ms")));
     }
 
     private static StreamStart ParseStreamStart(JsonElement payload)

@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace MaSatellite.Core.Session;
 
 /// <summary>One Sendspin connection: handshake, clock sync, stream handling and state tracking.</summary>
-public sealed class SendspinSession : IAsyncDisposable
+public sealed class SendspinSession : ISendspinSession
 {
     private readonly ISendspinTransport _transport;
     private readonly SendspinOptions _options;
@@ -64,7 +64,7 @@ public sealed class SendspinSession : IAsyncDisposable
     public string Remote => _transport.RemoteDescription;
 
     /// <summary>Called once with the server's hello. Return false to decline (another server is preferred); we then say goodbye.</summary>
-    public Func<ServerHello, Task<bool>>? AcceptServerAsync { get; set; }
+    public Func<ServerAdmission, Task<bool>>? AcceptServerAsync { get; set; }
 
     public event Action<SessionState>? StateChanged;
 
@@ -306,7 +306,7 @@ public sealed class SendspinSession : IAsyncDisposable
         }
 
         _logger.LogInformation("Connected to {Name} ({Id}), reason {Reason}, roles {Roles}", hello.Name, hello.ServerId, hello.ConnectionReason, string.Join(',', hello.ActiveRoles));
-        if (AcceptServerAsync is { } accept && !await accept(hello).ConfigureAwait(false))
+        if (AcceptServerAsync is { } accept && !await accept(new ServerAdmission(hello.ServerId, hello.Name, ArbitrationPolicy.FromLegacyReason(hello.ConnectionReason))).ConfigureAwait(false))
         {
             _logger.LogInformation("Declining {Name}: another server is preferred", hello.Name);
             await DisconnectAsync(GoodbyeReasons.AnotherServer).ConfigureAwait(false);

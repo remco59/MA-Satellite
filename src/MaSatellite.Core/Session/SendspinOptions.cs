@@ -2,8 +2,32 @@ using MaSatellite.Core.Protocol;
 
 namespace MaSatellite.Core.Session;
 
+/// <summary>Which Sendspin protocol to speak to a server.</summary>
+public enum SendspinProtocolMode
+{
+    /// <summary>Encrypted first; fall back to the legacy plaintext protocol for servers that do not answer the encrypted handshake.</summary>
+    Auto,
+
+    /// <summary>Only the encrypted protocol (Noise, optional pairing).</summary>
+    Encrypted,
+
+    /// <summary>Only the legacy plaintext protocol.</summary>
+    Legacy,
+}
+
 public sealed record SendspinOptions
 {
+    public SendspinProtocolMode ProtocolMode { get; init; } = SendspinProtocolMode.Auto;
+
+    /// <summary>Encrypted protocol: let an operator-approved but unpaired server activate this player (man-in-the-middle possible).</summary>
+    public bool AllowUnpairedAccess { get; init; } = true;
+
+    /// <summary>How long the encrypted handshake may take before we fall back (Auto) or give up.</summary>
+    public TimeSpan HandshakeTimeout { get; init; } = TimeSpan.FromSeconds(8);
+
+    /// <summary>How long a connection may stay without <c>server/activate</c> before it is dropped.</summary>
+    public TimeSpan ActivationTimeout { get; init; } = TimeSpan.FromSeconds(30);
+
     public string ClientId { get; init; } = Guid.NewGuid().ToString("D");
 
     public string PlayerName { get; init; } = "ma-satellite";

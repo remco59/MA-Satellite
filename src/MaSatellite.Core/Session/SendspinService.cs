@@ -1,6 +1,7 @@
 using MaSatellite.Core.Audio;
 using MaSatellite.Core.Discovery;
 using MaSatellite.Core.Protocol;
+using MaSatellite.Core.Security;
 using MaSatellite.Core.Time;
 using MaSatellite.Core.Transport;
 using MaSatellite.Core.Volume;
@@ -22,6 +23,8 @@ public sealed class SendspinService : IAsyncDisposable
     private readonly ILastServerStore _lastServer;
     private readonly ILoggerFactory _loggers;
     private readonly ILogger _logger;
+    private readonly ISendspinKeyStore _keys;
+    private readonly Dictionary<string, long> _legacyHosts = new(StringComparer.OrdinalIgnoreCase);
     private readonly ClockSync _clock;
     private readonly PlaybackEngine _engine;
     private readonly PlayerPipeline _pipeline;
@@ -32,7 +35,8 @@ public sealed class SendspinService : IAsyncDisposable
     private Task? _runTask;
     private SendspinListener? _listener;
     private IDisposable? _advertisement;
-    private SendspinSession? _current;
+    private ISendspinSession? _current;
+    private ServerAdmission? _currentAdmission;
     private SendspinOptions _options = new();
     private ServerConnectionOptions _connection = new();
     private SatelliteStatus _status = new();
@@ -45,8 +49,10 @@ public sealed class SendspinService : IAsyncDisposable
         ILocalClock? localClock = null,
         IServiceAdvertiser? advertiser = null,
         ILastServerStore? lastServerStore = null,
-        ILoggerFactory? loggerFactory = null)
+        ILoggerFactory? loggerFactory = null,
+        ISendspinKeyStore? keyStore = null)
     {
+        _keys = keyStore ?? new InMemoryKeyStore();
         _output = output;
         _volume = volume;
         _localClock = localClock ?? StopwatchClock.Instance;
@@ -78,7 +84,16 @@ public sealed class SendspinService : IAsyncDisposable
     }
 
     /// <summary>Shown in the status when the server only speaks the newer, encrypted Sendspin protocol.</summary>
-    public const string IncompatibleServerMessage = "Music Assistant requires the newer encrypted Sendspin protocol. Turn on \"Allow legacy clients\" in the Sendspin provider settings, or update ma-satellite.";
+    public const string IncompatibleServerMessage = "This server speaks a Sendspin protocol that is turned off in ma-satellite's settings (protocol mode).";
+
+    /// <summary>How long a server that failed the encrypted handshake is spoken to in the legacy protocol first (Auto mode).</summary>
+    private static readonly TimeSpan LegacyMemory = TimeSpan.FromMinutes(30);
+
+    /// <summary>Keys, pairing token and paired servers of this player.</summary>
+    public ISendspinKeyStore KeyStore => _keys;
+
+    /// <summary>Raised after a server paired with this player (the paired server list changed).</summary>
+    public event Action? PairingCompleted;
 
     public PlaybackStats Playback => _pipeline.Stats;
 
@@ -117,7 +132,7 @@ public sealed class SendspinService : IAsyncDisposable
     {
         CancellationTokenSource? cts;
         Task? run;
-        SendspinSession? current;
+        ISendspinSession? current;
         lock (_gate)
         {
             cts = _runCts;
@@ -200,7 +215,7 @@ public sealed class SendspinService : IAsyncDisposable
     {
         try
         {
-            _listener = new SendspinListener(_connection.ListenPort, _connection.Path, HandleTransportAsync, _localClock, _loggers.CreateLogger<SendspinListener>());
+            _listener = new SendspinListener(_connection.ListenPort, _connection.Path, t => HandleTransportAsync(t), _localClock, _loggers.CreateLogger<SendspinListener>());
             _listener.Start();
             if (_advertiser is not null)
             {
@@ -248,7 +263,12 @@ public sealed class SendspinService : IAsyncDisposable
                 Publish(s => s with { Connection = ConnectionState.Connecting, Detail = $"Connecting to {_connection.ServerHost}:{_connection.ServerPort}" });
                 var transport = await SendspinConnector.ConnectAsync(_connection.ServerHost, _connection.ServerPort, _connection.Path, _localClock, ct).ConfigureAwait(false);
                 var started = _localClock.NowMicros;
-                await HandleTransportAsync(transport).ConfigureAwait(false);
+                var switched = await HandleTransportAsync(transport).ConfigureAwait(false);
+                if (switched)
+                {
+                    continue; // other protocol, same server: try again at once
+                }
+
                 if (_localClock.NowMicros - started > 10_000_000)
                 {
                     backoff = TimeSpan.FromSeconds(1);
@@ -277,19 +297,62 @@ public sealed class SendspinService : IAsyncDisposable
         }
     }
 
-    /// <summary>Owns one connection from the transport being available until it closes.</summary>
-    private async Task HandleTransportAsync(ISendspinTransport transport)
+    /// <summary>
+    /// Owns one connection from the transport being available until it closes. Returns true when the connection ended
+    /// because the other protocol should be tried at once (connector mode reconnects without backoff).
+    /// </summary>
+    private async Task<bool> HandleTransportAsync(ISendspinTransport transport)
     {
+        var web = (WebSocketTransport)transport;
+        var host = HostKey(transport.RemoteDescription);
+        var mode = _options.ProtocolMode;
+        var encrypted = mode == SendspinProtocolMode.Encrypted || (mode == SendspinProtocolMode.Auto && !PrefersLegacy(host));
+        var switched = false;
         var ct = _runCts?.Token ?? CancellationToken.None;
-        await using var session = new SendspinSession(transport, _options, _clock, _pipeline, _volume, _localClock, _loggers.CreateLogger<SendspinSession>());
-        SessionState? last = null;
-        session.AcceptServerAsync = hello => AcceptAsync(session, hello);
-        session.StaticDelayChanged += d => StaticDelayChanged?.Invoke(d);
-        session.ProtocolMismatch += _ =>
+
+        ISendspinSession session;
+        SecureTransport? secure = null;
+        if (encrypted)
         {
-            _logger.LogError("The server requires the newer encrypted Sendspin protocol, which this version does not support");
-            Publish(s => s with { Detail = IncompatibleServerMessage });
+            secure = new SecureTransport(web, _keys, Security.Noise.NoiseSuite.ChaChaPolySha256, _loggers.CreateLogger<SecureTransport>(), _options.HandshakeTimeout);
+            session = new SecureSendspinSession(secure, _options, _clock, _pipeline, _volume, _localClock, _keys, _loggers.CreateLogger<SecureSendspinSession>());
+        }
+        else
+        {
+            session = new SendspinSession(web, _options, _clock, _pipeline, _volume, _localClock, _loggers.CreateLogger<SendspinSession>());
+        }
+
+        await using var disposable = session;
+        SessionState? last = null;
+        session.AcceptServerAsync = admission => AcceptAsync(session, admission);
+        session.StaticDelayChanged += d => StaticDelayChanged?.Invoke(d);
+        session.ProtocolMismatch += reason =>
+        {
+            if (mode == SendspinProtocolMode.Auto)
+            {
+                switched = true;
+                if (encrypted)
+                {
+                    _logger.LogInformation("{Host} does not speak the encrypted protocol ({Reason}); using the legacy protocol for it", host, reason);
+                    RememberLegacy(host);
+                }
+                else
+                {
+                    _logger.LogInformation("{Host} requires the encrypted protocol; switching", host);
+                    ForgetLegacy(host);
+                }
+
+                return;
+            }
+
+            _logger.LogError("The server at {Host} speaks another Sendspin protocol than the configured one: {Reason}", host, reason);
+            Publish(s => s with { Detail = encrypted ? "The server did not complete the encrypted handshake: " + reason : IncompatibleServerMessage });
         };
+        if (session is SecureSendspinSession secureSession)
+        {
+            secureSession.PairingCompleted += _ => PairingCompleted?.Invoke();
+        }
+
         session.StateChanged += state =>
         {
             if (_current != session)
@@ -318,6 +381,7 @@ public sealed class SendspinService : IAsyncDisposable
                 if (_current == session)
                 {
                     _current = null;
+                    _currentAdmission = null;
                     wasCurrent = true;
                 }
             }
@@ -328,34 +392,89 @@ public sealed class SendspinService : IAsyncDisposable
                 var connection = _connection.Mode == ConnectionMode.Advertise ? ConnectionState.Listening : ConnectionState.Connecting;
                 Publish(s => s with { Connection = connection, Session = new SessionState(), Detail = s.Detail == IncompatibleServerMessage ? s.Detail : null, InSync = false });
             }
+
+            if (secure is not null)
+            {
+                await secure.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+
+        return switched;
+    }
+
+    private bool PrefersLegacy(string host)
+    {
+        lock (_gate)
+        {
+            if (!_legacyHosts.TryGetValue(host, out var until))
+            {
+                return false;
+            }
+
+            if (_localClock.NowMicros < until)
+            {
+                return true;
+            }
+
+            _legacyHosts.Remove(host);
+            return false;
         }
     }
 
-    private async Task<bool> AcceptAsync(SendspinSession candidate, ServerHello hello)
+    private void RememberLegacy(string host)
+    {
+        lock (_gate)
+        {
+            _legacyHosts[host] = _localClock.NowMicros + (long)(LegacyMemory.TotalMilliseconds * 1000);
+        }
+    }
+
+    private void ForgetLegacy(string host)
+    {
+        lock (_gate)
+        {
+            _legacyHosts.Remove(host);
+        }
+    }
+
+    /// <summary>The address part of a remote description ("ip:port", "[ipv6]:port" or a ws:// URL).</summary>
+    internal static string HostKey(string remote)
+    {
+        if (Uri.TryCreate(remote, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(uri.Host) && uri.Scheme.StartsWith("ws", StringComparison.OrdinalIgnoreCase))
+        {
+            return uri.Host;
+        }
+
+        var colon = remote.LastIndexOf(':');
+        var host = colon > 0 ? remote[..colon] : remote;
+        return host.Trim('[', ']');
+    }
+
+    private async Task<bool> AcceptAsync(ISendspinSession candidate, ServerAdmission admission)
     {
         await _arbitration.WaitAsync().ConfigureAwait(false);
         try
         {
-            SendspinSession? existing;
+            ISendspinSession? existing;
+            ServerAdmission? existingAdmission;
             lock (_gate)
             {
                 existing = _current;
+                existingAdmission = _currentAdmission;
             }
 
-            if (existing is not null)
+            if (existing is not null && existingAdmission is not null)
             {
-                var existingReason = existing.State.ConnectionReason;
-                var takeOver = hello.ConnectionReason == ConnectionReasons.Playback
-                    || (existingReason != ConnectionReasons.Playback && hello.ServerId == _lastServer.LastPlayedServerId && existing.State.ServerId != _lastServer.LastPlayedServerId);
-                if (!takeOver)
+                if (!ArbitrationPolicy.ShouldReplace(existingAdmission, admission, _lastServer.LastPlayedServerId))
                 {
                     return false;
                 }
 
-                _logger.LogInformation("Switching from {Old} to {New}", existing.State.ServerName, hello.Name);
+                _logger.LogInformation("Switching from {Old} to {New}", existingAdmission.Name, admission.Name);
                 lock (_gate)
                 {
                     _current = candidate; // the old session must not clean up shared state any more
+                    _currentAdmission = admission;
                 }
 
                 await existing.DisconnectAsync(GoodbyeReasons.AnotherServer).ConfigureAwait(false);
@@ -366,6 +485,7 @@ public sealed class SendspinService : IAsyncDisposable
                 lock (_gate)
                 {
                     _current = candidate;
+                    _currentAdmission = admission;
                 }
             }
 

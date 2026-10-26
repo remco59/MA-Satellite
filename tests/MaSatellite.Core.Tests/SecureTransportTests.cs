@@ -64,6 +64,7 @@ public class SecureTransportTests
         var rig = new Rig(server, keys);
         await rig.ConnectServerAsync();
         var result = await rig.Transport!.HandshakeAsync(CancellationToken.None);
+        await WaitUntilAsync(() => server.Handshaken, "server finished handshake");
         return (rig, result);
     }
 
@@ -245,6 +246,7 @@ public class SecureTransportTests
         // the transport handles message 1 inside the receive loop; the next real message proves the new keys work
         var pending = rx.MoveNextAsync().AsTask();
         await WaitUntilAsync(() => rekeyed == 1, "rekeyed");
+        await WaitUntilAsync(() => server.ActiveCategory == PskCategory.LongTerm, "server switched keys");
         await server.SendJsonAsync("server/activate", new { activities = new[] { "playback" } });
         Assert.True(await pending.WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Contains("server/activate", rx.Current.Text);

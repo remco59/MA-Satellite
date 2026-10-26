@@ -42,7 +42,7 @@ public class SendspinServiceTests
 
         public SendspinService Service { get; }
 
-        public SendspinOptions Options { get; init; } = new() { PlayerName = "Test PC", ClientId = "11111111-1111-1111-1111-111111111111" };
+        public SendspinOptions Options { get; init; } = new() { PlayerName = "Test PC", ClientId = "11111111-1111-1111-1111-111111111111", ProtocolMode = SendspinProtocolMode.Legacy };
 
         public async ValueTask DisposeAsync()
         {
