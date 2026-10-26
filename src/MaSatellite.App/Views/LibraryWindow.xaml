@@ -4,7 +4,7 @@
   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:local="using:MaSatellite.App.Views">
-  <Grid Background="{StaticResource AuroraBackground}">
+  <Grid Background="{StaticResource AuroraBackground}" RequestedTheme="Dark">
     <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="86"/></Grid.RowDefinitions>
     <Grid.ColumnDefinitions><ColumnDefinition Width="218"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
     <!-- Persistent navigation. Every button selects a real library view. -->
