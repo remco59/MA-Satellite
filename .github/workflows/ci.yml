@@ -51,19 +51,44 @@ jobs:
             ./scripts/Sign-Msix.ps1 -Package $_.FullName -CertificatePfx $env:CERT_PFX -CertificatePassword $env:CERT_PASSWORD
           }
 
-      - name: Collect artifacts
+      - name: Collect MSIX artifacts
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path artifacts/dist | Out-Null
-          Get-ChildItem artifacts/msix -Recurse -Filter *.msix | Copy-Item -Destination artifacts/dist
-          Copy-Item "$env:RUNNER_TEMP/cert/MaSatellite.Dev.cer" artifacts/dist
-          Copy-Item scripts/Install-Dev.ps1 artifacts/dist
-          Get-ChildItem artifacts/dist
+          New-Item -ItemType Directory -Force -Path artifacts/msix-dist | Out-Null
+          Get-ChildItem artifacts/msix -Recurse -Filter *.msix | Copy-Item -Destination artifacts/msix-dist
+          Copy-Item "$env:RUNNER_TEMP/cert/MaSatellite.Dev.cer" artifacts/msix-dist
+          Copy-Item scripts/Install-Dev.ps1 artifacts/msix-dist
+          Get-ChildItem artifacts/msix-dist
 
       - uses: actions/upload-artifact@v4
         with:
           name: ma-satellite-msix
-          path: artifacts/dist/*
+          path: artifacts/msix-dist/*
+          if-no-files-found: error
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ISCC.exe -ErrorAction SilentlyContinue) -and -not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Build .exe installer
+        shell: pwsh
+        run: ./scripts/Build-Installer.ps1
+
+      - name: Test installer (install, start, uninstall)
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $setup = Get-ChildItem artifacts/dist -Filter 'ma-satellite-setup-*.exe' | Select-Object -First 1
+          ./scripts/Test-Installer.ps1 -Installer $setup.FullName
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ma-satellite-installer
+          path: artifacts/dist/ma-satellite-setup-*.exe
           if-no-files-found: error
 
       - uses: actions/upload-artifact@v4

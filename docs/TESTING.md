@@ -35,6 +35,14 @@ It connects a fake-audio player to the server, finds it in MA, plays a track on 
 - [ ] `%LOCALAPPDATA%\MaSatellite\logs` (or the package-redirected folder) contains a log; `settings.json` persists changes across restarts.
 - [ ] Uninstall via Settings → Apps leaves no tray icon and no startup entry.
 
+### `.exe` installer
+- [ ] CI is green and publishes the `ma-satellite-installer` artifact (the *Test installer* step already does a silent install/start/uninstall).
+- [ ] Run `ma-satellite-setup-<version>.exe` by double-click (SmartScreen: *More info → Run anyway*). It installs without admin rights; tray icon appears after *Start ma-satellite* at the end.
+- [ ] Run it again with *Install for all users* ticked and the firewall task selected: `Get-NetFirewallRule -DisplayName ma-satellite` shows the inbound TCP 8928 rule (private profile).
+- [ ] Task Manager → Startup apps lists ma-satellite. Disable it there: the tray menu shows *Start with Windows* unchecked and greyed; sign out/in: no autostart. Enable it again there: autostart works.
+- [ ] Install a newer build over the old one while the app runs: it is stopped, replaced and the settings survive.
+- [ ] Uninstall via Settings → Apps: no tray icon, no startup entry, no firewall rule; the prompt about settings/logs does what you answer.
+
 ### M1 – player core
 - [ ] After starting, *ma-satellite* shows up under Music Assistant → Settings → Players within ~10 s (mDNS). If not: add this PC's IP under the Sendspin provider's *Manual IP addresses*, or switch to *Connect* mode in Settings.
 - [ ] Play something to the PC: audio starts, no dropouts for 1 hour (check the log for `Dropped an undecodable audio chunk` and the settings window diagnostics: `in sync`, sync error under a few ms).
