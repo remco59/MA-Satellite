@@ -1,0 +1,62 @@
+name: Publish ma-satellite v0.1.1
+
+# One-time release request. Scoped to this file to avoid publishing future pushes.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-v0.1.1.yml'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Verify the versioned Windows build succeeded
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN: '40420345819'
+          EXPECTED_SHA: '4520cde515d7e9f7c63e46079e04f158772096bf'
+        run: |
+          actual_sha="$(gh run view "$BUILD_RUN" --repo "$GITHUB_REPOSITORY" --json headSha --jq .headSha)"
+          test "$actual_sha" = "$EXPECTED_SHA"
+          gh run watch "$BUILD_RUN" --repo "$GITHUB_REPOSITORY" --exit-status
+
+      - name: Download versioned Windows EXE installer
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 40420345819
+          name: ma-satellite-installer
+          path: release
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download versioned signed MSIX, cert and installation script
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 40420345819
+          name: ma-satellite-msix
+          path: release
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish v0.1.1 release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ls -lh release
+          test -f release/ma-satellite-setup-0.1.1.exe
+          test -f release/MaSatellite.App_0.1.1.0_x64.msix
+          if gh release view v0.1.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::v0.1.1 exists; refusing to overwrite"
+            exit 1
+          fi
+          gh release create v0.1.1 release/* \
+            --target "$GITHUB_SHA" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "ma-satellite v0.1.1 — Dark Aurora" \
+            --latest \
+            --notes "Dark Aurora UI redesign: a refreshed modern dark player, redesigned Music Assistant library with album grid and navigation, Now Playing and queue controls, new settings layout, and a compact tray mini-player. Includes the Windows x64 .exe installer and signed MSIX alternative. The installer builds are generated from the verified v0.1.1 Windows CI run. No backend or Sendspin protocol changes in this release."
