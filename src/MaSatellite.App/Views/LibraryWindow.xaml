@@ -22,6 +22,11 @@
         </StackPanel>
         <StackPanel Grid.Row="1" Spacing="6">
           <TextBlock Text="YOUR MUSIC" Margin="12,0,0,8" Style="{StaticResource AuroraSectionLabelStyle}"/>
+          <Button Tag="home" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
+            <StackPanel Orientation="Horizontal" Spacing="15">
+              <FontIcon Glyph="&#xE80F;" FontSize="16"/><TextBlock Text="Home" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Button>
           <Button Tag="album" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
             <StackPanel Orientation="Horizontal" Spacing="15">
               <FontIcon Glyph="&#xE80F;" FontSize="16"/><TextBlock Text="Library" VerticalAlignment="Center"/>
@@ -99,7 +104,8 @@
         <TextBlock x:Name="ContentDescription" Text="Everything you love, beautifully organised." Style="{StaticResource AuroraSubtitleStyle}"/>
       </StackPanel>
       <SelectorBar x:Name="Tabs" Grid.Row="2" SelectionChanged="OnTabChanged">
-        <SelectorBarItem Text="Albums" Tag="album" IsSelected="True"/>
+        <SelectorBarItem Text="Home" Tag="home" IsSelected="True"/>
+        <SelectorBarItem Text="Albums" Tag="album"/>
         <SelectorBarItem Text="Artists" Tag="artist"/>
         <SelectorBarItem Text="Playlists" Tag="playlist"/>
         <SelectorBarItem Text="Tracks" Tag="track"/>
@@ -139,6 +145,27 @@
       </Grid>
       <Grid Grid.Row="5" RowSpacing="16">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Border x:Name="HomeHero" Visibility="Collapsed" Background="{StaticResource AuroraHeroGradient}"
+                BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" CornerRadius="19" Padding="22">
+          <Grid ColumnSpacing="18">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <StackPanel VerticalAlignment="Center" Spacing="9">
+              <TextBlock Text="FEATURED FROM YOUR LIBRARY" Foreground="{StaticResource AuroraGood}" Style="{StaticResource AuroraSectionLabelStyle}"/>
+              <TextBlock x:Name="HomeTitle" Text="Your music, ready to play" Foreground="{StaticResource AuroraText}"
+                         FontSize="23" FontWeight="Bold" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+              <TextBlock x:Name="HomeArtist" Text="Explore your albums and playlists." Foreground="{StaticResource AuroraMuted}"
+                         FontSize="12" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+              <Button x:Name="HomePlayButton" Click="OnHomePlay" Content="Play featured album"
+                      Style="{StaticResource AuroraPrimaryButtonStyle}" HorizontalAlignment="Left" Margin="0,7,0,0"/>
+            </StackPanel>
+            <Border Grid.Column="1" Width="128" Height="128" Background="{StaticResource AuroraCard}" CornerRadius="14">
+              <Grid>
+                <FontIcon Glyph="&#xE8D6;" FontSize="35" Foreground="{StaticResource AuroraMuted}"/>
+                <Image x:Name="HomeArtwork" Stretch="UniformToFill"/>
+              </Grid>
+            </Border>
+          </Grid>
+        </Border>
         <Border x:Name="NowPlayingHero" Visibility="Collapsed" Background="{StaticResource AuroraHeroGradient}"
                 BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" CornerRadius="19" Padding="22">
           <Grid ColumnSpacing="25">
@@ -161,7 +188,7 @@
         </Border>
 
         <!-- Virtualized album cards, preserving the existing item commands. -->
-        <GridView x:Name="AlbumGrid" Grid.RowSpan="2" IsItemClickEnabled="True" SelectionMode="None"
+        <GridView x:Name="AlbumGrid" Grid.Row="1" IsItemClickEnabled="True" SelectionMode="None"
                   ItemClick="OnItemClick" Visibility="Collapsed"
                   HorizontalContentAlignment="Stretch" AutomationProperties.Name="Albums">
           <GridView.ItemTemplate>
