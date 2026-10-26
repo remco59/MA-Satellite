@@ -110,25 +110,29 @@ internal sealed class SatelliteShell : IDisposable
         var loggers = _loggers!;
         try
         {
-            _output = new WasapiAudioOutput(StopwatchClock.Instance, settings.OutputDeviceId, loggers.CreateLogger<WasapiAudioOutput>());
-            _volume = new WindowsMasterVolume(settings.OutputDeviceId, loggers.CreateLogger<WindowsMasterVolume>());
-            _host = new SatelliteHost(
+            var output = new WasapiAudioOutput(StopwatchClock.Instance, settings.OutputDeviceId, loggers.CreateLogger<WasapiAudioOutput>());
+            _output = output;
+            var volume = new WindowsMasterVolume(settings.OutputDeviceId, loggers.CreateLogger<WindowsMasterVolume>());
+            _volume = volume;
+            var host = new SatelliteHost(
                 _settings!,
-                _output,
-                _volume,
+                output,
+                volume,
                 deviceId =>
                 {
-                    _output.DeviceId = deviceId;
-                    _volume.SetDevice(deviceId);
+                    output.DeviceId = deviceId;
+                    volume.SetDevice(deviceId);
                 },
                 new MdnsAdvertiser(loggers.CreateLogger<MdnsAdvertiser>()),
                 new FileLastServerStore(_paths),
                 loggers,
                 version);
-            _host.StatusChanged += OnStatusChanged;
-            _smtc = new SmtcController(loggers.CreateLogger<SmtcController>());
-            _smtc.CommandRequested += command => _ = _host.SendCommandAsync(command);
-            _ = StartHostAsync();
+            _host = host;
+            host.StatusChanged += OnStatusChanged;
+            var smtc = new SmtcController(loggers.CreateLogger<SmtcController>());
+            _smtc = smtc;
+            smtc.CommandRequested += command => _ = host.SendCommandAsync(command);
+            _ = StartHostAsync(host);
         }
         catch (Exception ex)
         {
@@ -137,11 +141,11 @@ internal sealed class SatelliteShell : IDisposable
         }
     }
 
-    private async Task StartHostAsync()
+    private async Task StartHostAsync(SatelliteHost host)
     {
         try
         {
-            await _host!.StartAsync();
+            await host.StartAsync();
         }
         catch (Exception ex)
         {
@@ -159,7 +163,7 @@ internal sealed class SatelliteShell : IDisposable
             }
 
             _tray?.SetTooltip(FormatTooltip(status));
-            _smtc?.Update(status.Session, status.Connection == ConnectionState.Connected, _host!.ServerNowMicros);
+            _smtc?.Update(status.Session, status.Connection == ConnectionState.Connected, _host?.ServerNowMicros ?? 0);
             if (_miniPlayer is { IsShown: true })
             {
                 _miniPlayer.Refresh();
