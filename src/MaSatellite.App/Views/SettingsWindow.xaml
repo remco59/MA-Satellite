@@ -7,7 +7,17 @@
     <StackPanel Spacing="14" Padding="24">
       <TextBlock Text="ma-satellite" Style="{StaticResource TitleTextBlockStyle}" />
 
+      <Border CornerRadius="6" Padding="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+        <StackPanel Spacing="4">
+          <TextBlock x:Name="StatusLine" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" />
+          <TextBlock x:Name="NowPlayingLine" TextWrapping="Wrap" />
+          <TextBlock x:Name="DiagnosticsLine" Opacity="0.7" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+
       <TextBox x:Name="PlayerNameBox" Header="Player name" MaxLength="64" />
+
+      <ComboBox x:Name="DeviceBox" Header="Output device" HorizontalAlignment="Stretch" />
 
       <TextBox x:Name="HostBox" Header="Music Assistant host" PlaceholderText="192.168.0.98" />
 

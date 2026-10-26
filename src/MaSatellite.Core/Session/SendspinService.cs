@@ -154,6 +154,22 @@ public sealed class SendspinService : IAsyncDisposable
         await StartAsync(options, connection).ConfigureAwait(false);
     }
 
+    /// <summary>Changes the static delay without reconnecting.</summary>
+    public async Task SetStaticDelayAsync(int delayMs)
+    {
+        lock (_gate)
+        {
+            _options = _options with { StaticDelayMs = delayMs };
+        }
+
+        _pipeline.StaticDelayMs = delayMs;
+        var session = _current;
+        if (session is not null)
+        {
+            await session.SetStaticDelayAsync(delayMs).ConfigureAwait(false);
+        }
+    }
+
     public Task SendCommandAsync(ControllerCommand command, CancellationToken cancellationToken = default)
     {
         var session = _current;

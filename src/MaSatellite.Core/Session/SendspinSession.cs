@@ -149,6 +149,17 @@ public sealed class SendspinSession : IAsyncDisposable
         await _transport.SendTextAsync(MessageCodec.ClientCommand(command), cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Applies a delay chosen locally (settings UI) and tells the server.</summary>
+    public async Task SetStaticDelayAsync(int delayMs, CancellationToken cancellationToken = default)
+    {
+        _staticDelayMs = Math.Clamp(delayMs, 0, 5000);
+        _pipeline.StaticDelayMs = _staticDelayMs;
+        if (_helloDone)
+        {
+            await SendStateAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     /// <summary>Tells the server why we leave, then closes. Safe to call more than once.</summary>
     public async Task DisconnectAsync(string reason)
     {

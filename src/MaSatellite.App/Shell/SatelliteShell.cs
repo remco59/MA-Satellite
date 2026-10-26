@@ -1,16 +1,23 @@
 using MaSatellite.App.Views;
+using MaSatellite.Core.Discovery;
+using MaSatellite.Core.Session;
+using MaSatellite.Core.Time;
+using MaSatellite.Host.Audio;
 using MaSatellite.Host.Autostart;
 using MaSatellite.Host.Infrastructure;
 using MaSatellite.Host.Logging;
+using MaSatellite.Host.Orchestration;
 using MaSatellite.Host.Settings;
+using MaSatellite.Windows.Audio;
 using MaSatellite.Windows.Autostart;
 using MaSatellite.Windows.Tray;
 using Microsoft.Extensions.Logging;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 
 namespace MaSatellite.App.Shell;
 
-/// <summary>Owns the tray icon and the app's top-level windows. The app has no main window; it lives in the tray.</summary>
+/// <summary>Owns the tray icon, the player host and the app's top-level windows. The app has no main window; it lives in the tray.</summary>
 internal sealed class SatelliteShell : IDisposable
 {
     private const int CmdOpen = 1, CmdSettings = 2, CmdAutostart = 3, CmdExit = 99;
@@ -21,11 +28,16 @@ internal sealed class SatelliteShell : IDisposable
     private ILogger<SatelliteShell>? _logger;
     private SettingsStore? _settings;
     private AutostartReconciler? _autostart;
-    private IAutostartService? _autostartService;
     private AutostartState _autostartState = AutostartState.Unavailable;
     private TrayIcon? _tray;
     private Window? _keepAlive;
     private SettingsWindow? _settingsWindow;
+    private DispatcherQueue? _ui;
+    private WasapiAudioOutput? _output;
+    private WindowsMasterVolume? _volume;
+    private SatelliteHost? _host;
+    private readonly IAudioDeviceCatalog _devices = new WasapiDeviceCatalog();
+    private bool _disposed;
 
     public SatelliteShell(Action exit)
     {
@@ -34,9 +46,11 @@ internal sealed class SatelliteShell : IDisposable
 
     public void Start()
     {
+        _ui = DispatcherQueue.GetForCurrentThread();
         _loggers = LoggingSetup.Create(_paths);
         _logger = _loggers.CreateLogger<SatelliteShell>();
-        _logger.LogInformation("ma-satellite {Version} starting", typeof(SatelliteShell).Assembly.GetName().Version);
+        var version = typeof(SatelliteShell).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+        _logger.LogInformation("ma-satellite {Version} starting", version);
 
         _settings = new SettingsStore(_paths, _loggers.CreateLogger<SettingsStore>());
         var settings = _settings.Load();
@@ -44,8 +58,8 @@ internal sealed class SatelliteShell : IDisposable
         // A window that is never shown keeps the WinUI process alive while only the tray icon is visible.
         _keepAlive = new Window();
 
-        _autostartService = new PackagedAutostartService(_loggers.CreateLogger<PackagedAutostartService>());
-        _autostart = new AutostartReconciler(_autostartService, _loggers.CreateLogger<AutostartReconciler>());
+        var autostartService = new PackagedAutostartService(_loggers.CreateLogger<PackagedAutostartService>());
+        _autostart = new AutostartReconciler(autostartService, _loggers.CreateLogger<AutostartReconciler>());
         _ = ReconcileAutostartAsync(settings.Autostart);
 
         _tray = new TrayIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "tray.ico"))
@@ -56,13 +70,101 @@ internal sealed class SatelliteShell : IDisposable
         _tray.Clicked += ShowSettings;
         _tray.Show();
         _tray.SetTooltip($"ma-satellite — {settings.PlayerName}");
+
+        StartPlayer(version, settings);
     }
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
         _tray?.Dispose();
+        try
+        {
+            // Tells the server we are leaving (client/goodbye) and releases the audio device.
+            _host?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(4));
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Stopping the player failed");
+        }
+
+        _volume?.Dispose();
+        _output?.Dispose();
         _keepAlive?.Close();
         _loggers?.Dispose();
+    }
+
+    private void StartPlayer(string version, AppSettings settings)
+    {
+        try
+        {
+            _output = new WasapiAudioOutput(StopwatchClock.Instance, settings.OutputDeviceId, _loggers!.CreateLogger<WasapiAudioOutput>());
+            _volume = new WindowsMasterVolume(settings.OutputDeviceId, _loggers.CreateLogger<WindowsMasterVolume>());
+            _host = new SatelliteHost(
+                _settings!,
+                _output,
+                _volume,
+                deviceId =>
+                {
+                    _output.DeviceId = deviceId;
+                    _volume.SetDevice(deviceId);
+                },
+                new MdnsAdvertiser(_loggers.CreateLogger<MdnsAdvertiser>()),
+                new FileLastServerStore(_paths),
+                _loggers,
+                version);
+            _host.StatusChanged += OnStatusChanged;
+            _ = StartHostAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger!.LogError(ex, "Could not start the player");
+            _tray?.SetTooltip("ma-satellite — could not start (see log)");
+        }
+    }
+
+    private async Task StartHostAsync()
+    {
+        try
+        {
+            await _host!.StartAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger!.LogError(ex, "Starting the player failed");
+        }
+    }
+
+    private void OnStatusChanged(SatelliteStatus status)
+    {
+        _ui?.TryEnqueue(() =>
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _tray?.SetTooltip(FormatTooltip(status));
+        });
+    }
+
+    internal static string FormatTooltip(SatelliteStatus s)
+    {
+        var name = "ma-satellite";
+        var title = s.Session.Metadata.Title;
+        return s.Connection switch
+        {
+            ConnectionState.Connected when !string.IsNullOrEmpty(title) => $"{name} — {title}" + (string.IsNullOrEmpty(s.Session.Metadata.Artist) ? string.Empty : $" · {s.Session.Metadata.Artist}"),
+            ConnectionState.Connected => $"{name} — connected to {s.ServerName}",
+            ConnectionState.Listening => $"{name} — waiting for Music Assistant",
+            ConnectionState.Connecting => $"{name} — connecting…",
+            _ => $"{name} — stopped",
+        };
     }
 
     private IReadOnlyList<TrayMenuItem> BuildMenu() =>
@@ -96,14 +198,14 @@ internal sealed class SatelliteShell : IDisposable
 
     private void ShowSettings()
     {
-        if (_settings is null)
+        if (_settings is null || _host is null)
         {
             return;
         }
 
         if (_settingsWindow is null)
         {
-            _settingsWindow = new SettingsWindow(_settings, ApplyAutostartAsync);
+            _settingsWindow = new SettingsWindow(_settings, _devices, _host, ApplyAutostartAsync);
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         }
 
