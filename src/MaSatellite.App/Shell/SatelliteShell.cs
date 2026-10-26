@@ -107,10 +107,11 @@ internal sealed class SatelliteShell : IDisposable
 
     private void StartPlayer(string version, AppSettings settings)
     {
+        var loggers = _loggers!;
         try
         {
-            _output = new WasapiAudioOutput(StopwatchClock.Instance, settings.OutputDeviceId, _loggers!.CreateLogger<WasapiAudioOutput>());
-            _volume = new WindowsMasterVolume(settings.OutputDeviceId, _loggers.CreateLogger<WindowsMasterVolume>());
+            _output = new WasapiAudioOutput(StopwatchClock.Instance, settings.OutputDeviceId, loggers.CreateLogger<WasapiAudioOutput>());
+            _volume = new WindowsMasterVolume(settings.OutputDeviceId, loggers.CreateLogger<WindowsMasterVolume>());
             _host = new SatelliteHost(
                 _settings!,
                 _output,
@@ -120,12 +121,12 @@ internal sealed class SatelliteShell : IDisposable
                     _output.DeviceId = deviceId;
                     _volume.SetDevice(deviceId);
                 },
-                new MdnsAdvertiser(_loggers.CreateLogger<MdnsAdvertiser>()),
+                new MdnsAdvertiser(loggers.CreateLogger<MdnsAdvertiser>()),
                 new FileLastServerStore(_paths),
-                _loggers,
+                loggers,
                 version);
             _host.StatusChanged += OnStatusChanged;
-            _smtc = new SmtcController(_loggers.CreateLogger<SmtcController>());
+            _smtc = new SmtcController(loggers.CreateLogger<SmtcController>());
             _smtc.CommandRequested += command => _ = _host.SendCommandAsync(command);
             _ = StartHostAsync();
         }
