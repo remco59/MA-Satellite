@@ -8,7 +8,7 @@
   IgnorableNamespaces="uap uap5 desktop2 rescap">
 
   <!-- Publisher must match the subject of the signing certificate (see scripts/New-DevCertificate.ps1). -->
-  <Identity Name="MaSatellite" Publisher="CN=MaSatellite Dev" Version="0.1.0.0" />
+  <Identity Name="MaSatellite" Publisher="CN=MaSatellite Dev" Version="0.1.1.0" />
 
   <Properties>
     <DisplayName>ma-satellite</DisplayName>
