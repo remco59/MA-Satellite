@@ -303,6 +303,24 @@ public class SendspinServiceTests
         await WaitUntilAsync(() => rig.Output.Starts == 2, what: "output restarted");
     }
 
+    [Theory]
+    [InlineData("server/error")]
+    [InlineData("server/init")]
+    [InlineData("noise/handshake")]
+    public async Task A_server_that_wants_the_newer_encrypted_protocol_is_reported_clearly(string type)
+    {
+        await using var rig = new Rig();
+        await rig.Service.StartAsync(rig.Options, new ServerConnectionOptions { ListenPort = 0 });
+        var fake = new FakeServer(Clock) { RejectWith = type };
+        var socket = new ClientWebSocket();
+        await socket.ConnectAsync(new Uri($"ws://127.0.0.1:{rig.Service.ListenPort}/sendspin"), CancellationToken.None);
+        _ = fake.RunAsync(new WebSocketTransport(socket, Clock, "fake"));
+
+        await WaitUntilAsync(() => rig.Service.Status.Detail == SendspinService.IncompatibleServerMessage, what: "mismatch reported");
+        Assert.NotEqual(ConnectionState.Connected, rig.Service.Status.Connection);
+        Assert.Equal(ConnectionState.Listening, rig.Service.Status.Connection);
+    }
+
     [Fact]
     public async Task Listener_rejects_non_websocket_requests_and_wrong_paths()
     {

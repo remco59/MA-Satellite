@@ -77,6 +77,9 @@ public sealed class SendspinService : IAsyncDisposable
         }
     }
 
+    /// <summary>Shown in the status when the server only speaks the newer, encrypted Sendspin protocol.</summary>
+    public const string IncompatibleServerMessage = "Music Assistant requires the newer encrypted Sendspin protocol. Turn on \"Allow legacy clients\" in the Sendspin provider settings, or update ma-satellite.";
+
     public PlaybackStats Playback => _pipeline.Stats;
 
     /// <summary>The server's clock now (µs), or 0 while the clocks are not yet synchronised. Used to extrapolate track progress.</summary>
@@ -282,6 +285,11 @@ public sealed class SendspinService : IAsyncDisposable
         SessionState? last = null;
         session.AcceptServerAsync = hello => AcceptAsync(session, hello);
         session.StaticDelayChanged += d => StaticDelayChanged?.Invoke(d);
+        session.ProtocolMismatch += _ =>
+        {
+            _logger.LogError("The server requires the newer encrypted Sendspin protocol, which this version does not support");
+            Publish(s => s with { Detail = IncompatibleServerMessage });
+        };
         session.StateChanged += state =>
         {
             if (_current != session)
@@ -318,7 +326,7 @@ public sealed class SendspinService : IAsyncDisposable
             {
                 _pipeline.EndStream();
                 var connection = _connection.Mode == ConnectionMode.Advertise ? ConnectionState.Listening : ConnectionState.Connecting;
-                Publish(s => s with { Connection = connection, Session = new SessionState(), Detail = null, InSync = false });
+                Publish(s => s with { Connection = connection, Session = new SessionState(), Detail = s.Detail == IncompatibleServerMessage ? s.Detail : null, InSync = false });
             }
         }
     }

@@ -15,6 +15,9 @@ internal sealed class FakeServer
     private readonly List<(string Type, JsonElement Payload)> _received = [];
     private WebSocketTransport? _transport;
 
+    /// <summary>When set, the server answers the client's hello with this message type instead of server/hello.</summary>
+    public string? RejectWith { get; init; }
+
     public FakeServer(ILocalClock clock, string serverId = "fake-server", string name = "Fake Music Assistant", string reason = "playback")
     {
         _clock = clock;
@@ -67,6 +70,9 @@ internal sealed class FakeServer
 
                 switch (type)
                 {
+                    case "client/hello" when RejectWith is not null:
+                        await SendAsync(RejectWith, new { reason = "malformed" });
+                        break;
                     case "client/hello":
                         await SendAsync("server/hello", new
                         {

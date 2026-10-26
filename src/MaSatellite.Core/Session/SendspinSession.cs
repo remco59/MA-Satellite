@@ -68,6 +68,12 @@ public sealed class SendspinSession : IAsyncDisposable
 
     public event Action<SessionState>? StateChanged;
 
+    /// <summary>
+    /// Raised when the server answers with the newer encrypted Sendspin handshake (<c>server/init</c>, <c>noise/handshake</c>,
+    /// <c>server/error</c>) instead of <c>server/hello</c>: it no longer accepts plaintext (legacy) clients.
+    /// </summary>
+    public event Action<string>? ProtocolMismatch;
+
     /// <summary>Raised when the server changed our static delay; the host should persist it.</summary>
     public event Action<int>? StaticDelayChanged;
 
@@ -232,6 +238,13 @@ public sealed class SendspinSession : IAsyncDisposable
     private async Task<bool> HandleTextAsync(TransportMessage message, CancellationToken ct)
     {
         var parsed = MessageCodec.ParseServerMessage(message.Text!);
+        if (!_helloDone && parsed is UnknownServerMessage { Type: "server/init" or "noise/handshake" or "server/error" } newer)
+        {
+            _logger.LogWarning("{Remote} answered with {Type}: it expects the newer encrypted Sendspin protocol", Remote, newer.Type);
+            ProtocolMismatch?.Invoke(newer.Type);
+            return false;
+        }
+
         if (!_helloDone && parsed is not ServerHelloMessage)
         {
             _logger.LogDebug("Ignoring {Type} before server/hello", parsed.GetType().Name);
