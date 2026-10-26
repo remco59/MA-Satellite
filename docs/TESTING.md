@@ -45,6 +45,8 @@ It connects a fake-audio player to the server, finds it in MA, plays a track on 
 
 ### M1 – player core
 - [ ] After starting, *ma-satellite* shows up under Music Assistant → Settings → Players within ~10 s (mDNS). If not: add this PC's IP under the Sendspin provider's *Manual IP addresses*, or switch to *Connect* mode in Settings.
+- [ ] With Music Assistant 2.10.8, start a track and confirm that the log says `Stream started: pcm ...`, no FLAC chunks are dropped, the buffer grows above 0 ms, and audio is audible. PCM 16-bit at 44.1/48 kHz is intentionally the **only advertised audio format** until the real-server FLAC frame-sync error is fixed; re-enable FLAC only after testing real FLAC payloads.
+- [ ] Select the actual speaker/headphone endpoint if Windows `System default` resolves to a disconnected digital output (e.g. Realtek Digital Output).
 - [ ] Play something to the PC: audio starts, no dropouts for 1 hour (check the log for `Dropped an undecodable audio chunk` and the settings window diagnostics: `in sync`, sync error under a few ms).
 - [ ] Group the PC with another Sendspin/Cast/other player and clap or play a click track: no audible offset. If there is one, adjust *Static delay* (also adjustable from MA's player settings).
 - [ ] Volume: move the MA slider → the Windows volume changes; change the Windows volume (keyboard, flyout) → MA's slider follows within a second. Mute likewise.
