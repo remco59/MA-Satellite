@@ -59,26 +59,14 @@ public sealed record SendspinOptions
 
     public IReadOnlyList<AudioFormatSpec> SupportedFormats { get; init; } = DefaultFormats;
 
-    public static IReadOnlyList<AudioFormatSpec> DefaultFormats { get; } = BuildDefaultFormats();
-
-    private static List<AudioFormatSpec> BuildDefaultFormats()
-    {
-        var list = new List<AudioFormatSpec>();
-        foreach (var rate in new[] { 48000, 44100, 96000, 88200 })
-        {
-            list.Add(new AudioFormatSpec("flac", 2, rate, 16));
-        }
-
-        foreach (var rate in new[] { 48000, 44100, 96000, 88200 })
-        {
-            list.Add(new AudioFormatSpec("flac", 2, rate, 24));
-        }
-
-        foreach (var rate in new[] { 48000, 44100 })
-        {
-            list.Add(new AudioFormatSpec("pcm", 2, rate, 16));
-        }
-
-        return list;
-    }
+    // PCM-only until we can validate FLAC with captured frames from a real Music Assistant server.
+    // The current FLAC decoder drops real Sendspin chunks with "FLAC frame sync code not found",
+    // leaving the player connected but silently buffering 0 ms. Advertising FLAC (even after
+    // PCM) would still allow a server to choose it, so omit it entirely for now.
+    // Both sample rates are supported by Music Assistant and the existing PCM decoder.
+    public static IReadOnlyList<AudioFormatSpec> DefaultFormats { get; } =
+    [
+        new("pcm", 2, 48000, 16),
+        new("pcm", 2, 44100, 16),
+    ];
 }

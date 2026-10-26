@@ -78,7 +78,17 @@ public class SendspinServiceTests
         Assert.Contains("artwork@v1", roles);
         var support = hello.GetProperty("player@v1_support");
         Assert.True(support.GetProperty("buffer_capacity").GetInt32() > 0);
-        Assert.Equal("flac", support.GetProperty("supported_formats")[0].GetProperty("codec").GetString());
+        // All advertised formats must be decodable: the server can select any one.
+        // FLAC is deliberately omitted until real Music Assistant FLAC framing is fixed.
+        var formats = support.GetProperty("supported_formats").EnumerateArray().ToArray();
+        Assert.Equal(2, formats.Length);
+        Assert.All(formats, f =>
+        {
+            Assert.Equal("pcm", f.GetProperty("codec").GetString());
+            Assert.Equal(2, f.GetProperty("channels").GetInt32());
+            Assert.Equal(16, f.GetProperty("bit_depth").GetInt32());
+        });
+        Assert.Equal([48000, 44100], formats.Select(f => f.GetProperty("sample_rate").GetInt32()).ToArray());
 
         var state = await fake.WaitForAsync("client/state");
         Assert.Equal("synchronized", state.GetProperty("state").GetString());
