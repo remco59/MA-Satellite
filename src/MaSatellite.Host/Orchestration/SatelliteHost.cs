@@ -4,13 +4,14 @@ using MaSatellite.Core.Protocol;
 using MaSatellite.Core.Session;
 using MaSatellite.Core.Time;
 using MaSatellite.Core.Volume;
+using MaSatellite.Host.LocalApi;
 using MaSatellite.Host.Settings;
 using Microsoft.Extensions.Logging;
 
 namespace MaSatellite.Host.Orchestration;
 
 /// <summary>Everything non-UI that makes the player run: the Sendspin service wired to settings, volume and output.</summary>
-public sealed class SatelliteHost : IAsyncDisposable
+public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.ILocalApiSource
 {
     private readonly SettingsStore _settings;
     private readonly SendspinService _service;
@@ -18,6 +19,8 @@ public sealed class SatelliteHost : IAsyncDisposable
     private readonly IVolumeControl _volume;
     private readonly string _softwareVersion;
     private readonly ILogger<SatelliteHost> _logger;
+    private readonly ILoggerFactory _loggers;
+    private LocalApiServer? _api;
     private readonly SemaphoreSlim _applyLock = new(1, 1);
     private AppSettings _applied;
     private bool _started;
@@ -38,6 +41,7 @@ public sealed class SatelliteHost : IAsyncDisposable
         _volume = volume;
         _softwareVersion = softwareVersion;
         _logger = loggers.CreateLogger<SatelliteHost>();
+        _loggers = loggers;
         _applied = settings.Current;
         _service = new SendspinService(output, volume, clock, advertiser, lastServerStore, loggers);
         _service.StaticDelayChanged += OnServerChangedStaticDelay;
@@ -67,12 +71,14 @@ public sealed class SatelliteHost : IAsyncDisposable
         _applied = s;
         _setOutputDevice(s.OutputDeviceId);
         await _service.StartAsync(SettingsMapper.ToSendspinOptions(s, _softwareVersion), SettingsMapper.ToConnectionOptions(s)).ConfigureAwait(false);
+        await ApplyLocalApiAsync(s).ConfigureAwait(false);
         _settings.Changed += OnSettingsChanged;
     }
 
     public async Task StopAsync()
     {
         _settings.Changed -= OnSettingsChanged;
+        await StopLocalApiAsync().ConfigureAwait(false);
         await _service.StopAsync().ConfigureAwait(false);
         _started = false;
     }
@@ -107,6 +113,11 @@ public sealed class SatelliteHost : IAsyncDisposable
             {
                 await _service.SetStaticDelayAsync(updated.StaticDelayMs).ConfigureAwait(false);
             }
+
+            if (before.LocalApiEnabled != updated.LocalApiEnabled || before.LocalApiPort != updated.LocalApiPort)
+            {
+                await ApplyLocalApiAsync(updated).ConfigureAwait(false);
+            }
         }
         catch (Exception ex)
         {
@@ -115,6 +126,37 @@ public sealed class SatelliteHost : IAsyncDisposable
         finally
         {
             _applyLock.Release();
+        }
+    }
+
+    private async Task ApplyLocalApiAsync(AppSettings s)
+    {
+        await StopLocalApiAsync().ConfigureAwait(false);
+        if (!s.LocalApiEnabled)
+        {
+            return;
+        }
+
+        try
+        {
+            var api = new LocalApiServer(this, s.LocalApiPort, _loggers.CreateLogger<LocalApiServer>());
+            api.Start();
+            _api = api;
+        }
+        catch (Exception ex)
+        {
+            // Another program may own the port; the player must keep working without the widget API.
+            _logger.LogWarning(ex, "Local API could not start on port {Port}", s.LocalApiPort);
+        }
+    }
+
+    private async Task StopLocalApiAsync()
+    {
+        var api = _api;
+        _api = null;
+        if (api is not null)
+        {
+            await api.DisposeAsync().ConfigureAwait(false);
         }
     }
 
