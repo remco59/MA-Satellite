@@ -21,6 +21,7 @@ public sealed partial class LibraryWindow : Window
     private string _lastQuery = string.Empty;
     private int _loadId;
     private bool _loadingTargets;
+    private bool _closed;
 
     internal LibraryWindow(LibraryController controller, Action openSettings)
     {
@@ -42,7 +43,12 @@ public sealed partial class LibraryWindow : Window
         };
 
         _controller.Service.ServerEvent += OnServerEvent;
-        Closed += (_, _) => _controller.Service.ServerEvent -= OnServerEvent;
+        Closed += (_, _) =>
+        {
+            _closed = true;
+            _queueRefresh.Stop();
+            _controller.Service.ServerEvent -= OnServerEvent;
+        };
         Activated += OnFirstActivated;
     }
 
@@ -338,18 +344,22 @@ public sealed partial class LibraryWindow : Window
 
     private void OnServerEvent(MaEvent e)
     {
-        if (e.Event is not ("queue_updated" or "queue_items_updated" or "queue_time_updated") || SelectedTarget?.QueueId != e.ObjectId)
+        // ServerEvent is raised by the Music Assistant WebSocket thread.
+        // Never access TargetBox.SelectedItem (or any WinUI control) until we're on the UI thread.
+        // Elapsed-time ticks do not change the queue list.
+        if (e.Event is not ("queue_updated" or "queue_items_updated"))
         {
             return;
         }
 
-        if (e.Event == "queue_time_updated")
-        {
-            return; // elapsed-time ticks do not change the list
-        }
-
         DispatcherQueue.TryEnqueue(() =>
         {
+            // Recheck after dispatch: the user may have changed targets or closed this window.
+            if (_closed || SelectedTarget?.QueueId != e.ObjectId)
+            {
+                return;
+            }
+
             _queueRefresh.Stop();
             _queueRefresh.Start();
         });
