@@ -19,6 +19,9 @@ msbuild (Join-Path $root 'src\MaSatellite.App\MaSatellite.App.csproj') /restore 
   /p:Configuration=$Configuration /p:Platform=$Platform `
   /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:GenerateAppxPackageOnBuild=true `
   /p:AppxPackageDir=$out `
-  /p:AppxPackageSigningEnabled=true /p:PackageCertificateKeyFile=$CertificatePfx /p:PackageCertificatePassword=$plain
+  /p:AppxPackageSigningEnabled=false
 if ($LASTEXITCODE -ne 0) { throw "msbuild failed ($LASTEXITCODE)" }
+Get-ChildItem $out -Recurse -Filter *.msix | ForEach-Object {
+  & (Join-Path $PSScriptRoot 'Sign-Msix.ps1') -Package $_.FullName -CertificatePfx $CertificatePfx -CertificatePassword $plain
+}
 Write-Host "MSIX written below $out"

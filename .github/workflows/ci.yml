@@ -40,9 +40,15 @@ jobs:
           msbuild src/MaSatellite.App/MaSatellite.App.csproj /restore /v:minimal `
             /p:Configuration=Release /p:Platform=x64 `
             /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:GenerateAppxPackageOnBuild=true `
-            "/p:AppxPackageDir=$PWD/artifacts/msix/" `
-            /p:AppxPackageSigningEnabled=true "/p:PackageCertificateKeyFile=$env:CERT_PFX" "/p:PackageCertificatePassword=$env:CERT_PASSWORD"
+            "/p:AppxPackageDir=$PWD/artifacts/msix/" /p:AppxPackageSigningEnabled=false
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Sign MSIX
+        shell: pwsh
+        run: |
+          Get-ChildItem artifacts/msix -Recurse -Filter *.msix | ForEach-Object {
+            ./scripts/Sign-Msix.ps1 -Package $_.FullName -CertificatePfx $env:CERT_PFX -CertificatePassword $env:CERT_PASSWORD
+          }
 
       - name: Collect artifacts
         shell: pwsh
