@@ -33,7 +33,7 @@ public sealed partial class SettingsWindow : Window
         _applyAutostart = applyAutostart;
         InitializeComponent();
         Title = "ma-satellite settings";
-        AppWindow.Resize(new SizeInt32(580, 1180));
+        AppWindow.Resize(new SizeInt32(900, 790));
 
         try
         {
