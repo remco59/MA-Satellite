@@ -17,7 +17,8 @@ public sealed partial class LibraryWindow : Window
     private readonly Stack<MaItem> _history = new();
     private IReadOnlyList<PlayTarget> _targets = [];
     private MaItem? _openedItem;
-    private string _tab = "album";
+    private string _tab = "home";
+    private MaItem? _featuredAlbum;
     private string _lastQuery = string.Empty;
     private int _loadId;
     private bool _loadingTargets;
@@ -184,12 +185,14 @@ public sealed partial class LibraryWindow : Window
         ContextActions.Visibility = _openedItem?.Type == MaMediaType.Artist ? Visibility.Collapsed : Visibility.Visible;
         QueueBar.Visibility = (_tab is "queue" or "now") && _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
         NowPlayingHero.Visibility = _tab == "now" && _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
-        var useGrid = _tab == "album" && _openedItem is null;
+        HomeHero.Visibility = _tab == "home" && _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
+        var useGrid = (_tab is "home" or "album") && _openedItem is null;
         AlbumGrid.Visibility = useGrid ? Visibility.Visible : Visibility.Collapsed;
         List.Visibility = useGrid ? Visibility.Collapsed : Visibility.Visible;
         ContentHeading.Text = _openedItem?.Name ?? (_tab switch
         {
             "now" => "Now playing",
+            "home" => "Welcome back",
             "queue" => "Your queue",
             "search" => "Discover music",
             "artist" => "Artists",
@@ -200,6 +203,7 @@ public sealed partial class LibraryWindow : Window
         ContentDescription.Text = _openedItem is not null ? "Explore and play your selection." : _tab switch
         {
             "now" => "Your current Music Assistant playback and what's up next.",
+            "home" => "Your music, beautifully organised.",
             "queue" => "Manage what's coming up next.",
             "search" => "Find music across your library and providers.",
             _ => "Everything you love, beautifully organised.",
@@ -239,6 +243,13 @@ public sealed partial class LibraryWindow : Window
                 return;
             }
 
+            // Use actual library data for Home; there are no demo tracks or fake buttons.
+            var featured = _tab == "home" ? rows.FirstOrDefault(r => r.Item?.IsPlayable == true) : null;
+            _featuredAlbum = featured?.Item;
+            HomeTitle.Text = featured?.Title ?? "Your music, ready to play";
+            HomeArtist.Text = featured?.Subtitle ?? "Explore your albums and playlists.";
+            HomeArtwork.Source = featured?.Image;
+            HomePlayButton.IsEnabled = _featuredAlbum is not null && SelectedTarget is not null;
             // Only realize the active visual tree; both controls use virtualization.
             AlbumGrid.ItemsSource = useGrid ? rows : null;
             List.ItemsSource = useGrid ? null : rows;
@@ -332,6 +343,14 @@ public sealed partial class LibraryWindow : Window
         var item = new MenuFlyoutItem { Text = text };
         item.Click += async (_, _) => await action();
         return item;
+    }
+
+    private async void OnHomePlay(object sender, RoutedEventArgs e)
+    {
+        if (_featuredAlbum is { } album)
+        {
+            await PlayAsync(album, MaQueueOption.Replace);
+        }
     }
 
     private async void OnContextPlay(object sender, RoutedEventArgs e) => await PlayOpenedAsync(MaQueueOption.Replace);
