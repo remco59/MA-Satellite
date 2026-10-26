@@ -67,7 +67,7 @@ internal sealed class SatelliteShell : IDisposable
         // A window that is never shown keeps the WinUI process alive while only the tray icon is visible.
         _keepAlive = new Window();
 
-        var autostartService = new PackagedAutostartService(_loggers.CreateLogger<PackagedAutostartService>());
+        var autostartService = AutostartServiceFactory.Create(_loggers, Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "MaSatellite.App.exe"));
         _autostart = new AutostartReconciler(autostartService, _loggers.CreateLogger<AutostartReconciler>());
         _ = ReconcileAutostartAsync(settings.Autostart);
 

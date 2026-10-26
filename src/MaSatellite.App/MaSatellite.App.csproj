@@ -10,6 +10,7 @@
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
+    <!-- /p:Unpackaged=true builds the plain self-contained app that the Inno Setup installer (installer/) wraps. -->
     <WindowsPackageType>MSIX</WindowsPackageType>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <DefaultLanguage>en-US</DefaultLanguage>
@@ -20,6 +21,10 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <WarningsAsErrors>nullable</WarningsAsErrors>
     <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Unpackaged)' == 'true'">
+    <WindowsPackageType>None</WindowsPackageType>
+    <SelfContained>true</SelfContained>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Platform)' == 'x64'">
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -39,7 +44,7 @@
     <ProjectReference Include="..\MaSatellite.Host\MaSatellite.Host.csproj" />
     <ProjectReference Include="..\MaSatellite.Windows\MaSatellite.Windows.csproj" />
   </ItemGroup>
-  <ItemGroup>
+  <ItemGroup Condition="'$(Unpackaged)' != 'true'">
     <ProjectCapability Include="Msix" />
   </ItemGroup>
 </Project>

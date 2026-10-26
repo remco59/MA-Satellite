@@ -35,10 +35,11 @@ The plan assumes plain `client/hello` JSON over WebSocket. The Sendspin spec on 
 - **Arbitration.** One server at a time, decided after `server/hello` using `connection_reason` and the persisted last-played server, as the spec describes.
 - **Local API.** `HttpListener` on `127.0.0.1` only, no admin rights needed; refuses foreign `Origin` and `Host` headers; `POST /api/command` needs `application/json` (forces a CORS preflight that foreign origins fail).
 - **Secrets.** The MA token and the Sendspin keys are encrypted with DPAPI (current user) in `secrets/` and never logged.
-- **Firewall.** The MSIX declares an inbound rule for TCP 8928 on *private* networks only; on public networks use *Connect* mode.
+- **Two ways to install.** The MSIX is the original packaging; `installer/MaSatellite.iss` (Inno Setup) wraps an *unpackaged*, self-contained build (`dotnet publish -p:Unpackaged=true`, see `scripts/Build-Installer.ps1`). The app detects package identity at runtime (`PackageIdentity.IsPackaged`): packaged uses the manifest's `StartupTask`, unpackaged writes `HKCU\...\Run` (and respects Task Manager's *Startup apps* switch via `StartupApproved\Run`). Everything else (tray, SMTC through `MediaPlayer`, DPAPI, `%LOCALAPPDATA%\MaSatellite`) behaves the same. CI installs the `.exe` silently, starts it, checks the log and Run entry, uninstalls and checks cleanup (`scripts/Test-Installer.ps1`).
+- **Firewall.** The MSIX declares an inbound rule for TCP 8928 on *private* networks only; the `.exe` installer adds the same rule (`netsh`, program-scoped) when installed for all users (admin), and removes it on uninstall; on public networks use *Connect* mode.
 
 ## Known gaps / next steps
 
 - Encrypted protocol: only the `pairing_psk` pairing method is offered (no QR/dynamic pairing code UI), output/visualizer-less roles only (player, controller, metadata, artwork); first runs against a real Music Assistant may need tuning.
 - Opus decoder, visualizer role, per-device multiple instances (all listed under "Later" in the plan).
-- Auto-update and a real code-signing certificate (plan: "Later").
+- Auto-update and a real code-signing certificate (plan: "Later"); the `.exe` installer is unsigned too (SmartScreen warning).

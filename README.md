@@ -24,8 +24,9 @@ Everything that can be tested without Windows hardware is covered by automated t
 src/MaSatellite.Core      Sendspin protocol, clock sync, decoders, audio pipeline (no UI deps)
 src/MaSatellite.Host      Settings, logging, app orchestration, local API (no Windows deps, unit-testable)
 src/MaSatellite.Windows   CoreAudio/WASAPI, master volume, SMTC, tray icon, autostart
-src/MaSatellite.App       WinUI 3 app, single-project MSIX
+src/MaSatellite.App       WinUI 3 app, single-project MSIX (also builds unpackaged for the .exe installer)
 src/MaSatellite.MaApi     Client for MA's own WebSocket API (library browsing)
+installer                 Inno Setup script for the .exe installer
 widgets/lively            HTML/JS now-playing widget
 tests/*                   xUnit tests
 ```
@@ -39,7 +40,23 @@ Requirements: .NET 8 SDK. The WinUI app and the MSIX need Windows (Visual Studio
 dotnet test MaSatellite.Tests.slnf
 ```
 
-## Install (dev build)
+## Install
+
+### Option A: `.exe` installer (simplest)
+
+Download `ma-satellite-setup-<version>.exe` from the latest [GitHub Release](../../releases/latest) (or, for a branch build, from the `ma-satellite-installer` workflow artifact).
+
+1. Run it. It installs for the current user without admin rights. Choose *Install for all users* if you want the setup to add the Windows Firewall rule for Music Assistant to connect in (TCP 8928, private networks only); otherwise Windows asks the first time, or use *Connect* mode.
+2. The icon appears in the notification area; the app starts with Windows (toggle it in the tray menu).
+3. Uninstall via Settings → Apps. It offers to remove your settings and logs too.
+
+The installer is not code-signed yet, so Windows SmartScreen shows "unknown publisher": *More info → Run anyway*. Do not install both the `.exe` and the MSIX on one PC.
+
+To build it locally (needs Inno Setup 6): `scripts/Build-Installer.ps1`.
+
+### Option B: MSIX (dev build)
+
+The release also carries the signed `.msix`, `MaSatellite.Dev.cer` and `Install-Dev.ps1`; the steps are:
 
 CI publishes `ma-satellite-msix` as a workflow artifact containing the signed `.msix`, the public certificate `MaSatellite.Dev.cer` and `Install-Dev.ps1`.
 
@@ -66,3 +83,7 @@ Logs: `%LOCALAPPDATA%\MaSatellite\logs` (packaged apps see this redirected below
 ## Uninstall
 
 Settings → Apps → ma-satellite → Uninstall (or `Get-AppxPackage MaSatellite | Remove-AppxPackage`). Optionally remove the dev certificate from *Trusted People*.
+
+## Releasing
+
+Set `<Version>` in `Directory.Build.props` (and the manifest's `Identity Version`), merge, then push a matching tag: `git tag v0.1.0 && git push origin v0.1.0`. CI builds, tests and attaches the installer and MSIX files to a new GitHub Release (it fails if the tag and the version disagree).
