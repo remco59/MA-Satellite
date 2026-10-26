@@ -8,11 +8,15 @@ The full plan, decisions and milestones live in [`docs/PLAN.md`](docs/PLAN.md). 
 
 | Milestone | State |
 |---|---|
-| M0 Skeleton (tray, logging, settings, MSIX, CI) | in progress, see PR |
-| M1 Player core | in progress |
-| M2 Mini-player + Windows integration | planned |
-| M3 Local API + Lively widget | planned |
-| M4 Library browsing | planned |
+| M0 Skeleton (tray, logging, settings, MSIX, autostart, CI) | done |
+| M1 Player core (Sendspin, clock sync, FLAC/PCM, WASAPI, master volume) | done, needs your manual run (`docs/TESTING.md`) |
+| M2 Mini-player + Windows integration (flyout, SMTC, media keys) | done, needs your manual run |
+| M3 Local API + Lively widget | done |
+| M4 Library browsing (search, queue, transfer) | done, needs your manual run |
+
+Everything that can be tested without Windows hardware is covered by automated tests; audio output, the tray, SMTC and the WinUI windows are verified to build in CI but must be checked by hand.
+
+> **Protocol note.** This build speaks the plaintext ("legacy") Sendspin protocol, which Music Assistant 2.10 accepts while *Allow legacy clients* is on (default). Newer Sendspin versions require Noise encryption and pairing; see `docs/NOTES.md`.
 
 ## Layout
 
@@ -47,6 +51,15 @@ CI publishes `ma-satellite-msix` as a workflow artifact containing the signed `.
 3. The icon appears in the notification area; the app starts with Windows (toggle it in the tray menu).
 
 To build locally instead: `scripts/New-DevCertificate.ps1`, then `scripts/Build-Msix.ps1`.
+
+## Use
+
+1. Start the app. It advertises itself on the network; in Music Assistant the player *ma-satellite* (named after your PC) appears under Players. Left-click the tray icon for the mini-player, right-click for the menu.
+2. The volume slider in Music Assistant **is** the Windows master volume of the selected output device, in both directions (so it also affects other apps).
+3. For library browsing enter your Music Assistant host and a long-lived token in *Settings* (the token is stored encrypted for your Windows account, never logged).
+4. For desktop widgets see [`widgets/lively`](widgets/lively/README.md); the local API is documented there.
+
+More: [`docs/TESTING.md`](docs/TESTING.md) (checklists, troubleshooting), [`docs/NOTES.md`](docs/NOTES.md) (decisions).
 
 Logs: `%LOCALAPPDATA%\MaSatellite\logs` (packaged apps see this redirected below `%LOCALAPPDATA%\Packages\<package>\LocalCache\Local\MaSatellite`). Settings: `settings.json` next to it.
 
