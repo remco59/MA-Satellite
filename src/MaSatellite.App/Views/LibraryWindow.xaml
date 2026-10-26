@@ -22,44 +22,44 @@
         </StackPanel>
         <StackPanel Grid.Row="1" Spacing="6">
           <TextBlock Text="YOUR MUSIC" Margin="12,0,0,8" Style="{StaticResource AuroraSectionLabelStyle}"/>
-          <Button Tag="home" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
+          <Button x:Name="NavHome" Tag="home" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
             <StackPanel Orientation="Horizontal" Spacing="15">
               <FontIcon Glyph="&#xE80F;" FontSize="16"/><TextBlock Text="Home" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
-          <Button Tag="album" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
+          <Button x:Name="NavLibrary" Tag="album" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
             <StackPanel Orientation="Horizontal" Spacing="15">
               <FontIcon Glyph="&#xE80F;" FontSize="16"/><TextBlock Text="Library" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
-          <Button Tag="now" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
+          <Button x:Name="NavNow" Tag="now" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
             <StackPanel Orientation="Horizontal" Spacing="15">
               <FontIcon Glyph="&#xE768;" FontSize="16"/><TextBlock Text="Now playing" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
-          <Button Tag="search" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
+          <Button x:Name="NavSearch" Tag="search" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
             <StackPanel Orientation="Horizontal" Spacing="15">
               <FontIcon Glyph="&#xE721;" FontSize="16"/><TextBlock Text="Search" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
-          <Button Tag="queue" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
+          <Button x:Name="NavQueue" Tag="queue" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
             <StackPanel Orientation="Horizontal" Spacing="15">
               <FontIcon Glyph="&#xE8FD;" FontSize="16"/><TextBlock Text="Queue" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
           <Border Height="1" Background="{StaticResource AuroraBorder}" Margin="6,20,6,14"/>
           <TextBlock Text="YOUR COLLECTION" Margin="12,0,0,8" Style="{StaticResource AuroraSectionLabelStyle}"/>
-          <Button Tag="artist" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
+          <Button x:Name="NavArtist" Tag="artist" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
             <StackPanel Orientation="Horizontal" Spacing="15">
               <FontIcon Glyph="&#xE77B;" FontSize="16"/><TextBlock Text="Artists" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
-          <Button Tag="playlist" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
+          <Button x:Name="NavPlaylist" Tag="playlist" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
             <StackPanel Orientation="Horizontal" Spacing="15">
               <FontIcon Glyph="&#xE8F1;" FontSize="16"/><TextBlock Text="Playlists" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
-          <Button Tag="track" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
+          <Button x:Name="NavTrack" Tag="track" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
             <StackPanel Orientation="Horizontal" Spacing="15">
               <FontIcon Glyph="&#xE8D6;" FontSize="16"/><TextBlock Text="Tracks" VerticalAlignment="Center"/>
             </StackPanel>
