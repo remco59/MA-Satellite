@@ -60,8 +60,8 @@ internal sealed class FakeMaServer : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await _cts.CancelAsync();
-        _listener.Close();
         _socket?.Abort();
+        _listener.Abort();
         try
         {
             await _loop;

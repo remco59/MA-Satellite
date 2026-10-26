@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 25
     env:
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
@@ -22,7 +23,7 @@ jobs:
       - uses: microsoft/setup-msbuild@v2
 
       - name: Unit tests
-        run: dotnet test MaSatellite.Tests.slnf -c Release --logger "trx;LogFileName=tests.trx" --results-directory artifacts/test-results
+        run: dotnet test MaSatellite.Tests.slnf -c Release --blame-hang-timeout 120s --blame-hang-dump-type none --logger "trx;LogFileName=tests.trx" --results-directory artifacts/test-results
 
       - name: Create dev certificate
         shell: pwsh

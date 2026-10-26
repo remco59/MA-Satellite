@@ -56,7 +56,6 @@ public sealed class LocalApiServer : IAsyncDisposable
     {
         _source.StatusChanged -= OnStatusChanged;
         await _cts.CancelAsync().ConfigureAwait(false);
-        _listener.Close();
         EventClient[] clients;
         lock (_clientsGate)
         {
@@ -64,10 +63,13 @@ public sealed class LocalApiServer : IAsyncDisposable
             _clients.Clear();
         }
 
+        // Drop open connections first and abort (not close) the listener: Close() can wait for in-flight requests.
         foreach (var c in clients)
         {
             c.Socket.Abort();
         }
+
+        _listener.Abort();
 
         foreach (var task in new[] { _acceptLoop, _ticker })
         {
