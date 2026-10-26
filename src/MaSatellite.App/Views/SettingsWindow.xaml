@@ -7,9 +7,29 @@
     <StackPanel Spacing="14" Padding="24">
       <TextBlock Text="ma-satellite" Style="{StaticResource TitleTextBlockStyle}" />
 
+      <Border CornerRadius="6" Padding="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+        <StackPanel Spacing="4">
+          <TextBlock x:Name="StatusLine" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" />
+          <TextBlock x:Name="NowPlayingLine" TextWrapping="Wrap" />
+          <TextBlock x:Name="SecurityLine" Opacity="0.7" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
+          <TextBlock x:Name="DiagnosticsLine" Opacity="0.7" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+
       <TextBox x:Name="PlayerNameBox" Header="Player name" MaxLength="64" />
 
+      <ComboBox x:Name="DeviceBox" Header="Output device" HorizontalAlignment="Stretch" />
+
       <TextBox x:Name="HostBox" Header="Music Assistant host" PlaceholderText="192.168.0.98" />
+
+      <NumberBox x:Name="MaPortBox" Header="Music Assistant web port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Hidden" />
+
+      <PasswordBox x:Name="TokenBox" Header="Music Assistant access token (for the library)" PlaceholderText="Paste a long-lived token" />
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Content="Test connection" Click="OnTestConnection" />
+        <Button x:Name="RemoveTokenButton" Content="Remove saved token" Click="OnRemoveToken" />
+        <TextBlock x:Name="TokenStatus" VerticalAlignment="Center" Opacity="0.7" TextWrapping="Wrap" />
+      </StackPanel>
 
       <ComboBox x:Name="ModeBox" Header="Connection" HorizontalAlignment="Stretch">
         <ComboBoxItem Content="Advertise on the network (server connects to me)" />
@@ -20,7 +40,30 @@
 
       <NumberBox x:Name="DelayBox" Header="Static delay (ms)" Minimum="0" Maximum="5000" SpinButtonPlacementMode="Compact" />
 
+      <ComboBox x:Name="ProtocolBox" Header="Sendspin protocol" HorizontalAlignment="Stretch">
+        <ComboBoxItem Content="Automatic (encrypted, legacy for older servers)" />
+        <ComboBoxItem Content="Encrypted only" />
+        <ComboBoxItem Content="Legacy (plain text) only" />
+      </ComboBox>
+
+      <ToggleSwitch x:Name="UnpairedSwitch" Header="Allow servers that are not paired with this player to play audio" />
+
+      <TextBox x:Name="PairingTokenBox" Header="Pairing token (give to Music Assistant to pair this player)" IsReadOnly="True" TextWrapping="Wrap" />
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Content="Copy token" Click="OnCopyPairingToken" />
+        <Button Content="Create a new token" Click="OnNewPairingToken" />
+      </StackPanel>
+
+      <ComboBox x:Name="PairedBox" Header="Paired servers" HorizontalAlignment="Stretch" />
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button x:Name="UnpairButton" Content="Forget selected server" Click="OnUnpair" />
+        <TextBlock x:Name="PairedStatus" VerticalAlignment="Center" Opacity="0.7" TextWrapping="Wrap" />
+      </StackPanel>
+
       <ToggleSwitch x:Name="AutostartSwitch" Header="Start with Windows" />
+
+      <ToggleSwitch x:Name="ApiSwitch" Header="Local API for desktop widgets (127.0.0.1 only)" />
+      <NumberBox x:Name="ApiPortBox" Header="Local API port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Hidden" />
 
       <InfoBar x:Name="MessageBar" IsOpen="False" IsClosable="True" />
 

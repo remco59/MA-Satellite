@@ -1,0 +1,30 @@
+{
+  "apiPort": {
+    "type": "textbox",
+    "text": "ma-satellite API port",
+    "value": "8929"
+  },
+  "accent": {
+    "type": "color",
+    "text": "Accent colour",
+    "value": "#40d6be"
+  },
+  "opacity": {
+    "type": "slider",
+    "text": "Card opacity",
+    "value": 82,
+    "min": 20,
+    "max": 100,
+    "step": 1
+  },
+  "showAlbum": {
+    "type": "checkbox",
+    "text": "Show album",
+    "value": true
+  },
+  "showProgress": {
+    "type": "checkbox",
+    "text": "Show progress bar",
+    "value": true
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "AppVersion": "2.0.0.0",
+  "Title": "ma-satellite Now Playing",
+  "Thumbnail": "preview.png",
+  "Preview": "preview.png",
+  "Desc": "Live now-playing card for Music Assistant, fed by the ma-satellite app. Updates over a local WebSocket, no polling.",
+  "Author": "Remco",
+  "License": "MIT",
+  "Type": 1,
+  "FileName": "index.html"
+}

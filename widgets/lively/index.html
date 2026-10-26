@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ma-satellite Now Playing</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main id="card" class="card idle" aria-live="polite">
+    <div class="art" id="art">
+      <img id="artImg" alt="" hidden />
+      <svg id="artPlaceholder" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v10.55A4 4 0 1 0 11 17V7h6V3H9z" /></svg>
+    </div>
+    <div class="info">
+      <div class="title" id="title">Nothing playing</div>
+      <div class="artist" id="artist"></div>
+      <div class="album" id="album"></div>
+      <div class="progress" id="progress">
+        <span id="elapsed">0:00</span>
+        <div class="bar"><div class="fill" id="fill"></div></div>
+        <span id="total">0:00</span>
+      </div>
+      <div class="status" id="status">Connecting to ma-satellite…</div>
+    </div>
+  </main>
+  <script src="widget.js"></script>
+</body>
+</html>

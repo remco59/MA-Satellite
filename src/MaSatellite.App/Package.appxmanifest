@@ -42,12 +42,6 @@
           <uap5:StartupTask TaskId="MaSatelliteStartup" Enabled="true" DisplayName="ma-satellite" />
         </uap5:Extension>
 
-        <!-- Inbound rule for the Sendspin WebSocket listener (server-initiated connections). -->
-        <desktop2:Extension Category="windows.firewallRules">
-          <desktop2:FirewallRules Executable="MaSatellite.App.exe">
-            <desktop2:Rule Direction="in" IPProtocol="TCP" LocalPortMin="8928" LocalPortMax="8928" Profile="private" />
-          </desktop2:FirewallRules>
-        </desktop2:Extension>
       </Extensions>
     </Application>
   </Applications>
@@ -57,4 +51,13 @@
     <Capability Name="internetClient" />
     <Capability Name="privateNetworkClientServer" />
   </Capabilities>
+
+  <Extensions>
+    <!-- Inbound rule for the Sendspin WebSocket listener (server-initiated connections). -->
+    <desktop2:Extension Category="windows.firewallRules">
+      <desktop2:FirewallRules Executable="MaSatellite.App.exe">
+        <desktop2:Rule Direction="in" IPProtocol="TCP" LocalPortMin="8928" LocalPortMax="8928" Profile="private" />
+      </desktop2:FirewallRules>
+    </desktop2:Extension>
+  </Extensions>
 </Package>

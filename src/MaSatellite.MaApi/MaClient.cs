@@ -1,0 +1,159 @@
+using System.Text.Json;
+using MaSatellite.MaApi.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
+namespace MaSatellite.MaApi;
+
+/// <summary>Typed access to the parts of Music Assistant's API this app uses: library, search, queues and players.</summary>
+public sealed class MaClient : IAsyncDisposable
+{
+    private static readonly string[] SearchMediaTypes = ["artist", "album", "track", "playlist"];
+
+    private readonly MaConnection _connection;
+    private readonly string _baseUrl;
+
+    public MaClient(string host, int port, string? token, ILogger? logger = null)
+    {
+        _baseUrl = $"http://{host}:{port}";
+        _connection = new MaConnection(MaConnection.BuildUri(host, port), token, logger ?? NullLogger.Instance);
+        _connection.EventReceived += e => EventReceived?.Invoke(e);
+        _connection.Disconnected += e => Disconnected?.Invoke(e);
+    }
+
+    public string BaseUrl => _baseUrl;
+
+    public MaServerInfo? ServerInfo => _connection.ServerInfo;
+
+    public bool IsConnected => _connection.IsConnected;
+
+    public event Action<MaEvent>? EventReceived;
+
+    public event Action<Exception?>? Disconnected;
+
+    public Task ConnectAsync(CancellationToken ct = default) => _connection.ConnectAsync(ct);
+
+    public async Task<MaSearchResults> SearchAsync(string query, int limit = 25, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return MaSearchResults.Empty;
+        }
+
+        var result = await _connection.SendCommandAsync("music/search", new Dictionary<string, object?>
+        {
+            ["search_query"] = query.Trim(),
+            ["media_types"] = SearchMediaTypes,
+            ["limit"] = limit,
+            ["library_only"] = false,
+        }, cancellationToken: ct).ConfigureAwait(false);
+
+        IReadOnlyList<MaItem> Items(string name) =>
+            result.ValueKind == JsonValueKind.Object && result.TryGetProperty(name, out var arr) ? MaItemParser.ParseItems(arr, _baseUrl) : [];
+
+        return new MaSearchResults(Items("artists"), Items("albums"), Items("tracks"), Items("playlists"));
+    }
+
+    /// <summary>Lists a library collection (artists, albums, tracks or playlists), optionally filtered by a text search.</summary>
+    public async Task<IReadOnlyList<MaItem>> GetLibraryAsync(MaMediaType type, string? search = null, int limit = 100, int offset = 0, CancellationToken ct = default)
+    {
+        var command = type switch
+        {
+            MaMediaType.Artist => "music/artists/library_items",
+            MaMediaType.Album => "music/albums/library_items",
+            MaMediaType.Track => "music/tracks/library_items",
+            MaMediaType.Playlist => "music/playlists/library_items",
+            _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported library type"),
+        };
+
+        var result = await _connection.SendCommandAsync(command, new Dictionary<string, object?>
+        {
+            ["search"] = string.IsNullOrWhiteSpace(search) ? null : search.Trim(),
+            ["limit"] = limit,
+            ["offset"] = offset,
+        }, cancellationToken: ct).ConfigureAwait(false);
+        return MaItemParser.ParseItems(result, _baseUrl);
+    }
+
+    public async Task<IReadOnlyList<MaItem>> GetChildrenAsync(MaItem parent, CancellationToken ct = default)
+    {
+        var command = parent.Type switch
+        {
+            MaMediaType.Album => "music/albums/album_tracks",
+            MaMediaType.Playlist => "music/playlists/playlist_tracks",
+            MaMediaType.Artist => "music/artists/artist_albums",
+            _ => throw new ArgumentOutOfRangeException(nameof(parent), parent.Type, "This item has no children"),
+        };
+
+        var result = await _connection.SendCommandAsync(command, new Dictionary<string, object?>
+        {
+            ["item_id"] = parent.ItemId,
+            ["provider_instance_id_or_domain"] = parent.Provider,
+        }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
+        return MaItemParser.ParseItems(result, _baseUrl);
+    }
+
+    public async Task<IReadOnlyList<MaPlayer>> GetPlayersAsync(CancellationToken ct = default)
+    {
+        var result = await _connection.SendCommandAsync("players/all", null, cancellationToken: ct).ConfigureAwait(false);
+        return result.ValueKind == JsonValueKind.Array
+            ? result.EnumerateArray().Select(MaItemParser.ParsePlayer).ToList()
+            : [];
+    }
+
+    public async Task<IReadOnlyList<MaQueueInfo>> GetQueuesAsync(CancellationToken ct = default)
+    {
+        var result = await _connection.SendCommandAsync("player_queues/all", null, cancellationToken: ct).ConfigureAwait(false);
+        return result.ValueKind == JsonValueKind.Array
+            ? result.EnumerateArray().Select(q => MaItemParser.ParseQueue(q, _baseUrl)).ToList()
+            : [];
+    }
+
+    public async Task<IReadOnlyList<MaQueueItem>> GetQueueItemsAsync(string queueId, int limit = 200, int offset = 0, CancellationToken ct = default)
+    {
+        var result = await _connection.SendCommandAsync("player_queues/items", new Dictionary<string, object?>
+        {
+            ["queue_id"] = queueId,
+            ["limit"] = limit,
+            ["offset"] = offset,
+        }, cancellationToken: ct).ConfigureAwait(false);
+        return result.ValueKind == JsonValueKind.Array
+            ? result.EnumerateArray().Select(i => MaItemParser.ParseQueueItem(i, _baseUrl)).ToList()
+            : [];
+    }
+
+    /// <summary>Plays or enqueues media (a URI) on a queue. The queue id of a player equals its player id.</summary>
+    public Task PlayMediaAsync(string queueId, string uri, MaQueueOption option = MaQueueOption.Replace, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("player_queues/play_media", new Dictionary<string, object?>
+        {
+            ["queue_id"] = queueId,
+            ["media"] = uri,
+            ["option"] = option.ToString().ToLowerInvariant(),
+        }, cancellationToken: ct);
+
+    /// <summary>Moves the queue (items and position) from one player to another.</summary>
+    public Task TransferQueueAsync(string sourceQueueId, string targetQueueId, bool autoPlay = true, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("player_queues/transfer", new Dictionary<string, object?>
+        {
+            ["source_queue_id"] = sourceQueueId,
+            ["target_queue_id"] = targetQueueId,
+            ["auto_play"] = autoPlay,
+        }, cancellationToken: ct);
+
+    public Task QueueCommandAsync(string queueId, string command, CancellationToken ct = default) =>
+        _connection.SendCommandAsync($"player_queues/{command}", new Dictionary<string, object?> { ["queue_id"] = queueId }, cancellationToken: ct);
+
+    public Task PlayQueueIndexAsync(string queueId, int index, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("player_queues/play_index", new Dictionary<string, object?> { ["queue_id"] = queueId, ["index"] = index }, cancellationToken: ct);
+
+    /// <summary>Finds the player that represents this PC: by client id, then by name.</summary>
+    public static MaPlayer? FindThisPlayer(IEnumerable<MaPlayer> players, string clientId, string playerName)
+    {
+        var list = players.ToList();
+        return list.FirstOrDefault(p => p.PlayerId.Equals(clientId, StringComparison.OrdinalIgnoreCase))
+            ?? list.FirstOrDefault(p => p.PlayerId.Contains(clientId, StringComparison.OrdinalIgnoreCase))
+            ?? list.FirstOrDefault(p => p.Name.Equals(playerName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public ValueTask DisposeAsync() => _connection.DisposeAsync();
+}

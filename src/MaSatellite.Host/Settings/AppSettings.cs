@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using MaSatellite.Core.Session;
 
 namespace MaSatellite.Host.Settings;
 
@@ -44,6 +45,13 @@ public sealed record AppSettings
 
     /// <summary>Extra delay (0-5000 ms) compensating for output hardware after the audio port.</summary>
     public int StaticDelayMs { get; init; }
+
+    /// <summary>Auto speaks the encrypted protocol and falls back to the legacy plaintext protocol for older servers.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public SendspinProtocolMode ProtocolMode { get; init; } = SendspinProtocolMode.Auto;
+
+    /// <summary>Encrypted protocol: let a server that is not paired with this player start playback (anyone on the network who can reach the server's operator interface could be the server).</summary>
+    public bool AllowUnpairedAccess { get; init; } = true;
 
     public bool LocalApiEnabled { get; init; } = true;
 
