@@ -29,6 +29,7 @@ public sealed partial class LibraryWindow : Window
         _controller = controller;
         _openSettings = openSettings;
         InitializeComponent();
+        AuroraWindowChrome.Apply(this);
         Title = "ma-satellite library";
         AppWindow.Resize(new SizeInt32(1180, 790));
 
