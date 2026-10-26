@@ -173,16 +173,16 @@ internal sealed partial class MiniPlayerWindow : Window
         _updating = true;
         try
         {
-            TitleText.Text = string.IsNullOrEmpty(md.Title) ? "Nothing playing" : md.Title;
-            ArtistText.Text = md.Artist ?? string.Empty;
-            AlbumText.Text = md.Album ?? string.Empty;
-            StatusText.Text = status.Connection switch
+            SetMetadataText(TitleText, string.IsNullOrEmpty(md.Title) ? "Nothing playing" : md.Title);
+            SetMetadataText(ArtistText, md.Artist);
+            SetMetadataText(AlbumText, md.Album);
+            SetMetadataText(StatusText, status.Connection switch
             {
                 ConnectionState.Connected => $"{(view.IsPlaying ? "Playing on" : "Connected to")} {status.ServerName}" + (string.IsNullOrEmpty(session.Group.GroupName) ? string.Empty : $" · {session.Group.GroupName}"),
                 ConnectionState.Listening => status.Detail ?? "Waiting for Music Assistant",
                 ConnectionState.Connecting => status.Detail ?? "Connecting…",
                 _ => "Stopped",
-            };
+            });
 
             PlayPauseIcon.Glyph = view.IsPlaying ? "" : "";
             PlayPauseButton.IsEnabled = view.CanPlayPause;
@@ -211,6 +211,19 @@ internal sealed partial class MiniPlayerWindow : Window
         {
             _updating = false;
         }
+    }
+
+    /// <summary>Keep the full metadata on hover without letting it resize the player.</summary>
+    private static void SetMetadataText(TextBlock block, string? value)
+    {
+        var text = value ?? string.Empty;
+        if (block.Text == text)
+        {
+            return;
+        }
+
+        block.Text = text;
+        ToolTipService.SetToolTip(block, text.Length == 0 ? null : text);
     }
 
     private void UpdateArtwork(ArtworkImage? artwork)
