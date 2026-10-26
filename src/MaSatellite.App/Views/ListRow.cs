@@ -2,6 +2,7 @@ using MaSatellite.MaApi.Models;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using FontWeight = global::Windows.UI.Text.FontWeight;
 
 namespace MaSatellite.App.Views;
 
@@ -33,7 +34,7 @@ public sealed class ListRow
 
     public bool IsCurrent { get; }
 
-    public Windows.UI.Text.FontWeight Weight => IsCurrent ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
+    public FontWeight Weight => IsCurrent ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
 
     public Visibility PlaceholderVisibility => Image is null ? Visibility.Visible : Visibility.Collapsed;
 
