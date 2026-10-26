@@ -79,6 +79,9 @@ public sealed class SendspinService : IAsyncDisposable
 
     public PlaybackStats Playback => _pipeline.Stats;
 
+    /// <summary>The server's clock now (µs), or 0 while the clocks are not yet synchronised. Used to extrapolate track progress.</summary>
+    public long ServerNowMicros => _clock.IsSynchronized ? _clock.LocalToServer(_localClock.NowMicros) : 0;
+
     /// <summary>The port the listener is bound to (Advertise mode), once started.</summary>
     public int? ListenPort => _listener?.Port;
 

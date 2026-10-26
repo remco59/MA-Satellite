@@ -10,6 +10,7 @@ using MaSatellite.Host.Orchestration;
 using MaSatellite.Host.Settings;
 using MaSatellite.Windows.Audio;
 using MaSatellite.Windows.Autostart;
+using MaSatellite.Windows.Media;
 using MaSatellite.Windows.Tray;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
@@ -32,6 +33,8 @@ internal sealed class SatelliteShell : IDisposable
     private TrayIcon? _tray;
     private Window? _keepAlive;
     private SettingsWindow? _settingsWindow;
+    private MiniPlayerWindow? _miniPlayer;
+    private SmtcController? _smtc;
     private DispatcherQueue? _ui;
     private WasapiAudioOutput? _output;
     private WindowsMasterVolume? _volume;
@@ -67,7 +70,7 @@ internal sealed class SatelliteShell : IDisposable
             MenuProvider = BuildMenu,
         };
         _tray.MenuItemInvoked += OnMenuItem;
-        _tray.Clicked += ShowSettings;
+        _tray.Clicked += ToggleMiniPlayer;
         _tray.Show();
         _tray.SetTooltip($"ma-satellite — {settings.PlayerName}");
 
@@ -83,6 +86,8 @@ internal sealed class SatelliteShell : IDisposable
 
         _disposed = true;
         _tray?.Dispose();
+        _miniPlayer?.Close();
+        _miniPlayer = null;
         try
         {
             // Tells the server we are leaving (client/goodbye) and releases the audio device.
@@ -93,6 +98,7 @@ internal sealed class SatelliteShell : IDisposable
             _logger?.LogWarning(ex, "Stopping the player failed");
         }
 
+        _smtc?.Dispose();
         _volume?.Dispose();
         _output?.Dispose();
         _keepAlive?.Close();
@@ -119,6 +125,8 @@ internal sealed class SatelliteShell : IDisposable
                 _loggers,
                 version);
             _host.StatusChanged += OnStatusChanged;
+            _smtc = new SmtcController(_loggers.CreateLogger<SmtcController>());
+            _smtc.CommandRequested += command => _ = _host.SendCommandAsync(command);
             _ = StartHostAsync();
         }
         catch (Exception ex)
@@ -150,6 +158,11 @@ internal sealed class SatelliteShell : IDisposable
             }
 
             _tray?.SetTooltip(FormatTooltip(status));
+            _smtc?.Update(status.Session, status.Connection == ConnectionState.Connected, _host!.ServerNowMicros);
+            if (_miniPlayer is { IsShown: true })
+            {
+                _miniPlayer.Refresh();
+            }
         });
     }
 
@@ -182,6 +195,8 @@ internal sealed class SatelliteShell : IDisposable
         switch (id)
         {
             case CmdOpen:
+                ToggleMiniPlayer();
+                break;
             case CmdSettings:
                 ShowSettings();
                 break;
@@ -194,6 +209,17 @@ internal sealed class SatelliteShell : IDisposable
                 _exit();
                 break;
         }
+    }
+
+    private void ToggleMiniPlayer()
+    {
+        if (_settings is null || _host is null || _tray is null)
+        {
+            return;
+        }
+
+        _miniPlayer ??= new MiniPlayerWindow(_host, _settings, _devices, ShowSettings, () => _tray?.GetScreenRect());
+        _miniPlayer.Toggle();
     }
 
     private void ShowSettings()

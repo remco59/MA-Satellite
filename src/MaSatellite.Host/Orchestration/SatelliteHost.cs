@@ -15,6 +15,7 @@ public sealed class SatelliteHost : IAsyncDisposable
     private readonly SettingsStore _settings;
     private readonly SendspinService _service;
     private readonly Action<string?> _setOutputDevice;
+    private readonly IVolumeControl _volume;
     private readonly string _softwareVersion;
     private readonly ILogger<SatelliteHost> _logger;
     private readonly SemaphoreSlim _applyLock = new(1, 1);
@@ -34,6 +35,7 @@ public sealed class SatelliteHost : IAsyncDisposable
     {
         _settings = settings;
         _setOutputDevice = setOutputDevice;
+        _volume = volume;
         _softwareVersion = softwareVersion;
         _logger = loggers.CreateLogger<SatelliteHost>();
         _applied = settings.Current;
@@ -44,7 +46,12 @@ public sealed class SatelliteHost : IAsyncDisposable
 
     public SendspinService Service => _service;
 
+    /// <summary>The system master volume of the output device, which is also MA's volume for this player.</summary>
+    public IVolumeControl Volume => _volume;
+
     public SatelliteStatus Status => _service.Status;
+
+    public long ServerNowMicros => _service.ServerNowMicros;
 
     public event Action<SatelliteStatus>? StatusChanged;
 
