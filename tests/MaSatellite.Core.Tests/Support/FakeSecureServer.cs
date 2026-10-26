@@ -191,6 +191,50 @@ internal sealed class FakeSecureServer
         }
     }
 
+    public async Task<JsonElement> WaitForAsync(string type, Func<JsonElement, bool>? predicate = null, int timeoutMs = 5000)
+    {
+        var deadline = Environment.TickCount64 + timeoutMs;
+        while (Environment.TickCount64 < deadline)
+        {
+            foreach (var p in Payloads(type))
+            {
+                if (predicate is null || predicate(p))
+                {
+                    return p;
+                }
+            }
+
+            await Task.Delay(10);
+        }
+
+        throw new TimeoutException($"Server never received {type}");
+    }
+
+    /// <summary>Streams a 16-bit PCM sine in 20 ms chunks starting at <paramref name="startTs"/> (server µs), paced to stay ~<paramref name="aheadMs"/> ms ahead.</summary>
+    public async Task StreamSineAsync(long startTs, double seconds, double freq = 440, int aheadMs = 600, int rate = 48000)
+    {
+        const int chunkFrames = 960;
+        var total = (int)(seconds * rate);
+        for (var f = 0; f < total; f += chunkFrames)
+        {
+            var bytes = new byte[chunkFrames * 4];
+            for (var i = 0; i < chunkFrames; i++)
+            {
+                var v = (short)(Math.Sin(2 * Math.PI * freq * (f + i) / rate) * 12000);
+                System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(bytes.AsSpan(i * 4, 2), v);
+                System.Buffers.Binary.BinaryPrimitives.WriteInt16LittleEndian(bytes.AsSpan((i * 4) + 2, 2), v);
+            }
+
+            var ts = startTs + (f * 1_000_000L / rate);
+            while (ts - ServerNow > aheadMs * 1000L)
+            {
+                await Task.Delay(5);
+            }
+
+            await SendAudioAsync(ts, bytes);
+        }
+    }
+
     public Task SendJsonAsync(string type, object payload) => SendPlaintextAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new { type, payload })).Prepend((byte)0).ToArray());
 
     /// <summary>Sends a binary message whose first byte is the message id (e.g. 4 = audio).</summary>
@@ -294,6 +338,12 @@ internal sealed class FakeSecureServer
 
     private async Task SendPlaintextAsync(byte[] plaintext)
     {
+        var deadline = Environment.TickCount64 + 5000;
+        while (!Handshaken && Environment.TickCount64 < deadline)
+        {
+            await Task.Delay(5); // tests may start talking before the Noise handshake finished
+        }
+
         await _sendLock.WaitAsync();
         try
         {
