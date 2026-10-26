@@ -22,7 +22,7 @@ namespace MaSatellite.App.Views;
 internal sealed partial class MiniPlayerWindow : Window
 {
     private const int BaseWidth = 400;
-    private const int BaseHeight = 430;
+    private const int BaseHeight = 478;
     private const string SystemDefaultLabel = "System default";
 
     private readonly SatelliteHost _host;

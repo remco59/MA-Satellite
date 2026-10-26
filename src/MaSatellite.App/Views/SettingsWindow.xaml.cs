@@ -32,8 +32,9 @@ public sealed partial class SettingsWindow : Window
         _library = library;
         _applyAutostart = applyAutostart;
         InitializeComponent();
+        AuroraWindowChrome.Apply(this);
         Title = "ma-satellite settings";
-        AppWindow.Resize(new SizeInt32(580, 1180));
+        AppWindow.Resize(new SizeInt32(900, 790));
 
         try
         {
