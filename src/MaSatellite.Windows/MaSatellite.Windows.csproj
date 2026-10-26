@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="NAudio.Wasapi" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <ProjectReference Include="..\MaSatellite.Core\MaSatellite.Core.csproj" />
     <ProjectReference Include="..\MaSatellite.Host\MaSatellite.Host.csproj" />

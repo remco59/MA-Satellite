@@ -5,12 +5,14 @@ using MaSatellite.Core.Time;
 using MaSatellite.Host.Audio;
 using MaSatellite.Host.Autostart;
 using MaSatellite.Host.Infrastructure;
+using MaSatellite.Host.Library;
 using MaSatellite.Host.Logging;
 using MaSatellite.Host.Orchestration;
 using MaSatellite.Host.Settings;
 using MaSatellite.Windows.Audio;
 using MaSatellite.Windows.Autostart;
 using MaSatellite.Windows.Media;
+using MaSatellite.Windows.Security;
 using MaSatellite.Windows.Tray;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
@@ -21,7 +23,7 @@ namespace MaSatellite.App.Shell;
 /// <summary>Owns the tray icon, the player host and the app's top-level windows. The app has no main window; it lives in the tray.</summary>
 internal sealed class SatelliteShell : IDisposable
 {
-    private const int CmdOpen = 1, CmdSettings = 2, CmdAutostart = 3, CmdExit = 99;
+    private const int CmdOpen = 1, CmdSettings = 2, CmdAutostart = 3, CmdLibrary = 4, CmdExit = 99;
 
     private readonly Action _exit;
     private readonly AppPaths _paths = new();
@@ -34,6 +36,9 @@ internal sealed class SatelliteShell : IDisposable
     private Window? _keepAlive;
     private SettingsWindow? _settingsWindow;
     private MiniPlayerWindow? _miniPlayer;
+    private LibraryWindow? _libraryWindow;
+    private MaLibraryService? _library;
+    private LibraryController? _libraryController;
     private SmtcController? _smtc;
     private DispatcherQueue? _ui;
     private WasapiAudioOutput? _output;
@@ -88,6 +93,8 @@ internal sealed class SatelliteShell : IDisposable
         _tray?.Dispose();
         _miniPlayer?.Close();
         _miniPlayer = null;
+        _libraryWindow?.Close();
+        _libraryWindow = null;
         try
         {
             // Tells the server we are leaving (client/goodbye) and releases the audio device.
@@ -98,6 +105,7 @@ internal sealed class SatelliteShell : IDisposable
             _logger?.LogWarning(ex, "Stopping the player failed");
         }
 
+        _library?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2));
         _smtc?.Dispose();
         _volume?.Dispose();
         _output?.Dispose();
@@ -128,6 +136,9 @@ internal sealed class SatelliteShell : IDisposable
                 loggers,
                 version);
             _host = host;
+            var library = new MaLibraryService(_settings!, new DpapiSecretStore(_paths, loggers.CreateLogger<DpapiSecretStore>()), loggers.CreateLogger<MaLibraryService>());
+            _library = library;
+            _libraryController = new LibraryController(library, _settings!);
             host.StatusChanged += OnStatusChanged;
             var smtc = new SmtcController(loggers.CreateLogger<SmtcController>());
             _smtc = smtc;
@@ -188,6 +199,7 @@ internal sealed class SatelliteShell : IDisposable
     private IReadOnlyList<TrayMenuItem> BuildMenu() =>
     [
         new TrayMenuItem(CmdOpen, "Open"),
+        new TrayMenuItem(CmdLibrary, "Library…"),
         new TrayMenuItem(CmdSettings, "Settings…"),
         TrayMenuItem.Separator,
         new TrayMenuItem(CmdAutostart, "Start with Windows", Checked: _autostartState.IsEnabled(), Enabled: _autostartState.CanBeChangedByApp()),
@@ -201,6 +213,9 @@ internal sealed class SatelliteShell : IDisposable
         {
             case CmdOpen:
                 ToggleMiniPlayer();
+                break;
+            case CmdLibrary:
+                ShowLibrary();
                 break;
             case CmdSettings:
                 ShowSettings();
@@ -223,8 +238,24 @@ internal sealed class SatelliteShell : IDisposable
             return;
         }
 
-        _miniPlayer ??= new MiniPlayerWindow(_host, _settings, _devices, ShowSettings, () => _tray?.GetScreenRect());
+        _miniPlayer ??= new MiniPlayerWindow(_host, _settings, _devices, ShowSettings, ShowLibrary, () => _tray?.GetScreenRect());
         _miniPlayer.Toggle();
+    }
+
+    private void ShowLibrary()
+    {
+        if (_libraryController is null)
+        {
+            return;
+        }
+
+        if (_libraryWindow is null)
+        {
+            _libraryWindow = new LibraryWindow(_libraryController, ShowSettings);
+            _libraryWindow.Closed += (_, _) => _libraryWindow = null;
+        }
+
+        _libraryWindow.Activate();
     }
 
     private void ShowSettings()
@@ -236,7 +267,7 @@ internal sealed class SatelliteShell : IDisposable
 
         if (_settingsWindow is null)
         {
-            _settingsWindow = new SettingsWindow(_settings, _devices, _host, ApplyAutostartAsync);
+            _settingsWindow = new SettingsWindow(_settings, _devices, _host, _library!, ApplyAutostartAsync);
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         }
 

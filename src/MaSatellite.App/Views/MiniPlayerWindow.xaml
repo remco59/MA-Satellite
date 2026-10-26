@@ -78,9 +78,14 @@
         <ColumnDefinition Width="Auto" />
       </Grid.ColumnDefinitions>
       <ComboBox x:Name="DeviceBox" HorizontalAlignment="Stretch" SelectionChanged="OnDeviceChanged" ToolTipService.ToolTip="Output device" />
-      <Button Grid.Column="1" Click="OnOpenSettings" ToolTipService.ToolTip="Settings">
-        <FontIcon Glyph="&#xE713;" />
-      </Button>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+        <Button Click="OnOpenLibrary" ToolTipService.ToolTip="Library">
+          <FontIcon Glyph="&#xE8F1;" />
+        </Button>
+        <Button Click="OnOpenSettings" ToolTipService.ToolTip="Settings">
+          <FontIcon Glyph="&#xE713;" />
+        </Button>
+      </StackPanel>
     </Grid>
   </Grid>
 </Window>

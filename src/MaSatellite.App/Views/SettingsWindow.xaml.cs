@@ -1,5 +1,6 @@
 using MaSatellite.Core.Session;
 using MaSatellite.Host.Audio;
+using MaSatellite.Host.Library;
 using MaSatellite.Host.Orchestration;
 using MaSatellite.Host.Settings;
 using Microsoft.UI.Dispatching;
@@ -16,18 +17,20 @@ public sealed partial class SettingsWindow : Window
 
     private readonly SettingsStore _store;
     private readonly SatelliteHost _host;
+    private readonly MaLibraryService _library;
     private readonly Func<bool, Task> _applyAutostart;
     private readonly DispatcherQueueTimer _timer;
     private IReadOnlyList<AudioDeviceInfo> _devices = [];
 
-    internal SettingsWindow(SettingsStore store, IAudioDeviceCatalog devices, SatelliteHost host, Func<bool, Task> applyAutostart)
+    internal SettingsWindow(SettingsStore store, IAudioDeviceCatalog devices, SatelliteHost host, MaLibraryService library, Func<bool, Task> applyAutostart)
     {
         _store = store;
         _host = host;
+        _library = library;
         _applyAutostart = applyAutostart;
         InitializeComponent();
         Title = "ma-satellite settings";
-        AppWindow.Resize(new SizeInt32(560, 820));
+        AppWindow.Resize(new SizeInt32(580, 980));
 
         try
         {
@@ -56,6 +59,10 @@ public sealed partial class SettingsWindow : Window
         ListenPortBox.Value = s.ListenPort;
         DelayBox.Value = s.StaticDelayMs;
         AutostartSwitch.IsOn = s.Autostart;
+        MaPortBox.Value = s.MaWebPort;
+        ApiSwitch.IsOn = s.LocalApiEnabled;
+        ApiPortBox.Value = s.LocalApiPort;
+        UpdateTokenStatus();
 
         DeviceBox.Items.Clear();
         DeviceBox.Items.Add(SystemDefaultLabel);
@@ -113,6 +120,9 @@ public sealed partial class SettingsWindow : Window
             StaticDelayMs = ToInt(DelayBox.Value, 0),
             OutputDeviceId = deviceId,
             Autostart = AutostartSwitch.IsOn,
+            MaWebPort = ToInt(MaPortBox.Value, AppSettings.DefaultMaWebPort),
+            LocalApiEnabled = ApiSwitch.IsOn,
+            LocalApiPort = ToInt(ApiPortBox.Value, AppSettings.DefaultLocalApiPort),
         };
 
         var errors = _store.Save(updated);
@@ -125,11 +135,52 @@ public sealed partial class SettingsWindow : Window
             return;
         }
 
+        if (!string.IsNullOrWhiteSpace(TokenBox.Password))
+        {
+            _library.SaveToken(TokenBox.Password);
+            TokenBox.Password = string.Empty;
+            UpdateTokenStatus();
+        }
+
         await _applyAutostart(updated.Autostart);
         MessageBar.Severity = InfoBarSeverity.Success;
         MessageBar.Title = "Saved";
         MessageBar.Message = "Settings saved.";
         MessageBar.IsOpen = true;
+    }
+
+    private void UpdateTokenStatus()
+    {
+        TokenStatus.Text = _library.HasToken ? "A token is saved (encrypted for your Windows account)." : "No token saved.";
+        RemoveTokenButton.IsEnabled = _library.HasToken;
+    }
+
+    private void OnRemoveToken(object sender, RoutedEventArgs e)
+    {
+        _library.SaveToken(string.Empty);
+        UpdateTokenStatus();
+    }
+
+    private async void OnTestConnection(object sender, RoutedEventArgs e)
+    {
+        var host = HostBox.Text.Trim();
+        if (host.Length == 0)
+        {
+            TokenStatus.Text = "Enter the Music Assistant host first.";
+            return;
+        }
+
+        TokenStatus.Text = "Testing…";
+        try
+        {
+            var port = ToInt(MaPortBox.Value, AppSettings.DefaultMaWebPort);
+            var version = await _library.TestAsync(host, port, TokenBox.Password);
+            TokenStatus.Text = $"Connected to Music Assistant {version}.";
+        }
+        catch (MaSatellite.MaApi.MaException ex)
+        {
+            TokenStatus.Text = ex.Message;
+        }
     }
 
     private static int ToInt(double value, int fallback) => double.IsNaN(value) ? fallback : (int)Math.Round(value);

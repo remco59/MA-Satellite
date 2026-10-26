@@ -21,6 +21,15 @@
 
       <TextBox x:Name="HostBox" Header="Music Assistant host" PlaceholderText="192.168.0.98" />
 
+      <NumberBox x:Name="MaPortBox" Header="Music Assistant web port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Hidden" />
+
+      <PasswordBox x:Name="TokenBox" Header="Music Assistant access token (for the library)" PlaceholderText="Paste a long-lived token" />
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Content="Test connection" Click="OnTestConnection" />
+        <Button x:Name="RemoveTokenButton" Content="Remove saved token" Click="OnRemoveToken" />
+        <TextBlock x:Name="TokenStatus" VerticalAlignment="Center" Opacity="0.7" TextWrapping="Wrap" />
+      </StackPanel>
+
       <ComboBox x:Name="ModeBox" Header="Connection" HorizontalAlignment="Stretch">
         <ComboBoxItem Content="Advertise on the network (server connects to me)" />
         <ComboBoxItem Content="Connect to the Music Assistant host" />
@@ -31,6 +40,9 @@
       <NumberBox x:Name="DelayBox" Header="Static delay (ms)" Minimum="0" Maximum="5000" SpinButtonPlacementMode="Compact" />
 
       <ToggleSwitch x:Name="AutostartSwitch" Header="Start with Windows" />
+
+      <ToggleSwitch x:Name="ApiSwitch" Header="Local API for desktop widgets (127.0.0.1 only)" />
+      <NumberBox x:Name="ApiPortBox" Header="Local API port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Hidden" />
 
       <InfoBar x:Name="MessageBar" IsOpen="False" IsClosable="True" />
 

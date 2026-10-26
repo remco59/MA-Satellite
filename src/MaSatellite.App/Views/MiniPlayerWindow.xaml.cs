@@ -29,6 +29,7 @@ internal sealed partial class MiniPlayerWindow : Window
     private readonly SettingsStore _settings;
     private readonly IAudioDeviceCatalog _catalog;
     private readonly Action _openSettings;
+    private readonly Action _openLibrary;
     private readonly Func<Rectangle?> _trayRect;
     private readonly DispatcherQueueTimer _progressTimer;
     private readonly DispatcherQueueTimer _seekDebounce;
@@ -38,12 +39,13 @@ internal sealed partial class MiniPlayerWindow : Window
     private long _hiddenAtTicks;
     private long _pendingSeekMs;
 
-    public MiniPlayerWindow(SatelliteHost host, SettingsStore settings, IAudioDeviceCatalog catalog, Action openSettings, Func<Rectangle?> trayRect)
+    public MiniPlayerWindow(SatelliteHost host, SettingsStore settings, IAudioDeviceCatalog catalog, Action openSettings, Action openLibrary, Func<Rectangle?> trayRect)
     {
         _host = host;
         _settings = settings;
         _catalog = catalog;
         _openSettings = openSettings;
+        _openLibrary = openLibrary;
         _trayRect = trayRect;
         InitializeComponent();
         Title = "ma-satellite";
@@ -305,6 +307,12 @@ internal sealed partial class MiniPlayerWindow : Window
         {
             _settings.Save(_settings.Current with { OutputDeviceId = id });
         }
+    }
+
+    private void OnOpenLibrary(object sender, RoutedEventArgs e)
+    {
+        HideFlyout();
+        _openLibrary();
     }
 
     private void OnOpenSettings(object sender, RoutedEventArgs e)

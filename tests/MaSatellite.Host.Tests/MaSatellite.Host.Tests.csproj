@@ -8,6 +8,7 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <Using Include="Xunit" />
+    <Compile Include="..\MaSatellite.MaApi.Tests\FakeMaServer.cs" Link="Support\FakeMaServer.cs" />
     <ProjectReference Include="..\..\src\MaSatellite.Host\MaSatellite.Host.csproj" />
   </ItemGroup>
 </Project>
