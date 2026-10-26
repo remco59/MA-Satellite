@@ -13,6 +13,9 @@ public interface ISecretStore
 public static class SecretNames
 {
     public const string MaToken = "ma-token";
+
+    /// <summary>Static key, pairing PSK and paired-server PSKs of the encrypted Sendspin protocol.</summary>
+    public const string SendspinKeys = "sendspin-keys";
 }
 
 /// <summary>Non-persistent store for tests and unsupported platforms.</summary>

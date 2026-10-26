@@ -8,6 +8,7 @@ using MaSatellite.Host.Infrastructure;
 using MaSatellite.Host.Library;
 using MaSatellite.Host.Logging;
 using MaSatellite.Host.Orchestration;
+using MaSatellite.Host.Security;
 using MaSatellite.Host.Settings;
 using MaSatellite.Windows.Audio;
 using MaSatellite.Windows.Autostart;
@@ -122,6 +123,7 @@ internal sealed class SatelliteShell : IDisposable
             _output = output;
             var volume = new WindowsMasterVolume(settings.OutputDeviceId, loggers.CreateLogger<WindowsMasterVolume>());
             _volume = volume;
+            var secrets = new DpapiSecretStore(_paths, loggers.CreateLogger<DpapiSecretStore>());
             var host = new SatelliteHost(
                 _settings!,
                 output,
@@ -134,9 +136,10 @@ internal sealed class SatelliteShell : IDisposable
                 new MdnsAdvertiser(loggers.CreateLogger<MdnsAdvertiser>()),
                 new FileLastServerStore(_paths),
                 loggers,
-                version);
+                version,
+                keyStore: new SecretKeyStore(secrets));
             _host = host;
-            var library = new MaLibraryService(_settings!, new DpapiSecretStore(_paths, loggers.CreateLogger<DpapiSecretStore>()), loggers.CreateLogger<MaLibraryService>());
+            var library = new MaLibraryService(_settings!, secrets, loggers.CreateLogger<MaLibraryService>());
             _library = library;
             _libraryController = new LibraryController(library, _settings!);
             host.StatusChanged += OnStatusChanged;
@@ -188,6 +191,8 @@ internal sealed class SatelliteShell : IDisposable
         var title = s.Session.Metadata.Title;
         return s.Connection switch
         {
+            ConnectionState.Connected when s.Session.AwaitingApproval => $"{name} — approve this player in Music Assistant",
+            ConnectionState.Connected when s.Session.Pairing => $"{name} — pairing with {s.ServerName}…",
             ConnectionState.Connected when !string.IsNullOrEmpty(title) => $"{name} — {title}" + (string.IsNullOrEmpty(s.Session.Metadata.Artist) ? string.Empty : $" · {s.Session.Metadata.Artist}"),
             ConnectionState.Connected => $"{name} — connected to {s.ServerName}",
             ConnectionState.Listening => $"{name} — waiting for Music Assistant",

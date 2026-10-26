@@ -13,6 +13,8 @@ public static class SettingsMapper
         PlayerName = s.PlayerName,
         SoftwareVersion = softwareVersion,
         StaticDelayMs = s.StaticDelayMs,
+        ProtocolMode = s.ProtocolMode,
+        AllowUnpairedAccess = s.AllowUnpairedAccess,
     };
 
     public static ServerConnectionOptions ToConnectionOptions(AppSettings s) => new()
@@ -29,5 +31,7 @@ public static class SettingsMapper
         || before.PlayerName != after.PlayerName
         || before.ConnectionMode != after.ConnectionMode
         || before.ListenPort != after.ListenPort
+        || before.ProtocolMode != after.ProtocolMode
+        || before.AllowUnpairedAccess != after.AllowUnpairedAccess
         || (after.ConnectionMode == SettingsConnectionMode.Connect && (before.MaHost != after.MaHost || before.ServerPort != after.ServerPort));
 }

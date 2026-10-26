@@ -6,6 +6,7 @@
 |---|---|---|
 | Protocol parsing, clock-sync math, buffer/drift logic, decoders (FLAC bit-exact against ffmpeg fixtures), volume mapping | `tests/MaSatellite.Core.Tests`, `tests/MaSatellite.Windows.Tests` | `dotnet test MaSatellite.Tests.slnf` |
 | End to end: the real player against an in-process fake Sendspin server over real sockets (handshake, timing within a few ms, pitch, volume both ways, artwork, arbitration, reconnect) | `tests/MaSatellite.Core.Tests/SendspinServiceTests.cs` | same |
+| Encrypted protocol: Noise vectors, pairing token, secure transport (PSK selection, fragmentation, rekey, tampering), the whole session incl. pairing/unpair/arbitration/legacy fallback against an independent fake secure server | `tests/MaSatellite.Core.Tests/{Noise,PairingToken,SecureTransport,SecureSendspinService,ActivationValidator}Tests.cs` | same |
 | Settings, local API (HTTP + WebSocket, origin/host checks), library controller against a fake Music Assistant | `tests/MaSatellite.Host.Tests`, `tests/MaSatellite.MaApi.Tests` | same |
 | Lively widget in a real browser (mocked API) | `widgets/lively/test/widget.test.mjs` | `node widgets/lively/test/widget.test.mjs` (needs Playwright) |
 | Real Music Assistant (opt-in) | `tests/MaSatellite.Integration.Tests` | see below |
@@ -42,6 +43,14 @@ It connects a fake-audio player to the server, finds it in MA, plays a track on 
 - [ ] Switch the output device in Settings or the flyout while playing: audio continues on the new device after a moment. Unplug USB/Bluetooth headphones while playing: playback falls back to / waits for the default device and resumes.
 - [ ] Pause/skip in MA behave instantly; seeking in MA does not glitch.
 
+### Encrypted protocol (once, with *Allow legacy clients* still on)
+- [ ] Settings → *Sendspin protocol* = *Encrypted only*, save. The player appears in MA (possibly as a new player); the settings status line says `Encrypted · server not paired` (or `waiting for you to approve`).
+- [ ] Play something: audio starts, sync as with legacy (`in sync`, small sync error). Volume/mute both ways work.
+- [ ] Copy the pairing token from Settings and pair the PC in MA; afterwards the status line says `Encrypted · paired server`, and *Paired servers* lists it. Restart the app: it still plays without approval.
+- [ ] *Forget selected server* and reconnect: MA offers to pair again. *Create a new token*: the old token is rejected by MA.
+- [ ] Untick *Allow servers that are not paired…* while unpaired: the connection ends with `pairing_required` in the log.
+- [ ] *Automatic* with *Allow legacy clients* on and encryption working: log shows the encrypted session, not legacy.
+
 ### M2 – mini-player and Windows integration
 - [ ] Left-click the tray icon: flyout shows artwork, title/artist/album, seek bar, volume and output device; it closes when you click elsewhere.
 - [ ] Play/pause/next/previous and the seek bar control MA; buttons grey out when MA does not offer them.
@@ -67,6 +76,8 @@ It connects a fake-audio player to the server, finds it in MA, plays a track on 
 |---|---|
 | Player does not appear in MA | Windows must treat the network as *Private* (the firewall rule covers the private profile only), or use *Connect* mode with the MA host in Settings. Add the PC's IP in MA's Sendspin *Manual IP addresses* if mDNS is blocked. |
 | "Cannot listen on port 8928" in the settings status | Another program uses the port; change *Listen port* in Settings. |
-| Player connects but MA says it uses an unsupported protocol | MA removed *Allow legacy clients*; this build speaks the plaintext Sendspin protocol only (see `docs/NOTES.md`). |
+| Player connects but nothing plays / MA reports a protocol problem | Try *Settings → Sendspin protocol*: *Legacy only* works while MA's *Allow legacy clients* is on, *Encrypted only* once it is off. The log says which protocol was used and why a handshake failed. |
+| MA shows the PC twice | The encrypted protocol identifies the player by its key, so it appears as a new player the first time; remove the old entry in MA. |
+| "approve this player in Music Assistant" | The server is not paired with this PC and has not enabled it yet; enable the player in MA, or pair it (token in Settings). |
 | Audio slightly out of sync with other players | Adjust *Static delay*; Bluetooth outputs often need 100–250 ms. |
 | Library says it needs a token | Create a long-lived token in MA and paste it in Settings. |

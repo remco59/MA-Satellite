@@ -1,5 +1,7 @@
+using MaSatellite.Core.Session;
 using MaSatellite.Host.Orchestration;
 using MaSatellite.Host.Settings;
+using ConnectionMode = MaSatellite.Host.Settings.ConnectionMode;
 using CoreMode = MaSatellite.Core.Session.ConnectionMode;
 
 namespace MaSatellite.Host.Tests;
@@ -23,10 +25,24 @@ public class SettingsMapperTests
         Assert.Equal(CoreMode.Advertise, SettingsMapper.ToConnectionOptions(Base).Mode);
     }
 
+    [Fact]
+    public void Protocol_settings_default_to_automatic_and_flow_into_the_options()
+    {
+        var defaults = SettingsMapper.ToSendspinOptions(Base, "1");
+        Assert.Equal(SendspinProtocolMode.Auto, defaults.ProtocolMode);
+        Assert.True(defaults.AllowUnpairedAccess);
+
+        var o = SettingsMapper.ToSendspinOptions(Base with { ProtocolMode = SendspinProtocolMode.Encrypted, AllowUnpairedAccess = false }, "1");
+        Assert.Equal(SendspinProtocolMode.Encrypted, o.ProtocolMode);
+        Assert.False(o.AllowUnpairedAccess);
+    }
+
     [Theory]
     [InlineData("PlayerName", true)]
     [InlineData("ListenPort", true)]
     [InlineData("ConnectionMode", true)]
+    [InlineData("ProtocolMode", true)]
+    [InlineData("AllowUnpairedAccess", true)]
     [InlineData("StaticDelayMs", false)]
     [InlineData("OutputDeviceId", false)]
     [InlineData("Autostart", false)]
@@ -38,6 +54,8 @@ public class SettingsMapperTests
             "PlayerName" => Base with { PlayerName = "Other" },
             "ListenPort" => Base with { ListenPort = 9999 },
             "ConnectionMode" => Base with { ConnectionMode = ConnectionMode.Connect },
+            "ProtocolMode" => Base with { ProtocolMode = SendspinProtocolMode.Legacy },
+            "AllowUnpairedAccess" => Base with { AllowUnpairedAccess = false },
             "StaticDelayMs" => Base with { StaticDelayMs = 10 },
             "OutputDeviceId" => Base with { OutputDeviceId = "x" },
             "Autostart" => Base with { Autostart = false },

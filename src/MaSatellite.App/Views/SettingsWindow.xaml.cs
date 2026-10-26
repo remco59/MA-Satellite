@@ -1,3 +1,4 @@
+using MaSatellite.Core.Security;
 using MaSatellite.Core.Session;
 using MaSatellite.Host.Audio;
 using MaSatellite.Host.Library;
@@ -7,7 +8,9 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Graphics;
+using Clipboard = global::Windows.ApplicationModel.DataTransfer.Clipboard;
 using ConnectionMode = MaSatellite.Host.Settings.ConnectionMode;
+using DataPackage = global::Windows.ApplicationModel.DataTransfer.DataPackage;
 
 namespace MaSatellite.App.Views;
 
@@ -30,7 +33,7 @@ public sealed partial class SettingsWindow : Window
         _applyAutostart = applyAutostart;
         InitializeComponent();
         Title = "ma-satellite settings";
-        AppWindow.Resize(new SizeInt32(580, 980));
+        AppWindow.Resize(new SizeInt32(580, 1180));
 
         try
         {
@@ -48,7 +51,12 @@ public sealed partial class SettingsWindow : Window
         _timer.Tick += (_, _) => RefreshStatus();
         _timer.Start();
         RefreshStatus();
-        Closed += (_, _) => _timer.Stop();
+        _host.PairingChanged += OnPairingChanged;
+        Closed += (_, _) =>
+        {
+            _timer.Stop();
+            _host.PairingChanged -= OnPairingChanged;
+        };
     }
 
     private void Populate(AppSettings s)
@@ -62,7 +70,15 @@ public sealed partial class SettingsWindow : Window
         MaPortBox.Value = s.MaWebPort;
         ApiSwitch.IsOn = s.LocalApiEnabled;
         ApiPortBox.Value = s.LocalApiPort;
+        ProtocolBox.SelectedIndex = s.ProtocolMode switch
+        {
+            SendspinProtocolMode.Encrypted => 1,
+            SendspinProtocolMode.Legacy => 2,
+            _ => 0,
+        };
+        UnpairedSwitch.IsOn = s.AllowUnpairedAccess;
         UpdateTokenStatus();
+        RefreshPairing();
 
         DeviceBox.Items.Clear();
         DeviceBox.Items.Add(SystemDefaultLabel);
@@ -97,6 +113,7 @@ public sealed partial class SettingsWindow : Window
             ? string.Empty
             : string.IsNullOrEmpty(md.Artist) ? md.Title : $"{md.Title} — {md.Artist}";
 
+        SecurityLine.Text = DescribeSecurity(s.Session);
         var p = _host.Service.Playback;
         DiagnosticsLine.Text = s.Session.StreamActive
             ? $"{s.Session.Stream!.Codec} {s.Session.Stream.SampleRate} Hz · buffered {p.BufferedMs:0} ms · sync error {p.SyncErrorMicros / 1000.0:0.0} ms · {(p.InSync ? "in sync" : "not in sync")} · volume {s.Volume}%{(s.Muted ? " (muted)" : string.Empty)}"
@@ -123,6 +140,13 @@ public sealed partial class SettingsWindow : Window
             MaWebPort = ToInt(MaPortBox.Value, AppSettings.DefaultMaWebPort),
             LocalApiEnabled = ApiSwitch.IsOn,
             LocalApiPort = ToInt(ApiPortBox.Value, AppSettings.DefaultLocalApiPort),
+            ProtocolMode = ProtocolBox.SelectedIndex switch
+            {
+                1 => SendspinProtocolMode.Encrypted,
+                2 => SendspinProtocolMode.Legacy,
+                _ => SendspinProtocolMode.Auto,
+            },
+            AllowUnpairedAccess = UnpairedSwitch.IsOn,
         };
 
         var errors = _store.Save(updated);
@@ -147,6 +171,68 @@ public sealed partial class SettingsWindow : Window
         MessageBar.Title = "Saved";
         MessageBar.Message = "Settings saved.";
         MessageBar.IsOpen = true;
+    }
+
+    private static string DescribeSecurity(SessionState session)
+    {
+        if (session.AwaitingApproval)
+        {
+            return "Encrypted · waiting for you to approve this player in Music Assistant";
+        }
+
+        if (session.Pairing)
+        {
+            return "Encrypted · pairing in progress";
+        }
+
+        return session.Security switch
+        {
+            SessionSecurity.EncryptedPaired => "Encrypted · paired server",
+            SessionSecurity.EncryptedUnpaired => "Encrypted · server not paired",
+            _ => string.Empty,
+        };
+    }
+
+    private void OnPairingChanged() => DispatcherQueue.TryEnqueue(RefreshPairing);
+
+    private void RefreshPairing()
+    {
+        PairingTokenBox.Text = _host.KeyStore.PairingToken();
+        var selected = PairedBox.SelectedIndex;
+        PairedBox.Items.Clear();
+        foreach (var record in _host.KeyStore.Records)
+        {
+            PairedBox.Items.Add(new ComboBoxItem { Content = $"Server {record.ServerId[..Math.Min(8, record.ServerId.Length)]}…", Tag = record.ServerId });
+        }
+
+        PairedBox.SelectedIndex = PairedBox.Items.Count == 0 ? -1 : Math.Clamp(selected, 0, PairedBox.Items.Count - 1);
+        UnpairButton.IsEnabled = PairedBox.Items.Count > 0;
+        PairedStatus.Text = PairedBox.Items.Count == 0 ? "No server is paired." : string.Empty;
+    }
+
+    private void OnCopyPairingToken(object sender, RoutedEventArgs e)
+    {
+        var package = new DataPackage();
+        package.SetText(_host.KeyStore.PairingToken());
+        Clipboard.SetContent(package);
+        PairedStatus.Text = "Pairing token copied.";
+    }
+
+    private void OnNewPairingToken(object sender, RoutedEventArgs e)
+    {
+        _host.KeyStore.RegeneratePairingPsk();
+        RefreshPairing();
+        PairedStatus.Text = "A new token was created; the previous one no longer works.";
+    }
+
+    private void OnUnpair(object sender, RoutedEventArgs e)
+    {
+        if (PairedBox.SelectedItem is ComboBoxItem { Tag: string serverId })
+        {
+            _host.KeyStore.RemoveRecord(serverId);
+            RefreshPairing();
+            PairedStatus.Text = "Server forgotten. Remove this player in Music Assistant too, or pair again.";
+        }
     }
 
     private void UpdateTokenStatus()

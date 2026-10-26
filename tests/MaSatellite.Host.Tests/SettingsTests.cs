@@ -41,6 +41,23 @@ public class SettingsTests
     }
 
     [Fact]
+    public void Protocol_settings_round_trip_as_readable_text()
+    {
+        using var dir = new TempDir();
+        var store = NewStore(dir);
+        var initial = store.Load();
+        Assert.Equal(MaSatellite.Core.Session.SendspinProtocolMode.Auto, initial.ProtocolMode);
+        Assert.True(initial.AllowUnpairedAccess);
+
+        Assert.Empty(store.Save(initial with { ProtocolMode = MaSatellite.Core.Session.SendspinProtocolMode.Encrypted, AllowUnpairedAccess = false }));
+
+        var reloaded = NewStore(dir).Load();
+        Assert.Equal(MaSatellite.Core.Session.SendspinProtocolMode.Encrypted, reloaded.ProtocolMode);
+        Assert.False(reloaded.AllowUnpairedAccess);
+        Assert.Contains("\"Encrypted\"", File.ReadAllText(Path.Combine(dir.Path, "settings.json")));
+    }
+
+    [Fact]
     public void Save_rejects_invalid_and_does_not_write()
     {
         using var dir = new TempDir();

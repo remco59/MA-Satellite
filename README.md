@@ -16,7 +16,7 @@ The full plan, decisions and milestones live in [`docs/PLAN.md`](docs/PLAN.md). 
 
 Everything that can be tested without Windows hardware is covered by automated tests; audio output, the tray, SMTC and the WinUI windows are verified to build in CI but must be checked by hand.
 
-> **Protocol note.** This build speaks the plaintext ("legacy") Sendspin protocol, which Music Assistant 2.10 accepts while *Allow legacy clients* is on (default). Newer Sendspin versions require Noise encryption and pairing; see `docs/NOTES.md`.
+> **Protocol note.** ma-satellite speaks both the current Noise-encrypted Sendspin protocol (with pairing) and the older plaintext one that Music Assistant 2.10 still accepts while *Allow legacy clients* is on. *Automatic* mode (default) tries encrypted first. See `docs/NOTES.md`.
 
 ## Layout
 

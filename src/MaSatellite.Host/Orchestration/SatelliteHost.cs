@@ -3,6 +3,7 @@ using MaSatellite.Core.Discovery;
 using MaSatellite.Core.Protocol;
 using MaSatellite.Core.Session;
 using MaSatellite.Core.Time;
+using MaSatellite.Core.Security;
 using MaSatellite.Core.Volume;
 using MaSatellite.Host.LocalApi;
 using MaSatellite.Host.Settings;
@@ -34,7 +35,8 @@ public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.
         ILastServerStore lastServerStore,
         ILoggerFactory loggers,
         string softwareVersion,
-        ILocalClock? clock = null)
+        ILocalClock? clock = null,
+        ISendspinKeyStore? keyStore = null)
     {
         _settings = settings;
         _setOutputDevice = setOutputDevice;
@@ -43,7 +45,8 @@ public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.
         _logger = loggers.CreateLogger<SatelliteHost>();
         _loggers = loggers;
         _applied = settings.Current;
-        _service = new SendspinService(output, volume, clock, advertiser, lastServerStore, loggers);
+        _service = new SendspinService(output, volume, clock, advertiser, lastServerStore, loggers, keyStore);
+        _service.PairingCompleted += () => PairingChanged?.Invoke();
         _service.StaticDelayChanged += OnServerChangedStaticDelay;
         _service.StatusChanged += s => StatusChanged?.Invoke(s);
     }
@@ -58,6 +61,12 @@ public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.
     public long ServerNowMicros => _service.ServerNowMicros;
 
     public event Action<SatelliteStatus>? StatusChanged;
+
+    /// <summary>Raised when a server paired with this player.</summary>
+    public event Action? PairingChanged;
+
+    /// <summary>Keys, pairing token and paired servers of the encrypted protocol.</summary>
+    public ISendspinKeyStore KeyStore => _service.KeyStore;
 
     public async Task StartAsync()
     {

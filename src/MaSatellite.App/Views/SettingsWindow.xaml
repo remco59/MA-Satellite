@@ -11,6 +11,7 @@
         <StackPanel Spacing="4">
           <TextBlock x:Name="StatusLine" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="Wrap" />
           <TextBlock x:Name="NowPlayingLine" TextWrapping="Wrap" />
+          <TextBlock x:Name="SecurityLine" Opacity="0.7" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
           <TextBlock x:Name="DiagnosticsLine" Opacity="0.7" Style="{StaticResource CaptionTextBlockStyle}" TextWrapping="Wrap" />
         </StackPanel>
       </Border>
@@ -38,6 +39,26 @@
       <NumberBox x:Name="ListenPortBox" Header="Listen port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Hidden" />
 
       <NumberBox x:Name="DelayBox" Header="Static delay (ms)" Minimum="0" Maximum="5000" SpinButtonPlacementMode="Compact" />
+
+      <ComboBox x:Name="ProtocolBox" Header="Sendspin protocol" HorizontalAlignment="Stretch">
+        <ComboBoxItem Content="Automatic (encrypted, legacy for older servers)" />
+        <ComboBoxItem Content="Encrypted only" />
+        <ComboBoxItem Content="Legacy (plain text) only" />
+      </ComboBox>
+
+      <ToggleSwitch x:Name="UnpairedSwitch" Header="Allow servers that are not paired with this player to play audio" />
+
+      <TextBox x:Name="PairingTokenBox" Header="Pairing token (give to Music Assistant to pair this player)" IsReadOnly="True" TextWrapping="Wrap" />
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button Content="Copy token" Click="OnCopyPairingToken" />
+        <Button Content="Create a new token" Click="OnNewPairingToken" />
+      </StackPanel>
+
+      <ComboBox x:Name="PairedBox" Header="Paired servers" HorizontalAlignment="Stretch" />
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <Button x:Name="UnpairButton" Content="Forget selected server" Click="OnUnpair" />
+        <TextBlock x:Name="PairedStatus" VerticalAlignment="Center" Opacity="0.7" TextWrapping="Wrap" />
+      </StackPanel>
 
       <ToggleSwitch x:Name="AutostartSwitch" Header="Start with Windows" />
 
