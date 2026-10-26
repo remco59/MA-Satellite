@@ -1,5 +1,6 @@
 using MaSatellite.Core.Audio;
 using MaSatellite.Core.Protocol;
+using MaSatellite.Core.Session;
 
 namespace MaSatellite.Core.Tests;
 
@@ -98,6 +99,29 @@ public class DecoderTests
         var (header, frames) = SplitFlac(File.ReadAllBytes(Fixture("s16_44k_st_l5.flac")));
         var decoder = new FlacDecoder(default, header);
         Assert.Throws<AudioDecodeException>(() => decoder.Decode(frames.AsSpan(0, 100)));
+    }
+
+    [Fact]
+    public void Default_Sendspin_formats_negotiate_PCM_only_until_real_FLAC_is_fixed()
+    {
+        // A Music Assistant server may choose any advertised format, not just the first.
+        // PCM-only avoids the known real-server FLAC frame-sync failure (silent output).
+        var formats = new SendspinOptions().SupportedFormats;
+
+        Assert.Equal(2, formats.Count);
+        Assert.All(formats, format =>
+        {
+            Assert.Equal("pcm", format.Codec);
+            Assert.Equal(2, format.Channels);
+            Assert.Equal(16, format.BitDepth);
+        });
+        Assert.Equal(48000, formats[0].SampleRate);
+        Assert.Equal(44100, formats[1].SampleRate);
+        foreach (var format in formats)
+        {
+            Assert.IsType<PcmDecoder>(AudioDecoderFactory.Create(
+                new StreamPlayerFormat(format.Codec, format.SampleRate, format.Channels, format.BitDepth, null)));
+        }
     }
 
     [Fact]
