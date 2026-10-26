@@ -175,12 +175,23 @@ public sealed partial class LibraryWindow : Window
         }
     }
 
+    private void UpdateNavigationState()
+    {
+        var selected = (Style)Application.Current.Resources["AuroraNavSelectedButtonStyle"];
+        var regular = (Style)Application.Current.Resources["AuroraNavButtonStyle"];
+        foreach (var button in new[] { NavHome, NavLibrary, NavNow, NavSearch, NavQueue, NavArtist, NavPlaylist, NavTrack })
+        {
+            button.Style = (string?)button.Tag == _tab ? selected : regular;
+        }
+    }
+
     private async Task LoadTabAsync()
     {
         var id = ++_loadId;
         Message.IsOpen = false;
         EmptyText.Visibility = Visibility.Collapsed;
         Busy.IsActive = true;
+        UpdateNavigationState();
         ContextBar.Visibility = _openedItem is null ? Visibility.Collapsed : Visibility.Visible;
         ContextActions.Visibility = _openedItem?.Type == MaMediaType.Artist ? Visibility.Collapsed : Visibility.Visible;
         QueueBar.Visibility = (_tab is "queue" or "now") && _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
