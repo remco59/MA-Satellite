@@ -3,8 +3,12 @@ name: CI
 on:
   push:
     branches: [main, "claude/**"]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -96,3 +100,28 @@ jobs:
         with:
           name: test-results
           path: artifacts/test-results/**
+
+  # Pushing a tag like v0.1.0 publishes the installer and the MSIX bundle as a GitHub Release.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          pattern: ma-satellite-*
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ls -l release
+          # The tag must match the app version baked into the installer file name (Directory.Build.props).
+          test -f "release/ma-satellite-setup-${TAG#v}.exe" || { echo "::error::Tag $TAG does not match the built installer version"; exit 1; }
+          gh release create "$TAG" release/* --repo "$GITHUB_REPOSITORY" --title "ma-satellite ${TAG#v}" --generate-notes
