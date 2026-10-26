@@ -7,7 +7,8 @@
       "src\\MaSatellite.MaApi\\MaSatellite.MaApi.csproj",
       "tests\\MaSatellite.Core.Tests\\MaSatellite.Core.Tests.csproj",
       "tests\\MaSatellite.Host.Tests\\MaSatellite.Host.Tests.csproj",
-      "tests\\MaSatellite.MaApi.Tests\\MaSatellite.MaApi.Tests.csproj"
+      "tests\\MaSatellite.MaApi.Tests\\MaSatellite.MaApi.Tests.csproj",
+      "tests\\MaSatellite.Integration.Tests\\MaSatellite.Integration.Tests.csproj"
     ]
   }
 }
