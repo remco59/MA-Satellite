@@ -43,6 +43,20 @@ public sealed class WebSocketTransport : ISendspinTransport
         }
     }
 
+    /// <summary>Servers send binary audio/artwork frames; clients only need this in tests.</summary>
+    public async Task SendBinaryAsync(ReadOnlyMemory<byte> data, CancellationToken cancellationToken)
+    {
+        await _sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await _socket.SendAsync(data, WebSocketMessageType.Binary, endOfMessage: true, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _sendLock.Release();
+        }
+    }
+
     public async IAsyncEnumerable<TransportMessage> ReceiveAsync([EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var chunk = new byte[16 * 1024];

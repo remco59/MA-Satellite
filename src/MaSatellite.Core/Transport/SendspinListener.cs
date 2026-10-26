@@ -24,6 +24,7 @@ public sealed class SendspinListener : IAsyncDisposable
     private readonly ILogger _logger;
     private readonly CancellationTokenSource _cts = new();
     private readonly List<Task> _connections = [];
+    private readonly HashSet<WebSocket> _sockets = [];
     private TcpListener? _listener;
     private Task? _acceptLoop;
 
@@ -41,13 +42,33 @@ public sealed class SendspinListener : IAsyncDisposable
 
     public void Start()
     {
-        var listener = new TcpListener(IPAddress.IPv6Any, Port);
-        listener.Server.DualMode = true;
-        listener.Start(16);
+        var listener = CreateListener(Port);
         Port = ((IPEndPoint)listener.LocalEndpoint).Port;
         _listener = listener;
         _acceptLoop = Task.Run(AcceptLoopAsync);
         _logger.LogInformation("Sendspin listener started on port {Port}, path {Path}", Port, _path);
+    }
+
+    /// <summary>Dual-stack when IPv6 is available, plain IPv4 otherwise (IPv6 can be disabled on a machine).</summary>
+    private static TcpListener CreateListener(int port)
+    {
+        if (Socket.OSSupportsIPv6)
+        {
+            try
+            {
+                var dual = new TcpListener(IPAddress.IPv6Any, port);
+                dual.Server.DualMode = true;
+                dual.Start(16);
+                return dual;
+            }
+            catch (SocketException ex) when (ex.SocketErrorCode is SocketError.AddressFamilyNotSupported or SocketError.ProtocolNotSupported)
+            {
+            }
+        }
+
+        var v4 = new TcpListener(IPAddress.Any, port);
+        v4.Start(16);
+        return v4;
     }
 
     public async ValueTask DisposeAsync()
@@ -65,10 +86,18 @@ public sealed class SendspinListener : IAsyncDisposable
             }
         }
 
+        // Dropping the listener drops its connections; otherwise they would wait for the peer forever.
+        WebSocket[] open;
         Task[] pending;
         lock (_connections)
         {
+            open = [.. _sockets];
             pending = [.. _connections];
+        }
+
+        foreach (var socket in open)
+        {
+            socket.Abort();
         }
 
         await Task.WhenAll(pending.Select(t => t.ContinueWith(_ => { }, TaskScheduler.Default))).ConfigureAwait(false);
@@ -112,8 +141,23 @@ public sealed class SendspinListener : IAsyncDisposable
             }
 
             _logger.LogInformation("Server connected from {Remote}", remote);
-            await using var transport = new WebSocketTransport(websocket, _clock, remote);
-            await _onConnection(transport).ConfigureAwait(false);
+            lock (_connections)
+            {
+                _sockets.Add(websocket);
+            }
+
+            try
+            {
+                await using var transport = new WebSocketTransport(websocket, _clock, remote);
+                await _onConnection(transport).ConfigureAwait(false);
+            }
+            finally
+            {
+                lock (_connections)
+                {
+                    _sockets.Remove(websocket);
+                }
+            }
         }
         catch (Exception ex) when (ex is IOException or SocketException or OperationCanceledException or ObjectDisposedException or WebSocketException)
         {
