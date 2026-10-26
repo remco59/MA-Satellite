@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Makaretu.Dns.Multicast" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="MaSatellite.Core.Tests" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+  x:Class="MaSatellite.App.Views.SettingsWindow"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ScrollViewer>
+    <StackPanel Spacing="14" Padding="24">
+      <TextBlock Text="ma-satellite" Style="{StaticResource TitleTextBlockStyle}" />
+
+      <TextBox x:Name="PlayerNameBox" Header="Player name" MaxLength="64" />
+
+      <TextBox x:Name="HostBox" Header="Music Assistant host" PlaceholderText="192.168.0.98" />
+
+      <ComboBox x:Name="ModeBox" Header="Connection" HorizontalAlignment="Stretch">
+        <ComboBoxItem Content="Advertise on the network (server connects to me)" />
+        <ComboBoxItem Content="Connect to the Music Assistant host" />
+      </ComboBox>
+
+      <NumberBox x:Name="ListenPortBox" Header="Listen port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Hidden" />
+
+      <NumberBox x:Name="DelayBox" Header="Static delay (ms)" Minimum="0" Maximum="5000" SpinButtonPlacementMode="Compact" />
+
+      <ToggleSwitch x:Name="AutostartSwitch" Header="Start with Windows" />
+
+      <InfoBar x:Name="MessageBar" IsOpen="False" IsClosable="True" />
+
+      <Button x:Name="SaveButton" Content="Save" Style="{StaticResource AccentButtonStyle}" Click="OnSave" />
+    </StackPanel>
+  </ScrollViewer>
+</Window>

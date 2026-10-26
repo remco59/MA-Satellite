@@ -1,0 +1,15 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.pfx
+*.cer
+*.msix
+*.msixbundle
+AppPackages/
+BundleArtifacts/
+TestResults/
+artifacts/
+*.binlog
+.idea/

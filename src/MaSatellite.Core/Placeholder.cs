@@ -1,0 +1,1 @@
+namespace MaSatellite.Core;

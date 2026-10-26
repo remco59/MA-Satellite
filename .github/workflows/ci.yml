@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Unit tests
+        run: dotnet test MaSatellite.Tests.slnf -c Release --logger "trx;LogFileName=tests.trx" --results-directory artifacts/test-results
+
+      - name: Create dev certificate
+        shell: pwsh
+        run: |
+          $pw = [Guid]::NewGuid().ToString('N')
+          Write-Host "::add-mask::$pw"
+          $secure = ConvertTo-SecureString $pw -AsPlainText -Force
+          ./scripts/New-DevCertificate.ps1 -OutDir "$env:RUNNER_TEMP/cert" -PfxPassword $secure
+          "CERT_PASSWORD=$pw" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "CERT_PFX=$env:RUNNER_TEMP/cert/MaSatellite.Dev.pfx" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Build MSIX (x64)
+        shell: pwsh
+        run: |
+          msbuild src/MaSatellite.App/MaSatellite.App.csproj /restore /v:minimal `
+            /p:Configuration=Release /p:Platform=x64 `
+            /p:AppxBundle=Never /p:UapAppxPackageBuildMode=SideloadOnly /p:GenerateAppxPackageOnBuild=true `
+            "/p:AppxPackageDir=$PWD/artifacts/msix/" `
+            /p:AppxPackageSigningEnabled=true "/p:PackageCertificateKeyFile=$env:CERT_PFX" "/p:PackageCertificatePassword=$env:CERT_PASSWORD"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Collect artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/dist | Out-Null
+          Get-ChildItem artifacts/msix -Recurse -Filter *.msix | Copy-Item -Destination artifacts/dist
+          Copy-Item "$env:RUNNER_TEMP/cert/MaSatellite.Dev.cer" artifacts/dist
+          Copy-Item scripts/Install-Dev.ps1 artifacts/dist
+          Get-ChildItem artifacts/dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ma-satellite-msix
+          path: artifacts/dist/*
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: artifacts/test-results/**

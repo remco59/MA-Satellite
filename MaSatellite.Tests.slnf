@@ -1,0 +1,15 @@
+{
+  "solution": {
+    "path": "MaSatellite.sln",
+    "projects": [
+      "src/MaSatellite.Core/MaSatellite.Core.csproj",
+      "src/MaSatellite.Host/MaSatellite.Host.csproj",
+      "src/MaSatellite.MaApi/MaSatellite.MaApi.csproj",
+      "src/MaSatellite.Windows/MaSatellite.Windows.csproj",
+      "tests/MaSatellite.Core.Tests/MaSatellite.Core.Tests.csproj",
+      "tests/MaSatellite.Host.Tests/MaSatellite.Host.Tests.csproj",
+      "tests/MaSatellite.MaApi.Tests/MaSatellite.MaApi.Tests.csproj",
+      "tests/MaSatellite.Windows.Tests/MaSatellite.Windows.Tests.csproj"
+    ]
+  }
+}
