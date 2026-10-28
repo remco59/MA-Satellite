@@ -182,6 +182,9 @@ internal sealed class SatelliteShell : IDisposable
             {
                 _miniPlayer.Refresh();
             }
+
+            // The main library window also needs Sendspin state updates (not just MA queue events).
+            _libraryWindow?.RefreshLocalPlayback();
         });
     }
 
@@ -249,14 +252,14 @@ internal sealed class SatelliteShell : IDisposable
 
     private void ShowLibrary()
     {
-        if (_libraryController is null)
+        if (_libraryController is null || _host is null)
         {
             return;
         }
 
         if (_libraryWindow is null)
         {
-            _libraryWindow = new LibraryWindow(_libraryController, ShowSettings);
+            _libraryWindow = new LibraryWindow(_libraryController, _host, ShowSettings);
             _libraryWindow.Closed += (_, _) => _libraryWindow = null;
         }
 

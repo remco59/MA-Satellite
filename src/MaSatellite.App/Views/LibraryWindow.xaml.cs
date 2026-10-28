@@ -1,10 +1,16 @@
+using System.Runtime.InteropServices.WindowsRuntime;
+using MaSatellite.Core.Session;
 using MaSatellite.Host.Library;
+using MaSatellite.Host.Orchestration;
+using MaSatellite.Host.Presentation;
 using MaSatellite.MaApi;
 using MaSatellite.MaApi.Models;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Graphics;
+using Windows.Storage.Streams;
 
 namespace MaSatellite.App.Views;
 
@@ -12,6 +18,7 @@ namespace MaSatellite.App.Views;
 public sealed partial class LibraryWindow : Window
 {
     private readonly LibraryController _controller;
+    private readonly SatelliteHost _host;
     private readonly Action _openSettings;
     private readonly DispatcherQueueTimer _queueRefresh;
     private readonly Stack<MaItem> _history = new();
@@ -23,10 +30,14 @@ public sealed partial class LibraryWindow : Window
     private int _loadId;
     private bool _loadingTargets;
     private bool _closed;
+    private int _playbackRefreshRequest;
+    private int _artworkRequestId;
+    private string? _artworkCacheKey;
 
-    internal LibraryWindow(LibraryController controller, Action openSettings)
+    internal LibraryWindow(LibraryController controller, SatelliteHost host, Action openSettings)
     {
         _controller = controller;
+        _host = host;
         _openSettings = openSettings;
         InitializeComponent();
         AuroraWindowChrome.Apply(this);
@@ -53,6 +64,7 @@ public sealed partial class LibraryWindow : Window
         {
             _closed = true;
             _queueRefresh.Stop();
+            ++_artworkRequestId;
             _controller.Service.ServerEvent -= OnServerEvent;
         };
         Activated += OnFirstActivated;
@@ -398,11 +410,34 @@ public sealed partial class LibraryWindow : Window
 
     private async Task QueueCommandAsync(string command)
     {
-        if (SelectedTarget is { } target)
+        if (SelectedTarget is not { } target)
         {
-            await RunAsync(() => _controller.QueueControlAsync(target, command));
-            await RefreshPlaybackSummaryAsync();
+            return;
         }
+
+        // Sendspin commands are authoritative for the local player, just like the tray mini-player.
+        if (target.IsThisPc && _host.Status.Connection == ConnectionState.Connected)
+        {
+            var session = _host.Status.Session;
+            var localCommand = command switch
+            {
+                "play_pause" => TransportLogic.PlayPause(session),
+                "next" => TransportLogic.Next(session),
+                "previous" => TransportLogic.Previous(session),
+                _ => null,
+            };
+
+            if (localCommand is not null)
+            {
+                await _host.SendCommandAsync(localCommand);
+                RefreshLocalPlayback();
+            }
+
+            return;
+        }
+
+        await RunAsync(() => _controller.QueueControlAsync(target, command));
+        await RefreshPlaybackSummaryAsync();
     }
 
     private async void OnTransfer(object sender, RoutedEventArgs e)
@@ -430,8 +465,22 @@ public sealed partial class LibraryWindow : Window
         }
     }
 
+    /// <summary>Called on the UI thread by SatelliteShell when Sendspin status changes.</summary>
+    internal void RefreshLocalPlayback()
+    {
+        if (_closed || SelectedTarget is not { IsThisPc: true } target)
+        {
+            return;
+        }
+
+        // Invalidate in-flight queue responses from a previously selected remote player.
+        ++_playbackRefreshRequest;
+        ApplyPlaybackSummary(PlaybackSummaryLogic.FromLocal(_host.Status, target.Name));
+    }
+
     private async Task RefreshPlaybackSummaryAsync()
     {
+        var request = ++_playbackRefreshRequest;
         if (_closed)
         {
             return;
@@ -439,44 +488,125 @@ public sealed partial class LibraryWindow : Window
 
         if (SelectedTarget is not { } target)
         {
-            FooterTitle.Text = "Nothing playing";
-            FooterArtist.Text = "Choose a player";
-            NowPlayingTitle.Text = "Nothing playing";
-            NowPlayingArtist.Text = "Choose a player";
-            FooterArtwork.Source = null;
-            NowPlayingArtwork.Source = null;
+            ApplyPlaybackSummary(new PlaybackSummary("Nothing playing", "Choose a player", null, null, false, false));
+            return;
+        }
+
+        if (target.IsThisPc)
+        {
+            // Don't depend on the MA queue for our own player: Sendspin has the actual track.
+            ApplyPlaybackSummary(PlaybackSummaryLogic.FromLocal(_host.Status, target.Name));
             return;
         }
 
         try
         {
             var view = await _controller.GetQueueAsync(target);
-            if (_closed || SelectedTarget?.QueueId != target.QueueId)
+            if (_closed || request != _playbackRefreshRequest || SelectedTarget?.QueueId != target.QueueId)
             {
                 return;
             }
 
-            var currentIndex = view.Queue?.CurrentIndex;
-            var current = view.Items.FirstOrDefault(q => q.Index == currentIndex);
-            var title = current?.Name ?? "Nothing playing";
-            var artist = current?.Subtitle ?? target.Name;
-            FooterTitle.Text = title;
-            FooterArtist.Text = artist;
-            NowPlayingTitle.Text = title;
-            NowPlayingArtist.Text = artist;
-            var artwork = current is null ? null : new ListRow(title, artist, current.ImageUrl).Image;
-            FooterArtwork.Source = artwork;
-            NowPlayingArtwork.Source = artwork;
+            ApplyPlaybackSummary(PlaybackSummaryLogic.FromQueue(view));
         }
         catch (MaException)
         {
-            // Queue API failures must not blank an otherwise working library.
-            FooterTitle.Text = "Playback unavailable";
-            FooterArtist.Text = target.Name;
-            NowPlayingTitle.Text = "Playback unavailable";
-            NowPlayingArtist.Text = target.Name;
+            if (_closed || request != _playbackRefreshRequest || SelectedTarget?.QueueId != target.QueueId)
+            {
+                return;
+            }
+
+            // A queue API failure must not break the library or any local playback.
+            ApplyPlaybackSummary(new PlaybackSummary("Playback unavailable", target.Name, null, null, false, false));
+        }
+    }
+
+    private void ApplyPlaybackSummary(PlaybackSummary summary)
+    {
+        FooterTitle.Text = summary.Title;
+        FooterArtist.Text = summary.Artist;
+        NowPlayingTitle.Text = summary.Title;
+        NowPlayingArtist.Text = summary.Artist;
+
+        var state = summary.HasTrack ? (summary.IsPlaying ? "Playing" : "Paused") : "Idle";
+        var targetName = SelectedTarget?.Name ?? "No player selected";
+        FooterState.Text = $"{state} · {targetName}";
+        NowPlayingState.Text = $"{state} · {targetName}";
+
+        var icon = summary.IsPlaying ? "\uE769" : "\uE768";
+        FooterPlayPauseIcon.Glyph = icon;
+        QueuePlayPauseIcon.Glyph = icon;
+
+        if (SelectedTarget is { IsThisPc: true } && _host.Status.Connection == ConnectionState.Connected)
+        {
+            var transport = TransportLogic.Describe(_host.Status.Session);
+            FooterPlayPauseButton.IsEnabled = QueuePlayPauseButton.IsEnabled = transport.CanPlayPause;
+            FooterPreviousButton.IsEnabled = QueuePreviousButton.IsEnabled = transport.CanPrevious;
+            FooterNextButton.IsEnabled = QueueNextButton.IsEnabled = transport.CanNext;
+        }
+        else
+        {
+            var enabled = SelectedTarget is not null;
+            FooterPlayPauseButton.IsEnabled = QueuePlayPauseButton.IsEnabled = enabled;
+            FooterPreviousButton.IsEnabled = QueuePreviousButton.IsEnabled = enabled;
+            FooterNextButton.IsEnabled = QueueNextButton.IsEnabled = enabled;
+        }
+
+        UpdatePlaybackArtwork(summary);
+    }
+
+    private void UpdatePlaybackArtwork(PlaybackSummary summary)
+    {
+        // Avoid decoding the same Sendspin image on every metadata/progress update.
+        var key = summary.LocalArtwork is { } local
+            ? $"sendspin:{summary.Title}:{local.Version}"
+            : $"url:{summary.ArtworkUrl ?? string.Empty}";
+        if (key == _artworkCacheKey)
+        {
+            return;
+        }
+
+        _artworkCacheKey = key;
+        var request = ++_artworkRequestId;
+        if (summary.LocalArtwork is { } artwork)
+        {
             FooterArtwork.Source = null;
             NowPlayingArtwork.Source = null;
+            _ = LoadLocalArtworkAsync(artwork, request);
+        }
+        else
+        {
+            var image = string.IsNullOrWhiteSpace(summary.ArtworkUrl)
+                ? null
+                : new ListRow(summary.Title, summary.Artist, summary.ArtworkUrl).Image;
+            FooterArtwork.Source = image;
+            NowPlayingArtwork.Source = image;
+        }
+    }
+
+    private async Task LoadLocalArtworkAsync(ArtworkImage artwork, int request)
+    {
+        try
+        {
+            using var stream = new InMemoryRandomAccessStream();
+            await stream.WriteAsync(artwork.Data.AsBuffer());
+            stream.Seek(0);
+            var image = new BitmapImage { DecodePixelWidth = 400 };
+            await image.SetSourceAsync(stream);
+
+            if (!_closed && request == _artworkRequestId && SelectedTarget?.IsThisPc == true)
+            {
+                FooterArtwork.Source = image;
+                NowPlayingArtwork.Source = image;
+            }
+        }
+        catch (Exception)
+        {
+            if (!_closed && request == _artworkRequestId)
+            {
+                FooterArtwork.Source = null;
+                NowPlayingArtwork.Source = null;
+            }
         }
     }
 
