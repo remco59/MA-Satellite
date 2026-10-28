@@ -84,6 +84,36 @@ public sealed class LibraryController
         await client.QueueCommandAsync(target.QueueId, command, ct).ConfigureAwait(false);
     }
 
+    public async Task SeekAsync(PlayTarget target, double seconds, CancellationToken ct = default)
+    {
+        var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
+        await client.SeekQueueAsync(target.QueueId, seconds, ct).ConfigureAwait(false);
+    }
+
+    public async Task SetShuffleAsync(PlayTarget target, bool enabled, CancellationToken ct = default)
+    {
+        var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
+        await client.SetShuffleAsync(target.QueueId, enabled, ct).ConfigureAwait(false);
+    }
+
+    public async Task SetRepeatAsync(PlayTarget target, string mode, CancellationToken ct = default)
+    {
+        var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
+        await client.SetRepeatAsync(target.QueueId, mode, ct).ConfigureAwait(false);
+    }
+
+    public async Task SetVolumeAsync(PlayTarget target, int level, CancellationToken ct = default)
+    {
+        var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
+        await client.SetPlayerVolumeAsync(target.QueueId, level, ct).ConfigureAwait(false);
+    }
+
+    public async Task SetMutedAsync(PlayTarget target, bool muted, CancellationToken ct = default)
+    {
+        var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
+        await client.SetPlayerMutedAsync(target.QueueId, muted, ct).ConfigureAwait(false);
+    }
+
     public async Task PlayQueueIndexAsync(PlayTarget target, int index, CancellationToken ct = default)
     {
         var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
