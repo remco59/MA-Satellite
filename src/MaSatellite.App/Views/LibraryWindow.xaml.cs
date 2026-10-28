@@ -193,6 +193,10 @@ public sealed partial class LibraryWindow : Window
             return;
         }
 
+        _footerSeekDebounce.Stop();
+        _footerVolumeDebounce.Stop();
+        _remoteMuted = false;
+        ResetFooterControls();
         RefreshTransferTargets();
         await RefreshFooterVolumeAsync();
         if (_tab is "queue" or "now")
@@ -532,6 +536,7 @@ public sealed partial class LibraryWindow : Window
 
             ApplyPlaybackSummary(PlaybackSummaryLogic.FromQueue(view));
             ApplyRemoteFooterControls(view);
+            await RefreshFooterVolumeAsync();
         }
         catch (MaException)
         {
