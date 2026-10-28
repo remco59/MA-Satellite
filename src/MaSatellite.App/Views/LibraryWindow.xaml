@@ -6,7 +6,7 @@
   xmlns:local="using:MaSatellite.App.Views">
   <Grid Background="{StaticResource AuroraBackground}" RequestedTheme="Dark">
     <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="86"/></Grid.RowDefinitions>
-    <Grid.ColumnDefinitions><ColumnDefinition Width="218"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+    <Grid.ColumnDefinitions><ColumnDefinition Width="208"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
     <!-- Persistent navigation. Every button selects a real library view. -->
     <Border Grid.Column="0" Grid.RowSpan="2" Background="{StaticResource AuroraSidebarGradient}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,0,1,0">
       <Grid Padding="17,27,17,18">
@@ -20,48 +20,58 @@
             <TextBlock Text="Music, connected." Foreground="{StaticResource AuroraMuted}" FontSize="10"/>
           </StackPanel>
         </StackPanel>
-        <StackPanel Grid.Row="1" Spacing="6">
+        <!-- The sidebar is the single source of page navigation. Library subviews stay together. -->
+        <StackPanel Grid.Row="1" Spacing="5">
           <TextBlock Text="YOUR MUSIC" Margin="12,0,0,8" Style="{StaticResource AuroraSectionLabelStyle}"/>
-          <Button x:Name="NavHome" Tag="home" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
+          <Button x:Name="NavHome" Tag="home" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                  AutomationProperties.Name="Home">
             <StackPanel Orientation="Horizontal" Spacing="15">
               <FontIcon Glyph="&#xE80F;" FontSize="16"/><TextBlock Text="Home" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
-          <Button x:Name="NavLibrary" Tag="album" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
-            <StackPanel Orientation="Horizontal" Spacing="15">
-              <FontIcon Glyph="&#xE80F;" FontSize="16"/><TextBlock Text="Library" VerticalAlignment="Center"/>
-            </StackPanel>
-          </Button>
-          <Button x:Name="NavNow" Tag="now" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
-            <StackPanel Orientation="Horizontal" Spacing="15">
-              <FontIcon Glyph="&#xE768;" FontSize="16"/><TextBlock Text="Now playing" VerticalAlignment="Center"/>
-            </StackPanel>
-          </Button>
-          <Button x:Name="NavSearch" Tag="search" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
+          <Button x:Name="NavSearch" Tag="search" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                  AutomationProperties.Name="Search">
             <StackPanel Orientation="Horizontal" Spacing="15">
               <FontIcon Glyph="&#xE721;" FontSize="16"/><TextBlock Text="Search" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
-          <Button x:Name="NavQueue" Tag="queue" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
+          <Button x:Name="NavLibrary" Tag="album" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                  AutomationProperties.Name="Library">
             <StackPanel Orientation="Horizontal" Spacing="15">
-              <FontIcon Glyph="&#xE8FD;" FontSize="16"/><TextBlock Text="Queue" VerticalAlignment="Center"/>
+              <FontIcon Glyph="&#xE8F1;" FontSize="16"/><TextBlock Text="Library" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
-          <Border Height="1" Background="{StaticResource AuroraBorder}" Margin="6,20,6,14"/>
-          <TextBlock Text="YOUR COLLECTION" Margin="12,0,0,8" Style="{StaticResource AuroraSectionLabelStyle}"/>
-          <Button x:Name="NavArtist" Tag="artist" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
-            <StackPanel Orientation="Horizontal" Spacing="15">
-              <FontIcon Glyph="&#xE77B;" FontSize="16"/><TextBlock Text="Artists" VerticalAlignment="Center"/>
-            </StackPanel>
-          </Button>
-          <Button x:Name="NavPlaylist" Tag="playlist" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
+          <StackPanel Margin="35,0,0,7" Spacing="2" AutomationProperties.Name="Library views">
+            <Button x:Name="NavAlbum" Tag="album" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                    AutomationProperties.Name="Albums" Padding="12,7">
+              <TextBlock Text="Albums"/>
+            </Button>
+            <Button x:Name="NavArtist" Tag="artist" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                    AutomationProperties.Name="Artists" Padding="12,7">
+              <TextBlock Text="Artists"/>
+            </Button>
+            <Button x:Name="NavTrack" Tag="track" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                    AutomationProperties.Name="Tracks" Padding="12,7">
+              <TextBlock Text="Tracks"/>
+            </Button>
+          </StackPanel>
+          <Button x:Name="NavPlaylist" Tag="playlist" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                  AutomationProperties.Name="Playlists">
             <StackPanel Orientation="Horizontal" Spacing="15">
               <FontIcon Glyph="&#xE8F1;" FontSize="16"/><TextBlock Text="Playlists" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
-          <Button x:Name="NavTrack" Tag="track" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}">
+          <Border Height="1" Background="{StaticResource AuroraBorder}" Margin="6,10,6,10"/>
+          <Button x:Name="NavNow" Tag="now" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                  AutomationProperties.Name="Now playing">
             <StackPanel Orientation="Horizontal" Spacing="15">
-              <FontIcon Glyph="&#xE8D6;" FontSize="16"/><TextBlock Text="Tracks" VerticalAlignment="Center"/>
+              <FontIcon Glyph="&#xE768;" FontSize="16"/><TextBlock Text="Now playing" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Button>
+          <Button x:Name="NavQueue" Tag="queue" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                  AutomationProperties.Name="Queue">
+            <StackPanel Orientation="Horizontal" Spacing="15">
+              <FontIcon Glyph="&#xE8FD;" FontSize="16"/><TextBlock Text="Queue" VerticalAlignment="Center"/>
             </StackPanel>
           </Button>
         </StackPanel>
@@ -85,9 +95,9 @@
     </Border>
 
     <!-- Main content -->
-    <Grid Grid.Column="1" Padding="30,22,30,14" RowSpacing="13">
+    <Grid Grid.Column="1" Padding="24,18,24,12" RowSpacing="13">
       <Grid.RowDefinitions>
-        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
       </Grid.RowDefinitions>
       <Grid ColumnSpacing="16">
@@ -103,22 +113,12 @@
         <TextBlock x:Name="ContentHeading" Text="Your library" Style="{StaticResource AuroraTitleStyle}"/>
         <TextBlock x:Name="ContentDescription" Text="Everything you love, beautifully organised." Style="{StaticResource AuroraSubtitleStyle}"/>
       </StackPanel>
-      <SelectorBar x:Name="Tabs" Grid.Row="2" SelectionChanged="OnTabChanged">
-        <SelectorBarItem Text="Home" Tag="home" IsSelected="True"/>
-        <SelectorBarItem Text="Albums" Tag="album"/>
-        <SelectorBarItem Text="Artists" Tag="artist"/>
-        <SelectorBarItem Text="Playlists" Tag="playlist"/>
-        <SelectorBarItem Text="Tracks" Tag="track"/>
-        <SelectorBarItem Text="Search" Tag="search"/>
-        <SelectorBarItem Text="Queue" Tag="queue"/>
-        <SelectorBarItem Text="Now playing" Tag="now"/>
-      </SelectorBar>
-      <InfoBar x:Name="Message" Grid.Row="3" IsOpen="False" IsClosable="True">
+      <InfoBar x:Name="Message" Grid.Row="2" IsOpen="False" IsClosable="True">
         <InfoBar.ActionButton>
           <Button x:Name="SetupButton" Content="Open settings" Click="OnOpenSettings" Visibility="Collapsed"/>
         </InfoBar.ActionButton>
       </InfoBar>
-      <Grid x:Name="ContextBar" Grid.Row="4" ColumnSpacing="8" Visibility="Collapsed">
+      <Grid x:Name="ContextBar" Grid.Row="3" ColumnSpacing="8" Visibility="Collapsed">
         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <Button x:Name="BackButton" Click="OnBack" ToolTipService.ToolTip="Back" Style="{StaticResource AuroraButtonStyle}">
           <FontIcon Glyph="&#xE72B;"/>
@@ -131,7 +131,7 @@
           <Button Content="Add to queue" Style="{StaticResource AuroraButtonStyle}" Click="OnContextAdd"/>
         </StackPanel>
       </Grid>
-      <Grid x:Name="QueueBar" Grid.Row="4" ColumnSpacing="8" Visibility="Collapsed">
+      <Grid x:Name="QueueBar" Grid.Row="3" ColumnSpacing="8" Visibility="Collapsed">
         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Button x:Name="QueuePreviousButton" Click="OnQueuePrevious" Style="{StaticResource AuroraButtonStyle}" ToolTipService.ToolTip="Previous"><FontIcon Glyph="&#xE892;"/></Button>
@@ -143,7 +143,7 @@
           <Button Content="Transfer queue" Style="{StaticResource AuroraButtonStyle}" Click="OnTransfer"/>
         </StackPanel>
       </Grid>
-      <Grid Grid.Row="5" RowSpacing="16">
+      <Grid Grid.Row="4" RowSpacing="16">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
         <Border x:Name="HomeHero" Visibility="Collapsed" Background="{StaticResource AuroraHeroGradient}"
                 BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" CornerRadius="19" Padding="22">
