@@ -125,31 +125,18 @@ public sealed partial class LibraryWindow : Window
         }
     }
 
-    private void OnNavigate(object sender, RoutedEventArgs e)
+    private async void OnNavigate(object sender, RoutedEventArgs e)
     {
         if (sender is Button { Tag: string tab })
         {
-            var item = Tabs.Items.FirstOrDefault(i => (string?)i.Tag == tab);
-            if (item is not null)
-            {
-                // Tab change runs through the existing navigation and data loading logic.
-                if (Tabs.SelectedItem == item && _openedItem is not null)
-                {
-                    _openedItem = null;
-                    _history.Clear();
-                    _ = LoadTabAsync();
-                }
-                else
-                {
-                    Tabs.SelectedItem = item;
-                }
-            }
+            await NavigateAsync(tab);
         }
     }
 
-    private async void OnTabChanged(SelectorBar sender, SelectorBarSelectionChangedEventArgs args)
+    // All navigation comes through one path so focus, selection and detail history stay in sync.
+    private async Task NavigateAsync(string tab, bool forceReload = false)
     {
-        if (sender.SelectedItem?.Tag is not string tab || (tab == _tab && _openedItem is null))
+        if (!forceReload && tab == _tab && _openedItem is null)
         {
             return;
         }
@@ -163,11 +150,7 @@ public sealed partial class LibraryWindow : Window
     private async void OnSearchSubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
     {
         _lastQuery = args.QueryText?.Trim() ?? string.Empty;
-        _tab = "search";
-        _openedItem = null;
-        _history.Clear();
-        Tabs.SelectedItem = Tabs.Items.First(i => (string?)i.Tag == "search");
-        await LoadTabAsync();
+        await NavigateAsync("search", forceReload: true);
     }
 
     private async void OnTargetChanged(object sender, SelectionChangedEventArgs e)
@@ -192,9 +175,13 @@ public sealed partial class LibraryWindow : Window
     {
         var selected = (Style)Application.Current.Resources["AuroraNavSelectedButtonStyle"];
         var regular = (Style)Application.Current.Resources["AuroraNavButtonStyle"];
-        foreach (var button in new[] { NavHome, NavLibrary, NavNow, NavSearch, NavQueue, NavArtist, NavPlaylist, NavTrack })
+        foreach (var button in new[] { NavHome, NavLibrary, NavAlbum, NavArtist, NavTrack, NavPlaylist, NavNow, NavQueue, NavSearch })
         {
-            button.Style = (string?)button.Tag == _tab ? selected : regular;
+            // The Library parent remains active while browsing Albums, Artists, or Tracks.
+            var active = button == NavLibrary
+                ? _tab is "album" or "artist" or "track"
+                : (string?)button.Tag == _tab;
+            button.Style = active ? selected : regular;
         }
     }
 
