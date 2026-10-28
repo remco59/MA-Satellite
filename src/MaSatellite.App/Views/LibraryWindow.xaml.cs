@@ -33,6 +33,19 @@ public sealed partial class LibraryWindow : Window
     private int _playbackRefreshRequest;
     private int _artworkRequestId;
     private string? _artworkCacheKey;
+    private readonly DispatcherQueueTimer _footerProgressTimer;
+    private readonly DispatcherQueueTimer _footerSeekDebounce;
+    private readonly DispatcherQueueTimer _footerVolumeDebounce;
+    private bool _updatingFooter;
+    private long _footerDurationMs;
+    private long _remoteElapsedMs;
+    private DateTimeOffset _remotePositionUpdated;
+    private bool _remotePlaying;
+    private long _pendingSeekMs;
+    private int _pendingVolume;
+    private bool _remoteMuted;
+    private bool _remoteShuffle;
+    private string _remoteRepeat = "off";
 
     internal LibraryWindow(LibraryController controller, SatelliteHost host, Action openSettings)
     {
@@ -59,11 +72,31 @@ public sealed partial class LibraryWindow : Window
             }
         };
 
+        _footerProgressTimer = DispatcherQueue.CreateTimer();
+        _footerProgressTimer.Interval = TimeSpan.FromMilliseconds(500);
+        _footerProgressTimer.Tick += (_, _) => UpdateFooterProgress();
+        _footerProgressTimer.Start();
+
+        _footerSeekDebounce = DispatcherQueue.CreateTimer();
+        _footerSeekDebounce.Interval = TimeSpan.FromMilliseconds(350);
+        _footerSeekDebounce.IsRepeating = false;
+        _footerSeekDebounce.Tick += async (_, _) => await SendFooterSeekAsync();
+
+        _footerVolumeDebounce = DispatcherQueue.CreateTimer();
+        _footerVolumeDebounce.Interval = TimeSpan.FromMilliseconds(250);
+        _footerVolumeDebounce.IsRepeating = false;
+        _footerVolumeDebounce.Tick += async (_, _) => await SendFooterVolumeAsync();
+
+        _host.Volume.Changed += OnFooterSystemVolumeChanged;
         _controller.Service.ServerEvent += OnServerEvent;
         Closed += (_, _) =>
         {
             _closed = true;
             _queueRefresh.Stop();
+            _footerProgressTimer.Stop();
+            _footerSeekDebounce.Stop();
+            _footerVolumeDebounce.Stop();
+            _host.Volume.Changed -= OnFooterSystemVolumeChanged;
             ++_artworkRequestId;
             _controller.Service.ServerEvent -= OnServerEvent;
         };
@@ -161,6 +194,7 @@ public sealed partial class LibraryWindow : Window
         }
 
         RefreshTransferTargets();
+        await RefreshFooterVolumeAsync();
         if (_tab is "queue" or "now")
         {
             await LoadTabAsync();
@@ -463,6 +497,7 @@ public sealed partial class LibraryWindow : Window
         // Invalidate in-flight queue responses from a previously selected remote player.
         ++_playbackRefreshRequest;
         ApplyPlaybackSummary(PlaybackSummaryLogic.FromLocal(_host.Status, target.Name));
+        ApplyLocalFooterControls();
     }
 
     private async Task RefreshPlaybackSummaryAsync()
@@ -483,6 +518,7 @@ public sealed partial class LibraryWindow : Window
         {
             // Don't depend on the MA queue for our own player: Sendspin has the actual track.
             ApplyPlaybackSummary(PlaybackSummaryLogic.FromLocal(_host.Status, target.Name));
+            ApplyLocalFooterControls();
             return;
         }
 
@@ -495,6 +531,7 @@ public sealed partial class LibraryWindow : Window
             }
 
             ApplyPlaybackSummary(PlaybackSummaryLogic.FromQueue(view));
+            ApplyRemoteFooterControls(view);
         }
         catch (MaException)
         {
@@ -540,6 +577,10 @@ public sealed partial class LibraryWindow : Window
         }
 
         UpdatePlaybackArtwork(summary);
+        if (SelectedTarget is null)
+        {
+            ResetFooterControls();
+        }
     }
 
     private void UpdatePlaybackArtwork(PlaybackSummary summary)
@@ -602,6 +643,12 @@ public sealed partial class LibraryWindow : Window
         // ServerEvent is raised by the Music Assistant WebSocket thread.
         // Never access TargetBox.SelectedItem (or any WinUI control) until we're on the UI thread.
         // Elapsed-time ticks do not change the queue list.
+        if (e.Event == "player_updated")
+        {
+            DispatcherQueue.TryEnqueue(() => { if (!_closed && SelectedTarget?.IsThisPc == false) _ = RefreshFooterVolumeAsync(); });
+            return;
+        }
+
         if (e.Event is not ("queue_updated" or "queue_items_updated"))
         {
             return;
