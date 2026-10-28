@@ -134,9 +134,9 @@
       <Grid x:Name="QueueBar" Grid.Row="4" ColumnSpacing="8" Visibility="Collapsed">
         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <Button Click="OnQueuePrevious" Style="{StaticResource AuroraButtonStyle}" ToolTipService.ToolTip="Previous"><FontIcon Glyph="&#xE892;"/></Button>
-          <Button Click="OnQueuePlayPause" Style="{StaticResource AuroraPrimaryButtonStyle}" ToolTipService.ToolTip="Play or pause"><FontIcon Glyph="&#xE768;"/></Button>
-          <Button Click="OnQueueNext" Style="{StaticResource AuroraButtonStyle}" ToolTipService.ToolTip="Next"><FontIcon Glyph="&#xE893;"/></Button>
+          <Button x:Name="QueuePreviousButton" Click="OnQueuePrevious" Style="{StaticResource AuroraButtonStyle}" ToolTipService.ToolTip="Previous"><FontIcon Glyph="&#xE892;"/></Button>
+          <Button x:Name="QueuePlayPauseButton" Click="OnQueuePlayPause" Style="{StaticResource AuroraPrimaryButtonStyle}" ToolTipService.ToolTip="Play or pause"><FontIcon x:Name="QueuePlayPauseIcon" Glyph="&#xE768;"/></Button>
+          <Button x:Name="QueueNextButton" Click="OnQueueNext" Style="{StaticResource AuroraButtonStyle}" ToolTipService.ToolTip="Next"><FontIcon Glyph="&#xE893;"/></Button>
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
           <ComboBox x:Name="TransferBox" Width="200" PlaceholderText="Transfer to…"/>
@@ -182,6 +182,7 @@
                          TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2" Foreground="{StaticResource AuroraText}"/>
               <TextBlock x:Name="NowPlayingArtist" Text="Select a player to begin" FontSize="14"
                          TextTrimming="CharacterEllipsis" MaxLines="1" Foreground="{StaticResource AuroraMuted}"/>
+              <TextBlock x:Name="NowPlayingState" Text="Idle" Foreground="{StaticResource AuroraGood}" FontSize="12" TextTrimming="CharacterEllipsis"/>
               <TextBlock Text="Up next in your Music Assistant queue" Foreground="{StaticResource AuroraMuted}" FontSize="12"/>
             </StackPanel>
           </Grid>
@@ -262,13 +263,14 @@
           <TextBlock x:Name="FooterTitle" Text="Nothing playing" Foreground="{StaticResource AuroraText}" FontSize="13"
                      FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1"/>
           <TextBlock x:Name="FooterArtist" Text="Choose a player" Style="{StaticResource AuroraSubtitleStyle}" MaxLines="1"/>
+          <TextBlock x:Name="FooterState" Text="Idle" Foreground="{StaticResource AuroraGood}" FontSize="11" TextTrimming="CharacterEllipsis" MaxLines="1"/>
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
-          <Button Click="OnQueuePrevious" ToolTipService.ToolTip="Previous" AutomationProperties.Name="Previous"
+          <Button x:Name="FooterPreviousButton" Click="OnQueuePrevious" ToolTipService.ToolTip="Previous" AutomationProperties.Name="Previous"
                   Style="{StaticResource AuroraButtonStyle}" Padding="10"><FontIcon Glyph="&#xE892;"/></Button>
-          <Button Click="OnQueuePlayPause" ToolTipService.ToolTip="Play or pause" AutomationProperties.Name="Play or pause"
-                  Style="{StaticResource AuroraPrimaryButtonStyle}" Padding="12"><FontIcon Glyph="&#xE768;"/></Button>
-          <Button Click="OnQueueNext" ToolTipService.ToolTip="Next" AutomationProperties.Name="Next"
+          <Button x:Name="FooterPlayPauseButton" Click="OnQueuePlayPause" ToolTipService.ToolTip="Play or pause" AutomationProperties.Name="Play or pause"
+                  Style="{StaticResource AuroraPrimaryButtonStyle}" Padding="12"><FontIcon x:Name="FooterPlayPauseIcon" Glyph="&#xE768;"/></Button>
+          <Button x:Name="FooterNextButton" Click="OnQueueNext" ToolTipService.ToolTip="Next" AutomationProperties.Name="Next"
                   Style="{StaticResource AuroraButtonStyle}" Padding="10"><FontIcon Glyph="&#xE893;"/></Button>
         </StackPanel>
         <Button Grid.Column="3" Tag="queue" Click="OnNavigate" Content="Queue"
