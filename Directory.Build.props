@@ -12,7 +12,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <RootNamespace>$(MSBuildProjectName)</RootNamespace>
-    <Version>0.1.1</Version>
+    <Version>0.2.0</Version>
     <Authors>Remco</Authors>
     <Product>ma-satellite</Product>
   </PropertyGroup>
