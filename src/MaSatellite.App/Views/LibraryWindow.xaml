@@ -95,7 +95,7 @@
     </Border>
 
     <!-- Main content -->
-    <Grid Grid.Column="1" Padding="24,18,24,12" RowSpacing="13">
+    <Grid x:Name="MainContent" Grid.Column="1" Padding="24,18,24,12" RowSpacing="13">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
@@ -139,7 +139,7 @@
           <Button x:Name="QueueNextButton" Click="OnQueueNext" Style="{StaticResource AuroraButtonStyle}" ToolTipService.ToolTip="Next"><FontIcon Glyph="&#xE893;"/></Button>
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-          <ComboBox x:Name="TransferBox" Width="200" PlaceholderText="Transfer to…"/>
+          <ComboBox x:Name="TransferBox" Width="200" PlaceholderText="Transfer to…" AutomationProperties.Name="Transfer destination"/>
           <Button Content="Transfer queue" Style="{StaticResource AuroraButtonStyle}" Click="OnTransfer"/>
         </StackPanel>
       </Grid>
@@ -158,7 +158,7 @@
               <Button x:Name="HomePlayButton" Click="OnHomePlay" Content="Play selection" AutomationProperties.Name="Play featured selection"
                       Style="{StaticResource AuroraPrimaryButtonStyle}" HorizontalAlignment="Left" Margin="0,7,0,0"/>
             </StackPanel>
-            <Border Grid.Column="1" Width="128" Height="128" Background="{StaticResource AuroraCard}" CornerRadius="14">
+            <Border x:Name="HomeHeroArtwork" Grid.Column="1" Width="128" Height="128" Background="{StaticResource AuroraCard}" CornerRadius="14">
               <Grid>
                 <FontIcon Glyph="&#xE8D6;" FontSize="35" Foreground="{StaticResource AuroraMuted}"/>
                 <Image x:Name="HomeArtwork" Stretch="UniformToFill"/>
@@ -304,8 +304,8 @@
                       HorizontalAlignment="Center"/>
             <TextBlock x:Name="EmptyText" Text="Nothing here yet" FontSize="17" FontWeight="SemiBold"
                        Foreground="{StaticResource AuroraText}" TextAlignment="Center" TextWrapping="Wrap"/>
-            <TextBlock x:Name="EmptyDetail" Text="Your music will appear here." FontSize="12"
-                       Foreground="{StaticResource AuroraMuted}" TextAlignment="Center" TextWrapping="Wrap"/>
+            <TextBlock x:Name="EmptyDetail" Text="Your music will appear here." Style="{StaticResource AuroraStatusTextStyle}"
+                       MaxWidth="310" TextAlignment="Center"/>
             <Button x:Name="RetryButton" Content="Try again" Visibility="Collapsed" Click="OnRetry"
                     HorizontalAlignment="Center" Margin="0,6,0,0"
                     Style="{StaticResource AuroraPrimaryButtonStyle}" AutomationProperties.Name="Retry loading music"/>
@@ -374,7 +374,7 @@
               <FontIcon x:Name="FooterRepeatIcon" Glyph="&#xE8EE;" FontSize="14"/>
             </Button>
           </StackPanel>
-          <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
+          <StackPanel x:Name="FooterVolumeGroup" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
             <Button x:Name="FooterMuteButton" Click="OnFooterMute" ToolTipService.ToolTip="Mute or unmute"
                     AutomationProperties.Name="Mute or unmute" Style="{StaticResource AuroraButtonStyle}" Padding="7">
               <FontIcon x:Name="FooterMuteIcon" Glyph="&#xE767;" FontSize="15"/>
