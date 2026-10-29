@@ -5,7 +5,7 @@
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:local="using:MaSatellite.App.Views">
   <Grid Background="{StaticResource AuroraBackground}" RequestedTheme="Dark">
-    <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="86"/></Grid.RowDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="108"/></Grid.RowDefinitions>
     <Grid.ColumnDefinitions><ColumnDefinition Width="208"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
     <!-- Persistent navigation. Every button selects a real library view. -->
     <Border Grid.Column="0" Grid.RowSpan="2" Background="{StaticResource AuroraSidebarGradient}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,0,1,0">
@@ -249,32 +249,82 @@
                    Foreground="{StaticResource AuroraMuted}" Visibility="Collapsed" FontSize="14"/>
       </Grid>
     </Grid>
-    <!-- Real Music Assistant queue controls in a persistent playback strip. -->
-    <Border Grid.Column="1" Grid.Row="1" Background="{StaticResource AuroraSidebar}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,1,0,0" Padding="21,10">
-      <Grid ColumnSpacing="18">
-        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <Border Width="58" Height="58" CornerRadius="11" Background="{StaticResource AuroraHeroGradient}">
-          <Grid>
-            <FontIcon Glyph="&#xE8D6;" Foreground="{StaticResource AuroraMuted}"/>
-            <Image x:Name="FooterArtwork" Stretch="UniformToFill"/>
-          </Grid>
-        </Border>
-        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="5">
-          <TextBlock x:Name="FooterTitle" Text="Nothing playing" Foreground="{StaticResource AuroraText}" FontSize="13"
-                     FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1"/>
-          <TextBlock x:Name="FooterArtist" Text="Choose a player" Style="{StaticResource AuroraSubtitleStyle}" MaxLines="1"/>
-          <TextBlock x:Name="FooterState" Text="Idle" Foreground="{StaticResource AuroraGood}" FontSize="11" TextTrimming="CharacterEllipsis" MaxLines="1"/>
-        </StackPanel>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
-          <Button x:Name="FooterPreviousButton" Click="OnQueuePrevious" ToolTipService.ToolTip="Previous" AutomationProperties.Name="Previous"
-                  Style="{StaticResource AuroraButtonStyle}" Padding="10"><FontIcon Glyph="&#xE892;"/></Button>
-          <Button x:Name="FooterPlayPauseButton" Click="OnQueuePlayPause" ToolTipService.ToolTip="Play or pause" AutomationProperties.Name="Play or pause"
-                  Style="{StaticResource AuroraPrimaryButtonStyle}" Padding="12"><FontIcon x:Name="FooterPlayPauseIcon" Glyph="&#xE768;"/></Button>
-          <Button x:Name="FooterNextButton" Click="OnQueueNext" ToolTipService.ToolTip="Next" AutomationProperties.Name="Next"
-                  Style="{StaticResource AuroraButtonStyle}" Padding="10"><FontIcon Glyph="&#xE893;"/></Button>
-        </StackPanel>
-        <Button Grid.Column="3" Tag="queue" Click="OnNavigate" Content="Queue"
-                Style="{StaticResource AuroraButtonStyle}" VerticalAlignment="Center"/>
+    <!-- Persistent transport: local Sendspin state or the selected remote Music Assistant queue. -->
+    <Border Grid.Column="1" Grid.Row="1" Background="{StaticResource AuroraSidebar}"
+            BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,1,0,0" Padding="15,6">
+      <Grid RowSpacing="3">
+        <Grid.RowDefinitions><RowDefinition Height="30"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Grid ColumnSpacing="8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="35"/><ColumnDefinition Width="*"/><ColumnDefinition Width="35"/>
+          </Grid.ColumnDefinitions>
+          <TextBlock x:Name="FooterElapsed" Text="0:00" FontSize="10" Foreground="{StaticResource AuroraMuted}"
+                     VerticalAlignment="Center"/>
+          <Slider x:Name="FooterSeekSlider" Grid.Column="1" Minimum="0" Maximum="1" IsEnabled="False"
+                  IsThumbToolTipEnabled="False" ValueChanged="OnFooterSeekChanged"
+                  AutomationProperties.Name="Track position" VerticalAlignment="Center"/>
+          <TextBlock x:Name="FooterDuration" Grid.Column="2" Text="—" FontSize="10" TextAlignment="Right"
+                     Foreground="{StaticResource AuroraMuted}" VerticalAlignment="Center"/>
+        </Grid>
+        <Grid Grid.Row="1" ColumnSpacing="12">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <Button Grid.Column="0" Tag="now" Click="OnNavigate" Style="{StaticResource AuroraButtonStyle}"
+                  Padding="0" CornerRadius="10" ToolTipService.ToolTip="Open now playing"
+                  AutomationProperties.Name="Open now playing">
+            <Border Width="50" Height="50" CornerRadius="9" Background="{StaticResource AuroraHeroGradient}">
+              <Grid>
+                <FontIcon Glyph="&#xE8D6;" Foreground="{StaticResource AuroraMuted}"/>
+                <Image x:Name="FooterArtwork" Stretch="UniformToFill"/>
+              </Grid>
+            </Border>
+          </Button>
+          <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+            <TextBlock x:Name="FooterTitle" Text="Nothing playing" Foreground="{StaticResource AuroraText}" FontSize="12"
+                       FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+            <TextBlock x:Name="FooterArtist" Text="Choose a player" Style="{StaticResource AuroraSubtitleStyle}" FontSize="11" MaxLines="1"/>
+            <TextBlock x:Name="FooterState" Text="Idle" Foreground="{StaticResource AuroraGood}" FontSize="10"
+                       TextTrimming="CharacterEllipsis" MaxLines="1"/>
+          </StackPanel>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="3">
+            <Button x:Name="FooterShuffleButton" Click="OnFooterShuffle" ToolTipService.ToolTip="Shuffle"
+                    AutomationProperties.Name="Toggle shuffle" Style="{StaticResource AuroraButtonStyle}" Padding="7" IsEnabled="False">
+              <FontIcon x:Name="FooterShuffleIcon" Glyph="&#xE8B1;" FontSize="14"/>
+            </Button>
+            <Button x:Name="FooterPreviousButton" Click="OnQueuePrevious" ToolTipService.ToolTip="Previous"
+                    AutomationProperties.Name="Previous" Style="{StaticResource AuroraButtonStyle}" Padding="8">
+              <FontIcon Glyph="&#xE892;"/>
+            </Button>
+            <Button x:Name="FooterPlayPauseButton" Click="OnQueuePlayPause" ToolTipService.ToolTip="Play or pause"
+                    AutomationProperties.Name="Play or pause" Style="{StaticResource AuroraPrimaryButtonStyle}" Padding="11">
+              <FontIcon x:Name="FooterPlayPauseIcon" Glyph="&#xE768;"/>
+            </Button>
+            <Button x:Name="FooterNextButton" Click="OnQueueNext" ToolTipService.ToolTip="Next"
+                    AutomationProperties.Name="Next" Style="{StaticResource AuroraButtonStyle}" Padding="8">
+              <FontIcon Glyph="&#xE893;"/>
+            </Button>
+            <Button x:Name="FooterRepeatButton" Click="OnFooterRepeat" ToolTipService.ToolTip="Repeat"
+                    AutomationProperties.Name="Cycle repeat mode" Style="{StaticResource AuroraButtonStyle}" Padding="7" IsEnabled="False">
+              <FontIcon x:Name="FooterRepeatIcon" Glyph="&#xE8EE;" FontSize="14"/>
+            </Button>
+          </StackPanel>
+          <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
+            <Button x:Name="FooterMuteButton" Click="OnFooterMute" ToolTipService.ToolTip="Mute or unmute"
+                    AutomationProperties.Name="Mute or unmute" Style="{StaticResource AuroraButtonStyle}" Padding="7">
+              <FontIcon x:Name="FooterMuteIcon" Glyph="&#xE767;" FontSize="15"/>
+            </Button>
+            <Slider x:Name="FooterVolumeSlider" Width="83" Minimum="0" Maximum="100" IsEnabled="False"
+                    ValueChanged="OnFooterVolumeChanged" AutomationProperties.Name="Player volume"
+                    VerticalAlignment="Center"/>
+          </StackPanel>
+          <Button Grid.Column="4" Tag="queue" Click="OnNavigate" Style="{StaticResource AuroraButtonStyle}"
+                  VerticalAlignment="Center" Padding="9" ToolTipService.ToolTip="Open queue"
+                  AutomationProperties.Name="Open queue">
+            <FontIcon Glyph="&#xE8FD;" FontSize="16"/>
+          </Button>
+        </Grid>
       </Grid>
     </Border>
   </Grid>

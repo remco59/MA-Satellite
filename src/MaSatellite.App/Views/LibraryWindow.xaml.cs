@@ -33,6 +33,19 @@ public sealed partial class LibraryWindow : Window
     private int _playbackRefreshRequest;
     private int _artworkRequestId;
     private string? _artworkCacheKey;
+    private readonly DispatcherQueueTimer _footerProgressTimer;
+    private readonly DispatcherQueueTimer _footerSeekDebounce;
+    private readonly DispatcherQueueTimer _footerVolumeDebounce;
+    private bool _updatingFooter;
+    private long _footerDurationMs;
+    private long _remoteElapsedMs;
+    private DateTimeOffset _remotePositionUpdated;
+    private bool _remotePlaying;
+    private long _pendingSeekMs;
+    private int _pendingVolume;
+    private bool _remoteMuted;
+    private bool _remoteShuffle;
+    private string _remoteRepeat = "off";
 
     internal LibraryWindow(LibraryController controller, SatelliteHost host, Action openSettings)
     {
@@ -59,11 +72,31 @@ public sealed partial class LibraryWindow : Window
             }
         };
 
+        _footerProgressTimer = DispatcherQueue.CreateTimer();
+        _footerProgressTimer.Interval = TimeSpan.FromMilliseconds(500);
+        _footerProgressTimer.Tick += (_, _) => UpdateFooterProgress();
+        _footerProgressTimer.Start();
+
+        _footerSeekDebounce = DispatcherQueue.CreateTimer();
+        _footerSeekDebounce.Interval = TimeSpan.FromMilliseconds(350);
+        _footerSeekDebounce.IsRepeating = false;
+        _footerSeekDebounce.Tick += async (_, _) => await SendFooterSeekAsync();
+
+        _footerVolumeDebounce = DispatcherQueue.CreateTimer();
+        _footerVolumeDebounce.Interval = TimeSpan.FromMilliseconds(250);
+        _footerVolumeDebounce.IsRepeating = false;
+        _footerVolumeDebounce.Tick += async (_, _) => await SendFooterVolumeAsync();
+
+        _host.Volume.Changed += OnFooterSystemVolumeChanged;
         _controller.Service.ServerEvent += OnServerEvent;
         Closed += (_, _) =>
         {
             _closed = true;
             _queueRefresh.Stop();
+            _footerProgressTimer.Stop();
+            _footerSeekDebounce.Stop();
+            _footerVolumeDebounce.Stop();
+            _host.Volume.Changed -= OnFooterSystemVolumeChanged;
             ++_artworkRequestId;
             _controller.Service.ServerEvent -= OnServerEvent;
         };
@@ -160,7 +193,12 @@ public sealed partial class LibraryWindow : Window
             return;
         }
 
+        _footerSeekDebounce.Stop();
+        _footerVolumeDebounce.Stop();
+        _remoteMuted = false;
+        ResetFooterControls();
         RefreshTransferTargets();
+        await RefreshFooterVolumeAsync();
         if (_tab is "queue" or "now")
         {
             await LoadTabAsync();
@@ -463,6 +501,7 @@ public sealed partial class LibraryWindow : Window
         // Invalidate in-flight queue responses from a previously selected remote player.
         ++_playbackRefreshRequest;
         ApplyPlaybackSummary(PlaybackSummaryLogic.FromLocal(_host.Status, target.Name));
+        ApplyLocalFooterControls();
     }
 
     private async Task RefreshPlaybackSummaryAsync()
@@ -483,6 +522,7 @@ public sealed partial class LibraryWindow : Window
         {
             // Don't depend on the MA queue for our own player: Sendspin has the actual track.
             ApplyPlaybackSummary(PlaybackSummaryLogic.FromLocal(_host.Status, target.Name));
+            ApplyLocalFooterControls();
             return;
         }
 
@@ -495,6 +535,8 @@ public sealed partial class LibraryWindow : Window
             }
 
             ApplyPlaybackSummary(PlaybackSummaryLogic.FromQueue(view));
+            ApplyRemoteFooterControls(view);
+            await RefreshFooterVolumeAsync();
         }
         catch (MaException)
         {
@@ -540,6 +582,222 @@ public sealed partial class LibraryWindow : Window
         }
 
         UpdatePlaybackArtwork(summary);
+        if (SelectedTarget is null)
+        {
+            ResetFooterControls();
+        }
+    }
+
+
+    private void ResetFooterControls()
+    {
+        _updatingFooter = true;
+        try
+        {
+            _footerDurationMs = 0;
+            FooterSeekSlider.IsEnabled = false;
+            FooterSeekSlider.Maximum = 1;
+            FooterSeekSlider.Value = 0;
+            FooterElapsed.Text = "0:00";
+            FooterDuration.Text = "—";
+            FooterShuffleButton.IsEnabled = false;
+            FooterRepeatButton.IsEnabled = false;
+            FooterMuteButton.IsEnabled = false;
+            FooterVolumeSlider.IsEnabled = false;
+        }
+        finally { _updatingFooter = false; }
+    }
+
+    private void ApplyLocalFooterControls()
+    {
+        var session = _host.Status.Session;
+        var duration = session.Metadata.Progress?.TrackDurationMs ?? 0;
+        var transport = TransportLogic.Describe(session);
+        _footerDurationMs = duration;
+        FooterSeekSlider.IsEnabled = transport.CanSeek && duration > 0;
+        FooterShuffleButton.IsEnabled = false; // Sendspin does not expose queue shuffle or repeat.
+        FooterRepeatButton.IsEnabled = false;
+        FooterMuteButton.IsEnabled = true;
+        FooterVolumeSlider.IsEnabled = true;
+        SetFooterVolume(_host.Status.Volume, _host.Status.Muted);
+        UpdateFooterProgress();
+    }
+
+    private void ApplyRemoteFooterControls(QueueView view)
+    {
+        var queue = view.Queue;
+        _remoteShuffle = queue?.Shuffle ?? false;
+        _remoteRepeat = queue?.Repeat ?? "off";
+        _remotePlaying = queue?.State is "play" or "playing";
+        _remoteElapsedMs = (long)Math.Max(0, (queue?.ElapsedSeconds ?? 0) * 1000);
+        _remotePositionUpdated = DateTimeOffset.UtcNow;
+        var current = queue?.CurrentItem ?? view.Items.FirstOrDefault(i => i.Index == queue?.CurrentIndex);
+        _footerDurationMs = (long)(current?.DurationSeconds ?? 0) * 1000;
+        FooterSeekSlider.IsEnabled = current is not null && _footerDurationMs > 0;
+        FooterShuffleButton.IsEnabled = queue is not null;
+        FooterRepeatButton.IsEnabled = queue is not null;
+        UpdateFooterModes();
+        UpdateFooterProgress();
+    }
+
+    private void UpdateFooterModes()
+    {
+        FooterShuffleIcon.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+            _remoteShuffle ? "AuroraGood" : "AuroraMuted"];
+        FooterRepeatIcon.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+            _remoteRepeat == "off" ? "AuroraMuted" : "AuroraGood"];
+        ToolTipService.SetToolTip(FooterRepeatButton, $"Repeat: {_remoteRepeat}");
+        ToolTipService.SetToolTip(FooterShuffleButton, _remoteShuffle ? "Shuffle on" : "Shuffle off");
+    }
+
+    private void UpdateFooterProgress()
+    {
+        if (_closed || _footerSeekDebounce.IsRunning || SelectedTarget is null) return;
+        long position;
+        if (SelectedTarget.IsThisPc)
+        {
+            position = _host.Status.Session.Metadata.PositionMs(_host.ServerNowMicros) ?? 0;
+        }
+        else
+        {
+            var elapsed = _remotePlaying ? (long)(DateTimeOffset.UtcNow - _remotePositionUpdated).TotalMilliseconds : 0;
+            position = _remoteElapsedMs + Math.Max(0, elapsed);
+        }
+        var duration = _footerDurationMs;
+        _updatingFooter = true;
+        try
+        {
+            FooterSeekSlider.Maximum = Math.Max(1, duration);
+            FooterSeekSlider.Value = Math.Clamp(position, 0, Math.Max(1, duration));
+            FooterElapsed.Text = ProgressFormatter.Time(Math.Max(0, position));
+            FooterDuration.Text = duration > 0 ? ProgressFormatter.Time(duration) : "—";
+        }
+        finally { _updatingFooter = false; }
+    }
+
+    private void SetFooterVolume(int value, bool muted)
+    {
+        _updatingFooter = true;
+        try
+        {
+            FooterVolumeSlider.Value = Math.Clamp(value, 0, 100);
+            FooterMuteIcon.Glyph = muted || value == 0 ? "\uE74F" : "\uE767";
+        }
+        finally { _updatingFooter = false; }
+    }
+
+    private void OnFooterSystemVolumeChanged() => DispatcherQueue.TryEnqueue(() =>
+    {
+        if (!_closed && SelectedTarget?.IsThisPc == true)
+        {
+            SetFooterVolume(_host.Status.Volume, _host.Status.Muted);
+        }
+    });
+
+    private async Task RefreshFooterVolumeAsync()
+    {
+        if (_closed || SelectedTarget is not { } selected) return;
+        if (selected.IsThisPc)
+        {
+            FooterVolumeSlider.IsEnabled = FooterMuteButton.IsEnabled = true;
+            SetFooterVolume(_host.Status.Volume, _host.Status.Muted);
+            return;
+        }
+        try
+        {
+            var client = await _controller.Service.GetClientAsync();
+            var players = await client.GetPlayersAsync();
+            if (_closed || SelectedTarget?.QueueId != selected.QueueId) return;
+            var volume = players.FirstOrDefault(p => p.PlayerId == selected.QueueId)?.Volume;
+            FooterVolumeSlider.IsEnabled = FooterMuteButton.IsEnabled = volume.HasValue;
+            if (volume is { } value) SetFooterVolume(value, _remoteMuted);
+        }
+        catch (MaException)
+        {
+            if (!_closed && SelectedTarget?.QueueId == selected.QueueId)
+            {
+                FooterVolumeSlider.IsEnabled = FooterMuteButton.IsEnabled = false;
+            }
+        }
+    }
+
+    private void OnFooterSeekChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        if (_updatingFooter || !FooterSeekSlider.IsEnabled) return;
+        _pendingSeekMs = (long)e.NewValue;
+        FooterElapsed.Text = ProgressFormatter.Time(_pendingSeekMs);
+        _footerSeekDebounce.Stop();
+        _footerSeekDebounce.Start();
+    }
+
+    private async Task SendFooterSeekAsync()
+    {
+        if (SelectedTarget is not { } selected) return;
+        if (selected.IsThisPc)
+        {
+            var command = TransportLogic.Seek(_host.Status.Session, _pendingSeekMs);
+            if (command is not null) await _host.SendCommandAsync(command);
+        }
+        else
+        {
+            await RunAsync(() => _controller.SeekAsync(selected, _pendingSeekMs / 1000d));
+            _remoteElapsedMs = _pendingSeekMs;
+            _remotePositionUpdated = DateTimeOffset.UtcNow;
+        }
+    }
+
+    private void OnFooterVolumeChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        if (_updatingFooter || SelectedTarget is not { } target || !FooterVolumeSlider.IsEnabled) return;
+        _pendingVolume = (int)Math.Round(e.NewValue);
+        if (target.IsThisPc)
+        {
+            _host.Volume.SetVolume(_pendingVolume);
+        }
+        else
+        {
+            _footerVolumeDebounce.Stop();
+            _footerVolumeDebounce.Start();
+        }
+    }
+
+    private async Task SendFooterVolumeAsync()
+    {
+        if (SelectedTarget is { IsThisPc: false } target)
+        {
+            await RunAsync(() => _controller.SetVolumeAsync(target, _pendingVolume));
+        }
+    }
+
+    private async void OnFooterMute(object sender, RoutedEventArgs e)
+    {
+        if (SelectedTarget is not { } target) return;
+        if (target.IsThisPc)
+        {
+            _host.Volume.SetMuted(!_host.Volume.Muted);
+            SetFooterVolume(_host.Status.Volume, _host.Volume.Muted);
+        }
+        else
+        {
+            _remoteMuted = !_remoteMuted;
+            await RunAsync(() => _controller.SetMutedAsync(target, _remoteMuted));
+            SetFooterVolume((int)FooterVolumeSlider.Value, _remoteMuted);
+        }
+    }
+
+    private async void OnFooterShuffle(object sender, RoutedEventArgs e)
+    {
+        if (SelectedTarget is not { IsThisPc: false } target) return;
+        await RunAsync(() => _controller.SetShuffleAsync(target, !_remoteShuffle));
+        await RefreshPlaybackSummaryAsync();
+    }
+
+    private async void OnFooterRepeat(object sender, RoutedEventArgs e)
+    {
+        if (SelectedTarget is not { IsThisPc: false } target) return;
+        var next = _remoteRepeat switch { "off" => "all", "all" => "one", _ => "off" };
+        await RunAsync(() => _controller.SetRepeatAsync(target, next));
+        await RefreshPlaybackSummaryAsync();
     }
 
     private void UpdatePlaybackArtwork(PlaybackSummary summary)
@@ -602,6 +860,12 @@ public sealed partial class LibraryWindow : Window
         // ServerEvent is raised by the Music Assistant WebSocket thread.
         // Never access TargetBox.SelectedItem (or any WinUI control) until we're on the UI thread.
         // Elapsed-time ticks do not change the queue list.
+        if (e.Event == "player_updated")
+        {
+            DispatcherQueue.TryEnqueue(() => { if (!_closed && SelectedTarget?.IsThisPc == false) _ = RefreshFooterVolumeAsync(); });
+            return;
+        }
+
         if (e.Event is not ("queue_updated" or "queue_items_updated"))
         {
             return;

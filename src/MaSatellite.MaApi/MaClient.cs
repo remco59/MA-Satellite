@@ -146,6 +146,41 @@ public sealed class MaClient : IAsyncDisposable
     public Task PlayQueueIndexAsync(string queueId, int index, CancellationToken ct = default) =>
         _connection.SendCommandAsync("player_queues/play_index", new Dictionary<string, object?> { ["queue_id"] = queueId, ["index"] = index }, cancellationToken: ct);
 
+    public Task SeekQueueAsync(string queueId, double seconds, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("player_queues/seek", new Dictionary<string, object?>
+        {
+            ["queue_id"] = queueId,
+            ["position"] = Math.Max(0, seconds),
+        }, cancellationToken: ct);
+
+    public Task SetShuffleAsync(string queueId, bool enabled, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("player_queues/shuffle", new Dictionary<string, object?>
+        {
+            ["queue_id"] = queueId,
+            ["shuffle_enabled"] = enabled,
+        }, cancellationToken: ct);
+
+    public Task SetRepeatAsync(string queueId, string mode, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("player_queues/repeat", new Dictionary<string, object?>
+        {
+            ["queue_id"] = queueId,
+            ["repeat_mode"] = mode is "one" or "all" ? mode : "off",
+        }, cancellationToken: ct);
+
+    public Task SetPlayerVolumeAsync(string playerId, int volume, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("players/cmd/volume_set", new Dictionary<string, object?>
+        {
+            ["player_id"] = playerId,
+            ["volume_level"] = Math.Clamp(volume, 0, 100),
+        }, cancellationToken: ct);
+
+    public Task SetPlayerMutedAsync(string playerId, bool muted, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("players/cmd/volume_mute", new Dictionary<string, object?>
+        {
+            ["player_id"] = playerId,
+            ["muted"] = muted,
+        }, cancellationToken: ct);
+
     /// <summary>Finds the player that represents this PC: by client id, then by name.</summary>
     public static MaPlayer? FindThisPlayer(IEnumerable<MaPlayer> players, string clientId, string playerName)
     {
