@@ -86,7 +86,7 @@ public sealed class MaClient : IAsyncDisposable
     }
 
     /// <summary>Lists a library collection with optional server-side sorting across the whole library.</summary>
-    public async Task<IReadOnlyList<MaItem>> GetLibraryAsync(MaMediaType type, string? search = null, int limit = 100, int offset = 0, CancellationToken ct = default, string? sortField = null, string? sortDirection = null)
+    public async Task<IReadOnlyList<MaItem>> GetLibraryAsync(MaMediaType type, string? search = null, int limit = 100, int offset = 0, string? sortField = null, string? sortDirection = null, CancellationToken ct = default)
     {
         var command = type switch
         {
