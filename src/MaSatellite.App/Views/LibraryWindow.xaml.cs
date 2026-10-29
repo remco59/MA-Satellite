@@ -212,6 +212,36 @@ public sealed partial class LibraryWindow : Window
         }
     }
 
+    /// <summary>Keep browsing and transport usable when the desktop window is resized.</summary>
+    private void OnLibrarySizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        var width = e.NewSize.Width;
+        SidebarColumn.Width = new GridLength(width < 760 ? 152 : width < 1030 ? 184 : 208);
+        TargetColumn.Width = new GridLength(width < 760 ? 152 : width < 1030 ? 198 : 244);
+        MainContent.Padding = width < 880 ? new Thickness(14, 14, 14, 10) : new Thickness(24, 18, 24, 12);
+
+        // Essential playback controls always stay in view. The full volume controls
+        // are also available in the tray player at narrow widths.
+        FooterVolumeGroup.Visibility = width < 1040 ? Visibility.Collapsed : Visibility.Visible;
+        FooterShuffleButton.Visibility = width < 820 ? Visibility.Collapsed : Visibility.Visible;
+        FooterRepeatButton.Visibility = width < 820 ? Visibility.Collapsed : Visibility.Visible;
+        HomeHeroArtwork.Visibility = width < 710 ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private async void OnRetry(object sender, RoutedEventArgs e)
+    {
+        await LoadTargetsAsync();
+        await LoadTabAsync();
+    }
+
+    private void ShowEmptyState(string title, string detail, bool retry = false)
+    {
+        EmptyText.Text = title;
+        EmptyDetail.Text = detail;
+        RetryButton.Visibility = retry ? Visibility.Visible : Visibility.Collapsed;
+        EmptyState.Visibility = Visibility.Visible;
+    }
+
     private void UpdateNavigationState()
     {
         var selected = (Style)Application.Current.Resources["AuroraNavSelectedButtonStyle"];
@@ -230,7 +260,9 @@ public sealed partial class LibraryWindow : Window
     {
         var id = ++_loadId;
         Message.IsOpen = false;
-        EmptyText.Visibility = Visibility.Collapsed;
+        EmptyState.Visibility = Visibility.Collapsed;
+        RetryButton.Visibility = Visibility.Collapsed;
+        LoadingState.Visibility = Visibility.Visible;
         Busy.IsActive = true;
         UpdateNavigationState();
         ContextBar.Visibility = _openedItem is null ? Visibility.Collapsed : Visibility.Visible;
@@ -336,15 +368,29 @@ public sealed partial class LibraryWindow : Window
             HomeAlbumSection.Visibility = albumShelf.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             AlbumGrid.ItemsSource = useGrid ? rows : null;
             List.ItemsSource = (isHome || useGrid) ? null : rows;
-            EmptyText.Text = empty;
-            EmptyText.Visibility = (isHome ? rows.Count + recentRows.Count == 0 : rows.Count == 0)
-                ? Visibility.Visible : Visibility.Collapsed;
+            if (isHome ? rows.Count + recentRows.Count == 0 : rows.Count == 0)
+            {
+                var detail = _tab switch
+                {
+                    "search" => string.IsNullOrWhiteSpace(_lastQuery)
+                        ? "Enter an artist, album or track above to begin."
+                        : "Try a different search term.",
+                    "queue" or "now" => "Add something to your selected player's queue to get started.",
+                    "home" => "Add music to your Music Assistant library to see it here.",
+                    _ => "Items you add to your Music Assistant library will appear here.",
+                };
+                ShowEmptyState(empty, detail);
+            }
+
             await RefreshPlaybackSummaryAsync();
         }
         catch (MaException ex) when (id == _loadId)
         {
             List.ItemsSource = null;
             AlbumGrid.ItemsSource = null;
+            HomeRecentGrid.ItemsSource = null;
+            HomeAlbumsGrid.ItemsSource = null;
+            ShowEmptyState("Couldn't load your music", "Check the Music Assistant connection and try again.", retry: true);
             ShowError(ex);
         }
         finally
@@ -352,6 +398,7 @@ public sealed partial class LibraryWindow : Window
             if (id == _loadId)
             {
                 Busy.IsActive = false;
+                LoadingState.Visibility = Visibility.Collapsed;
             }
         }
     }
