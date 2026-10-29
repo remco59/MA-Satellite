@@ -129,9 +129,59 @@ public class MaClientTests
     }
 
     [Fact]
-    public async Task Library_sorting_is_sent_to_music_assistant_instead_of_sorting_only_loaded_items()
+    public async Task Legacy_music_assistant_sends_order_by_for_descending_library_sort()
+    {
+        // MA <= 2.10 ignores sort_field and sort_direction without an error.
+        await using var server = new FakeMaServer(serverVersion: "2.10.8");
+        server.Handlers["music/albums/library_items"] = args =>
+        {
+            var newestFirst = args.TryGetProperty("order_by", out var order)
+                && order.GetString() == "year_desc";
+            var data = new[]
+            {
+                new { item_id = "a", provider = "library", name = "A 2019", media_type = "album", uri = "library://album/a", year = 2019 },
+                new { item_id = "b", provider = "library", name = "B 2024", media_type = "album", uri = "library://album/b", year = 2024 },
+                new { item_id = "c", provider = "library", name = "C 2023", media_type = "album", uri = "library://album/c", year = 2023 },
+            };
+            return newestFirst ? data.OrderByDescending(a => a.year).ToArray() : data;
+        };
+        await using var client = await ConnectAsync(server);
+
+        var albums = await client.GetLibraryAsync(MaMediaType.Album, sortField: "year", sortDirection: "desc");
+
+        Assert.Equal(new int?[] { 2024, 2023, 2019 }, albums.Select(a => a.Year));
+        var args = server.Received.Last(r => r.Command == "music/albums/library_items").Args;
+        Assert.Equal("year_desc", args.GetProperty("order_by").GetString());
+        Assert.False(args.TryGetProperty("sort_field", out _));
+        Assert.False(args.TryGetProperty("sort_direction", out _));
+    }
+
+    [Fact]
+    public async Task Legacy_music_assistant_preserves_ascending_and_default_sorts()
     {
         await using var server = new FakeMaServer();
+        server.Handlers["music/playlists/library_items"] = _ => Array.Empty<object>();
+        await using var client = await ConnectAsync(server);
+
+        await client.GetLibraryAsync(MaMediaType.Playlist, sortField: "sort_name", sortDirection: "asc");
+        var args = server.Received.Last(r => r.Command == "music/playlists/library_items").Args;
+        Assert.Equal("sort_name", args.GetProperty("order_by").GetString());
+
+        await client.GetLibraryAsync(MaMediaType.Playlist, sortField: "play_count", sortDirection: "desc");
+        args = server.Received.Last(r => r.Command == "music/playlists/library_items").Args;
+        Assert.Equal("play_count_desc", args.GetProperty("order_by").GetString());
+
+        await client.GetLibraryAsync(MaMediaType.Playlist);
+        args = server.Received.Last(r => r.Command == "music/playlists/library_items").Args;
+        Assert.False(args.TryGetProperty("order_by", out _));
+        Assert.False(args.TryGetProperty("sort_field", out _));
+        Assert.False(args.TryGetProperty("sort_direction", out _));
+    }
+
+    [Fact]
+    public async Task Modern_music_assistant_uses_typed_sort_fields()
+    {
+        await using var server = new FakeMaServer(schemaVersion: 75, serverVersion: "2.11.0");
         server.Handlers["music/playlists/library_items"] = _ => Array.Empty<object>();
         await using var client = await ConnectAsync(server);
 
@@ -139,11 +189,13 @@ public class MaClientTests
         var args = server.Received.Last(r => r.Command == "music/playlists/library_items").Args;
         Assert.Equal("play_count", args.GetProperty("sort_field").GetString());
         Assert.Equal("desc", args.GetProperty("sort_direction").GetString());
+        Assert.False(args.TryGetProperty("order_by", out _));
 
         await client.GetLibraryAsync(MaMediaType.Playlist);
-        var defaultArgs = server.Received.Last(r => r.Command == "music/playlists/library_items").Args;
-        Assert.False(defaultArgs.TryGetProperty("sort_field", out _));
-        Assert.False(defaultArgs.TryGetProperty("sort_direction", out _));
+        args = server.Received.Last(r => r.Command == "music/playlists/library_items").Args;
+        Assert.False(args.TryGetProperty("sort_field", out _));
+        Assert.False(args.TryGetProperty("sort_direction", out _));
+        Assert.False(args.TryGetProperty("order_by", out _));
     }
 
     [Fact]
