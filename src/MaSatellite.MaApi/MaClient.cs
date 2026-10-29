@@ -9,6 +9,7 @@ namespace MaSatellite.MaApi;
 public sealed class MaClient : IAsyncDisposable
 {
     private static readonly string[] SearchMediaTypes = ["artist", "album", "track", "playlist"];
+    private static readonly string[] RecentlyPlayedMediaTypes = ["track", "album"];
 
     private readonly MaConnection _connection;
     private readonly string _baseUrl;
@@ -52,6 +53,17 @@ public sealed class MaClient : IAsyncDisposable
             result.ValueKind == JsonValueKind.Object && result.TryGetProperty(name, out var arr) ? MaItemParser.ParseItems(arr, _baseUrl) : [];
 
         return new MaSearchResults(Items("artists"), Items("albums"), Items("tracks"), Items("playlists"));
+    }
+
+    /// <summary>Returns recent library listening history; the server is the source of truth.</summary>
+    public async Task<IReadOnlyList<MaItem>> GetRecentlyPlayedAsync(int limit = 12, CancellationToken ct = default)
+    {
+        var result = await _connection.SendCommandAsync("music/recently_played_items", new Dictionary<string, object?>
+        {
+            ["limit"] = limit,
+            ["media_types"] = RecentlyPlayedMediaTypes,
+        }, cancellationToken: ct).ConfigureAwait(false);
+        return MaItemParser.ParseItems(result, _baseUrl);
     }
 
     /// <summary>Lists a library collection (artists, albums, tracks or playlists), optionally filtered by a text search.</summary>

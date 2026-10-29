@@ -53,6 +53,9 @@ public sealed partial class LibraryWindow : Window
         _host = host;
         _openSettings = openSettings;
         InitializeComponent();
+        // Share the library's existing clickable album card template across Home shelves.
+        HomeRecentGrid.ItemTemplate = AlbumGrid.ItemTemplate;
+        HomeAlbumsGrid.ItemTemplate = AlbumGrid.ItemTemplate;
         AuroraWindowChrome.Apply(this);
         Title = "ma-satellite library";
         AppWindow.Resize(new SizeInt32(1180, 790));
@@ -235,9 +238,11 @@ public sealed partial class LibraryWindow : Window
         QueueBar.Visibility = (_tab is "queue" or "now") && _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
         NowPlayingHero.Visibility = _tab == "now" && _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
         HomeHero.Visibility = _tab == "home" && _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
-        var useGrid = (_tab is "home" or "album") && _openedItem is null;
+        var isHome = _tab == "home" && _openedItem is null;
+        var useGrid = _tab == "album" && _openedItem is null;
+        HomeShelves.Visibility = isHome ? Visibility.Visible : Visibility.Collapsed;
         AlbumGrid.Visibility = useGrid ? Visibility.Visible : Visibility.Collapsed;
-        List.Visibility = useGrid ? Visibility.Collapsed : Visibility.Visible;
+        List.Visibility = (isHome || useGrid) ? Visibility.Collapsed : Visibility.Visible;
         ContentHeading.Text = _openedItem?.Name ?? (_tab switch
         {
             "now" => "Now playing",
@@ -252,7 +257,7 @@ public sealed partial class LibraryWindow : Window
         ContentDescription.Text = _openedItem is not null ? "Explore and play your selection." : _tab switch
         {
             "now" => "Your current Music Assistant playback and what's up next.",
-            "home" => "Your music, beautifully organised.",
+            "home" => "Your recent plays and albums in one place.",
             "queue" => "Manage what's coming up next.",
             "search" => "Find music across your library and providers.",
             _ => "Everything you love, beautifully organised.",
@@ -260,6 +265,7 @@ public sealed partial class LibraryWindow : Window
         try
         {
             List<ListRow> rows;
+            List<ListRow> recentRows = [];
             string empty = "Nothing here yet.";
             if (_openedItem is { } parent)
             {
@@ -271,6 +277,24 @@ public sealed partial class LibraryWindow : Window
             {
                 rows = await LoadQueueRowsAsync();
                 empty = "The queue is empty.";
+            }
+            else if (_tab == "home")
+            {
+                var client = await _controller.Service.GetClientAsync();
+                rows = (await client.GetLibraryAsync(MaMediaType.Album, limit: 60))
+                    .Select(i => ListRow.From(i)).ToList();
+                try
+                {
+                    recentRows = (await client.GetRecentlyPlayedAsync(20))
+                        .Where(i => i.Type is MaMediaType.Album or MaMediaType.Track)
+                        .Select(i => ListRow.From(i)).ToList();
+                }
+                catch (MaException)
+                {
+                    // Older servers may not provide listening history; never invent it.
+                    recentRows = [];
+                }
+                empty = "No music yet. Add albums to Music Assistant to get started.";
             }
             else if (_tab == "search")
             {
@@ -293,17 +317,28 @@ public sealed partial class LibraryWindow : Window
             }
 
             // Use actual library data for Home; there are no demo tracks or fake buttons.
-            var featured = _tab == "home" ? rows.FirstOrDefault(r => r.Item?.IsPlayable == true) : null;
+            var featured = isHome
+                ? recentRows.FirstOrDefault(r => r.Item?.IsPlayable == true)
+                    ?? rows.FirstOrDefault(r => r.Item?.IsPlayable == true)
+                : null;
             _featuredAlbum = featured?.Item;
             HomeTitle.Text = featured?.Title ?? "Your music, ready to play";
             HomeArtist.Text = featured?.Subtitle ?? "Explore your albums and playlists.";
             HomeArtwork.Source = featured?.Image;
             HomePlayButton.IsEnabled = _featuredAlbum is not null && SelectedTarget is not null;
-            // Only realize the active visual tree; both controls use virtualization.
+            // A featured item never immediately repeats as the first shelf card.
+            var featuredUri = featured?.Item?.Uri;
+            List<ListRow> recentShelf = isHome ? recentRows.Where(r => r.Item?.Uri != featuredUri).Take(16).ToList() : [];
+            List<ListRow> albumShelf = isHome ? rows.Where(r => r.Item?.Uri != featuredUri).Take(30).ToList() : [];
+            HomeRecentGrid.ItemsSource = isHome ? recentShelf : null;
+            HomeAlbumsGrid.ItemsSource = isHome ? albumShelf : null;
+            HomeRecentSection.Visibility = recentShelf.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            HomeAlbumSection.Visibility = albumShelf.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             AlbumGrid.ItemsSource = useGrid ? rows : null;
-            List.ItemsSource = useGrid ? null : rows;
+            List.ItemsSource = (isHome || useGrid) ? null : rows;
             EmptyText.Text = empty;
-            EmptyText.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            EmptyText.Visibility = (isHome ? rows.Count + recentRows.Count == 0 : rows.Count == 0)
+                ? Visibility.Visible : Visibility.Collapsed;
             await RefreshPlaybackSummaryAsync();
         }
         catch (MaException ex) when (id == _loadId)
