@@ -408,6 +408,14 @@ public sealed partial class LibraryWindow : Window
         await LoadTabAsync();
     }
 
+    private async void OnCardPlay(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: ListRow { Item: { IsPlayable: true } item } })
+        {
+            await PlayAsync(item, MaQueueOption.Replace);
+        }
+    }
+
     private void OnRowMenu(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: ListRow { Item: { } item } })
