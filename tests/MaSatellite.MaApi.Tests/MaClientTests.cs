@@ -129,6 +129,45 @@ public class MaClientTests
     }
 
     [Fact]
+    public async Task Library_sorting_is_sent_to_music_assistant_instead_of_sorting_only_loaded_items()
+    {
+        await using var server = new FakeMaServer();
+        server.Handlers["music/playlists/library_items"] = _ => Array.Empty<object>();
+        await using var client = await ConnectAsync(server);
+
+        await client.GetLibraryAsync(MaMediaType.Playlist, sortField: "play_count", sortDirection: "desc");
+        var args = server.Received.Last(r => r.Command == "music/playlists/library_items").Args;
+        Assert.Equal("play_count", args.GetProperty("sort_field").GetString());
+        Assert.Equal("desc", args.GetProperty("sort_direction").GetString());
+
+        await client.GetLibraryAsync(MaMediaType.Playlist);
+        var defaultArgs = server.Received.Last(r => r.Command == "music/playlists/library_items").Args;
+        Assert.False(defaultArgs.TryGetProperty("sort_field", out _));
+        Assert.False(defaultArgs.TryGetProperty("sort_direction", out _));
+    }
+
+    [Fact]
+    public async Task Similar_artists_uses_real_provider_results()
+    {
+        await using var server = new FakeMaServer();
+        server.Handlers["music/artists/similar_artists"] = _ => new[]
+        {
+            new { item_id = "8", provider = "music", name = "Related artist", media_type = "artist", uri = "music://artist/8" },
+        };
+        await using var client = await ConnectAsync(server);
+        var seed = new MaItem(MaMediaType.Artist, "4", "library", "Seed", "library://artist/4", null, null, null, null, null);
+
+        var similar = await client.GetSimilarArtistsAsync(seed, limit: 8);
+
+        Assert.Single(similar);
+        Assert.Equal("Related artist", similar[0].Name);
+        var args = server.Received.Last(r => r.Command == "music/artists/similar_artists").Args;
+        Assert.Equal("4", args.GetProperty("item_id").GetString());
+        Assert.Equal(8, args.GetProperty("limit").GetInt32());
+        Assert.Equal("library", args.GetProperty("provider_instance_id_or_domain").GetString());
+    }
+
+    [Fact]
     public async Task Chunked_results_are_concatenated()
     {
         await using var server = new FakeMaServer();

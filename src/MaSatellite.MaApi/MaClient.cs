@@ -66,8 +66,27 @@ public sealed class MaClient : IAsyncDisposable
         return MaItemParser.ParseItems(result, _baseUrl);
     }
 
-    /// <summary>Lists a library collection (artists, albums, tracks or playlists), optionally filtered by a text search.</summary>
-    public async Task<IReadOnlyList<MaItem>> GetLibraryAsync(MaMediaType type, string? search = null, int limit = 100, int offset = 0, CancellationToken ct = default)
+    /// <summary>Looks up provider-backed artists similar to one from the listening history; may be unsupported by some providers.</summary>
+    public async Task<IReadOnlyList<MaItem>> GetSimilarArtistsAsync(MaItem artist, int limit = 16, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(artist);
+        if (artist.Type != MaMediaType.Artist)
+        {
+            throw new ArgumentException("A seed artist is required.", nameof(artist));
+        }
+
+        var result = await _connection.SendCommandAsync("music/artists/similar_artists", new Dictionary<string, object?>
+        {
+            ["item_id"] = artist.ItemId,
+            ["provider_instance_id_or_domain"] = artist.Provider,
+            ["limit"] = limit,
+        }, cancellationToken: ct).ConfigureAwait(false);
+
+        return MaItemParser.ParseItems(result, _baseUrl);
+    }
+
+    /// <summary>Lists a library collection with optional server-side sorting across the whole library.</summary>
+    public async Task<IReadOnlyList<MaItem>> GetLibraryAsync(MaMediaType type, string? search = null, int limit = 100, int offset = 0, string? sortField = null, string? sortDirection = null, CancellationToken ct = default)
     {
         var command = type switch
         {
@@ -78,12 +97,19 @@ public sealed class MaClient : IAsyncDisposable
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported library type"),
         };
 
-        var result = await _connection.SendCommandAsync(command, new Dictionary<string, object?>
+        var args = new Dictionary<string, object?>
         {
             ["search"] = string.IsNullOrWhiteSpace(search) ? null : search.Trim(),
             ["limit"] = limit,
             ["offset"] = offset,
-        }, cancellationToken: ct).ConfigureAwait(false);
+        };
+        if (!string.IsNullOrWhiteSpace(sortField))
+        {
+            args["sort_field"] = sortField;
+            args["sort_direction"] = sortDirection is "asc" or "desc" ? sortDirection : "asc";
+        }
+
+        var result = await _connection.SendCommandAsync(command, args, cancellationToken: ct).ConfigureAwait(false);
         return MaItemParser.ParseItems(result, _baseUrl);
     }
 
