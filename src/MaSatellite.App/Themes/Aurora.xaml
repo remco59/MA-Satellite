@@ -7,6 +7,8 @@
   <SolidColorBrush x:Key="AuroraSidebar" Color="#10192B"/>
   <SolidColorBrush x:Key="AuroraCard" Color="#1B2940"/>
   <SolidColorBrush x:Key="AuroraCardSoft" Color="#172237"/>
+  <SolidColorBrush x:Key="AuroraSurfaceRaised" Color="#1A2940"/>
+  <SolidColorBrush x:Key="AuroraAccentSoft" Color="#2B3D61"/>
   <SolidColorBrush x:Key="AuroraInput" Color="#202D43"/>
   <SolidColorBrush x:Key="AuroraBorder" Color="#304057"/>
   <SolidColorBrush x:Key="AuroraText" Color="#F5F7FF"/>
@@ -27,7 +29,7 @@
     <GradientStop Color="#0F1728" Offset="1"/>
   </LinearGradientBrush>
   <Style x:Key="AuroraTitleStyle" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="30"/>
+    <Setter Property="FontSize" Value="28"/>
     <Setter Property="FontWeight" Value="Bold"/>
     <Setter Property="Foreground" Value="{StaticResource AuroraText}"/>
     <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
@@ -45,7 +47,7 @@
     <Setter Property="Padding" Value="16"/>
   </Style>
   <Style x:Key="AuroraButtonStyle" TargetType="Button">
-    <Setter Property="Background" Value="{StaticResource AuroraCard}"/>
+    <Setter Property="Background" Value="{StaticResource AuroraSurfaceRaised}"/>
     <Setter Property="Foreground" Value="{StaticResource AuroraText}"/>
     <Setter Property="BorderBrush" Value="{StaticResource AuroraBorder}"/>
     <Setter Property="BorderThickness" Value="1"/>
@@ -76,6 +78,12 @@
     <Setter Property="Background" Value="{StaticResource AuroraCard}"/>
     <Setter Property="Foreground" Value="{StaticResource AuroraText}"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
+  </Style>
+  <!-- Keep focus legible against the dark surfaces without a heavy filled border. -->
+  <Style x:Key="AuroraStatusTextStyle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+    <Setter Property="Foreground" Value="{StaticResource AuroraMuted}"/>
   </Style>
   <Style x:Key="AuroraSectionLabelStyle" TargetType="TextBlock">
     <Setter Property="Foreground" Value="{StaticResource AuroraMuted}"/>

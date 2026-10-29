@@ -4,9 +4,9 @@
   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:local="using:MaSatellite.App.Views">
-  <Grid Background="{StaticResource AuroraBackground}" RequestedTheme="Dark">
+  <Grid x:Name="LibraryRoot" Background="{StaticResource AuroraBackground}" RequestedTheme="Dark" SizeChanged="OnLibrarySizeChanged">
     <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="108"/></Grid.RowDefinitions>
-    <Grid.ColumnDefinitions><ColumnDefinition Width="208"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+    <Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="208"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
     <!-- Persistent navigation. Every button selects a real library view. -->
     <Border Grid.Column="0" Grid.RowSpan="2" Background="{StaticResource AuroraSidebarGradient}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,0,1,0">
       <Grid Padding="17,27,17,18">
@@ -76,13 +76,13 @@
           </Button>
         </StackPanel>
         <StackPanel Grid.Row="3" Spacing="15">
-          <Border Background="{StaticResource AuroraCardSoft}" CornerRadius="14" Padding="13" BorderThickness="1" BorderBrush="{StaticResource AuroraBorder}">
+          <Border Background="{StaticResource AuroraSurfaceRaised}" CornerRadius="14" Padding="13" BorderThickness="1" BorderBrush="{StaticResource AuroraBorder}">
             <StackPanel Spacing="6">
               <StackPanel Orientation="Horizontal" Spacing="7">
                 <FontIcon Glyph="&#xE73E;" FontSize="12" Foreground="{StaticResource AuroraGood}"/>
                 <TextBlock Text="Music Assistant" Foreground="{StaticResource AuroraText}" FontSize="12" FontWeight="SemiBold"/>
               </StackPanel>
-              <TextBlock x:Name="SidebarStatus" Text="Connecting to your library…" Foreground="{StaticResource AuroraMuted}" FontSize="11" TextTrimming="CharacterEllipsis"/>
+              <TextBlock x:Name="SidebarStatus" Text="Connecting to your library…" AutomationProperties.LiveSetting="Polite" Foreground="{StaticResource AuroraMuted}" FontSize="11" TextTrimming="CharacterEllipsis"/>
             </StackPanel>
           </Border>
           <Button Click="OnOpenSettings" Style="{StaticResource AuroraNavButtonStyle}" AutomationProperties.Name="Open settings">
@@ -95,13 +95,13 @@
     </Border>
 
     <!-- Main content -->
-    <Grid Grid.Column="1" Padding="24,18,24,12" RowSpacing="13">
+    <Grid x:Name="MainContent" Grid.Column="1" Padding="24,18,24,12" RowSpacing="13">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
         <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
       </Grid.RowDefinitions>
       <Grid ColumnSpacing="16">
-        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="244"/></Grid.ColumnDefinitions>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition x:Name="TargetColumn" Width="244"/></Grid.ColumnDefinitions>
         <AutoSuggestBox x:Name="SearchBox" PlaceholderText="Search Music Assistant…" QueryIcon="Find"
                         QuerySubmitted="OnSearchSubmitted" MaxWidth="620" HorizontalAlignment="Stretch"
                         AutomationProperties.Name="Search music"/>
@@ -120,7 +120,7 @@
       </InfoBar>
       <Grid x:Name="ContextBar" Grid.Row="3" ColumnSpacing="8" Visibility="Collapsed">
         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <Button x:Name="BackButton" Click="OnBack" ToolTipService.ToolTip="Back" Style="{StaticResource AuroraButtonStyle}">
+        <Button x:Name="BackButton" Click="OnBack" ToolTipService.ToolTip="Back" AutomationProperties.Name="Back to library" Style="{StaticResource AuroraButtonStyle}">
           <FontIcon Glyph="&#xE72B;"/>
         </Button>
         <TextBlock x:Name="ContextTitle" Grid.Column="1" VerticalAlignment="Center"
@@ -139,7 +139,7 @@
           <Button x:Name="QueueNextButton" Click="OnQueueNext" Style="{StaticResource AuroraButtonStyle}" ToolTipService.ToolTip="Next"><FontIcon Glyph="&#xE893;"/></Button>
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-          <ComboBox x:Name="TransferBox" Width="200" PlaceholderText="Transfer to…"/>
+          <ComboBox x:Name="TransferBox" Width="200" PlaceholderText="Transfer to…" AutomationProperties.Name="Transfer destination"/>
           <Button Content="Transfer queue" Style="{StaticResource AuroraButtonStyle}" Click="OnTransfer"/>
         </StackPanel>
       </Grid>
@@ -155,10 +155,10 @@
                          FontSize="23" FontWeight="Bold" TextTrimming="CharacterEllipsis" MaxLines="1"/>
               <TextBlock x:Name="HomeArtist" Text="Explore your albums and playlists." Foreground="{StaticResource AuroraMuted}"
                          FontSize="12" TextTrimming="CharacterEllipsis" MaxLines="1"/>
-              <Button x:Name="HomePlayButton" Click="OnHomePlay" Content="Play selection"
+              <Button x:Name="HomePlayButton" Click="OnHomePlay" Content="Play selection" AutomationProperties.Name="Play featured selection"
                       Style="{StaticResource AuroraPrimaryButtonStyle}" HorizontalAlignment="Left" Margin="0,7,0,0"/>
             </StackPanel>
-            <Border Grid.Column="1" Width="128" Height="128" Background="{StaticResource AuroraCard}" CornerRadius="14">
+            <Border x:Name="HomeHeroArtwork" Grid.Column="1" Width="128" Height="128" Background="{StaticResource AuroraCard}" CornerRadius="14">
               <Grid>
                 <FontIcon Glyph="&#xE8D6;" FontSize="35" Foreground="{StaticResource AuroraMuted}"/>
                 <Image x:Name="HomeArtwork" Stretch="UniformToFill"/>
@@ -287,9 +287,30 @@
             </DataTemplate>
           </ListView.ItemTemplate>
         </ListView>
-        <ProgressRing x:Name="Busy" Grid.RowSpan="2" IsActive="False" Width="42" Height="42" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-        <TextBlock x:Name="EmptyText" Grid.RowSpan="2" HorizontalAlignment="Center" VerticalAlignment="Center"
-                   Foreground="{StaticResource AuroraMuted}" Visibility="Collapsed" FontSize="14"/>
+        <!-- Distinct loading/empty/error surfaces keep the page understandable at all DPI settings. -->
+        <StackPanel x:Name="LoadingState" Grid.RowSpan="2" Visibility="Collapsed"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+          <ProgressRing x:Name="Busy" IsActive="False" Width="42" Height="42"
+                        AutomationProperties.Name="Loading your music"/>
+          <TextBlock Text="Loading your music…" Foreground="{StaticResource AuroraMuted}" FontSize="13"
+                     HorizontalAlignment="Center"/>
+        </StackPanel>
+        <Border x:Name="EmptyState" Grid.RowSpan="2" Visibility="Collapsed" HorizontalAlignment="Center"
+                VerticalAlignment="Center" MaxWidth="410" Padding="30,24" CornerRadius="18"
+                Background="{StaticResource AuroraSurfaceRaised}" BorderBrush="{StaticResource AuroraBorder}"
+                BorderThickness="1">
+          <StackPanel Spacing="11" HorizontalAlignment="Center">
+            <FontIcon Glyph="&#xE8D6;" FontSize="29" Foreground="{StaticResource AuroraAccent}"
+                      HorizontalAlignment="Center"/>
+            <TextBlock x:Name="EmptyText" Text="Nothing here yet" FontSize="17" FontWeight="SemiBold"
+                       Foreground="{StaticResource AuroraText}" TextAlignment="Center" TextWrapping="Wrap"/>
+            <TextBlock x:Name="EmptyDetail" Text="Your music will appear here." Style="{StaticResource AuroraStatusTextStyle}"
+                       MaxWidth="310" TextAlignment="Center"/>
+            <Button x:Name="RetryButton" Content="Try again" Visibility="Collapsed" Click="OnRetry"
+                    HorizontalAlignment="Center" Margin="0,6,0,0"
+                    Style="{StaticResource AuroraPrimaryButtonStyle}" AutomationProperties.Name="Retry loading music"/>
+          </StackPanel>
+        </Border>
       </Grid>
     </Grid>
     <!-- Persistent transport: local Sendspin state or the selected remote Music Assistant queue. -->
@@ -353,7 +374,7 @@
               <FontIcon x:Name="FooterRepeatIcon" Glyph="&#xE8EE;" FontSize="14"/>
             </Button>
           </StackPanel>
-          <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
+          <StackPanel x:Name="FooterVolumeGroup" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
             <Button x:Name="FooterMuteButton" Click="OnFooterMute" ToolTipService.ToolTip="Mute or unmute"
                     AutomationProperties.Name="Mute or unmute" Style="{StaticResource AuroraButtonStyle}" Padding="7">
               <FontIcon x:Name="FooterMuteIcon" Glyph="&#xE767;" FontSize="15"/>
