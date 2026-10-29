@@ -232,6 +232,18 @@
                 </GridView.ItemsPanel>
               </GridView>
             </StackPanel>
+            <StackPanel x:Name="HomeTopTracksSection" Spacing="6" Visibility="Collapsed">
+              <TextBlock Text="On repeat" Foreground="{StaticResource AuroraText}" FontSize="18" FontWeight="SemiBold"/>
+              <TextBlock Text="The tracks you play most, according to Music Assistant." Style="{StaticResource AuroraSubtitleStyle}"/>
+              <GridView x:Name="HomeTopTracksGrid" Height="284" IsItemClickEnabled="True" SelectionMode="None"
+                        ItemClick="OnItemClick" AutomationProperties.Name="Your most played tracks"
+                        ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                        ScrollViewer.VerticalScrollMode="Disabled">
+                <GridView.ItemsPanel>
+                  <ItemsPanelTemplate><ItemsStackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                </GridView.ItemsPanel>
+              </GridView>
+            </StackPanel>
             <StackPanel x:Name="HomePlaylistsSection" Spacing="6" Visibility="Collapsed">
               <TextBlock x:Name="HomePlaylistsTitle" Text="Your most played playlists" Foreground="{StaticResource AuroraText}" FontSize="18" FontWeight="SemiBold"/>
               <TextBlock Text="Your playlists, ranked by Music Assistant listening stats." Style="{StaticResource AuroraSubtitleStyle}"/>
