@@ -135,7 +135,7 @@ MSIX installs redirect the local app data directory under `%LOCALAPPDATA%\Packag
 **Prerequisites:** .NET **8 SDK**. Building the Windows app/MSIX requires Windows with Visual Studio 2022 or Build Tools and the **Windows application development** workload. Building the EXE installer also needs **Inno Setup 6**.
 
 ```powershell
-# Cross-platform unit tests (Windows, macOS, Linux)
+# Cross-platform tests (Windows, macOS, Linux)
 dotnet test MaSatellite.Linux.slnf
 
 # Full unit tests (Windows)
@@ -144,9 +144,10 @@ dotnet test MaSatellite.Tests.slnf
 # Publish a self-contained x64 Windows installer (Windows + Inno Setup 6)
 .\scripts\Build-Installer.ps1
 
-# Build a signed development MSIX (Windows)
-.\scripts\New-DevCertificate.ps1
-.\scripts\Build-Msix.ps1
+# Build and sign a development MSIX (Windows; password required by both scripts)
+$password = Read-Host "Development signing password" -AsSecureString
+.\scripts\New-DevCertificate.ps1 -PfxPassword $password
+.\scripts\Build-Msix.ps1 -CertificatePfx .\artifacts\cert\MaSatellite.Dev.pfx -CertificatePassword $password
 ```
 
 GitHub Actions builds the Windows app, runs tests, smoke-tests the installer, and uploads EXE/MSIX artifacts. Version-tagged builds publish a [GitHub Release](https://github.com/remco59/MA-Satellite/releases). A real Music Assistant integration test is available on an opt-in basis; see [docs/TESTING.md](docs/TESTING.md).
