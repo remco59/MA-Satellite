@@ -195,7 +195,7 @@
             <StackPanel x:Name="HomeRecentSection" Spacing="6">
               <TextBlock Text="Recently played" Foreground="{StaticResource AuroraText}" FontSize="18" FontWeight="SemiBold"/>
               <TextBlock Text="Pick up an album or track you listened to earlier." Style="{StaticResource AuroraSubtitleStyle}"/>
-              <GridView x:Name="HomeRecentGrid" Height="224" IsItemClickEnabled="True" SelectionMode="None"
+              <GridView x:Name="HomeRecentGrid" Height="284" IsItemClickEnabled="True" SelectionMode="None"
                         ItemClick="OnItemClick" AutomationProperties.Name="Recently played"
                         ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
                         ScrollViewer.VerticalScrollMode="Disabled">
@@ -207,7 +207,7 @@
             <StackPanel x:Name="HomeAlbumSection" Spacing="6">
               <TextBlock Text="From your library" Foreground="{StaticResource AuroraText}" FontSize="18" FontWeight="SemiBold"/>
               <TextBlock Text="Explore albums you've added to Music Assistant." Style="{StaticResource AuroraSubtitleStyle}"/>
-              <GridView x:Name="HomeAlbumsGrid" Height="224" IsItemClickEnabled="True" SelectionMode="None"
+              <GridView x:Name="HomeAlbumsGrid" Height="284" IsItemClickEnabled="True" SelectionMode="None"
                         ItemClick="OnItemClick" AutomationProperties.Name="Albums from your library"
                         ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
                         ScrollViewer.VerticalScrollMode="Disabled">
@@ -225,24 +225,36 @@
                   HorizontalContentAlignment="Stretch" AutomationProperties.Name="Albums">
           <GridView.ItemTemplate>
             <DataTemplate x:DataType="local:ListRow">
-              <Border Width="164" Padding="11" CornerRadius="15" Background="{StaticResource AuroraCardSoft}"
-                      BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" Margin="3">
+              <!-- Four full-size covers fit at the default desktop width; GridView wraps naturally on resize. -->
+              <Border Width="208" Padding="10" CornerRadius="15" Background="Transparent"
+                      Margin="4" AutomationProperties.Name="{x:Bind Title}">
                 <StackPanel Spacing="6">
-                  <Border Width="140" Height="140" Background="{StaticResource AuroraHeroGradient}" CornerRadius="11">
-                    <Grid>
-                      <FontIcon Glyph="&#xE8D6;" Foreground="{StaticResource AuroraMuted}" FontSize="30" Opacity="0.5"
-                                Visibility="{x:Bind PlaceholderVisibility}"/>
-                      <Image Source="{x:Bind Image}" Stretch="UniformToFill"/>
-                    </Grid>
-                  </Border>
-                  <TextBlock Text="{x:Bind Title}" FontWeight="{x:Bind Weight}" Foreground="{StaticResource AuroraText}"
-                             TextTrimming="CharacterEllipsis" MaxLines="1" ToolTipService.ToolTip="{x:Bind Title}"/>
-                  <TextBlock Text="{x:Bind Subtitle}" Style="{StaticResource AuroraSubtitleStyle}" FontSize="11" MaxLines="1"/>
-                  <Button Tag="{x:Bind}" Click="OnRowMenu" Visibility="{x:Bind MenuVisibility}"
-                          Style="{StaticResource AuroraButtonStyle}" HorizontalAlignment="Right" Padding="8,3"
-                          ToolTipService.ToolTip="Play options">
-                    <FontIcon Glyph="&#xE712;" FontSize="12"/>
-                  </Button>
+                  <Grid Width="188" Height="188">
+                    <Border CornerRadius="12" Background="{StaticResource AuroraHeroGradient}">
+                      <Grid>
+                        <FontIcon Glyph="&#xE8D6;" Foreground="{StaticResource AuroraMuted}" FontSize="36"
+                                  Opacity="0.5" Visibility="{x:Bind PlaceholderVisibility}"/>
+                        <Image Source="{x:Bind Image}" Stretch="UniformToFill"/>
+                      </Grid>
+                    </Border>
+                    <Button Tag="{x:Bind}" Click="OnRowMenu" Visibility="{x:Bind MenuVisibility}"
+                            Style="{StaticResource AuroraButtonStyle}" HorizontalAlignment="Right" VerticalAlignment="Top"
+                            Margin="0,7,7,0" Width="35" Height="35" Padding="7"
+                            ToolTipService.ToolTip="More playback options" AutomationProperties.Name="More playback options">
+                      <FontIcon Glyph="&#xE712;" FontSize="14"/>
+                    </Button>
+                    <Button Tag="{x:Bind}" Click="OnCardPlay" Visibility="{x:Bind MenuVisibility}"
+                            Style="{StaticResource AuroraPrimaryButtonStyle}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                            Margin="0,0,8,8" Width="42" Height="42" Padding="8"
+                            ToolTipService.ToolTip="Play now" AutomationProperties.Name="Play album or track">
+                      <FontIcon Glyph="&#xE768;" FontSize="20"/>
+                    </Button>
+                  </Grid>
+                  <TextBlock Text="{x:Bind Title}" FontSize="13" FontWeight="SemiBold"
+                             Foreground="{StaticResource AuroraText}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
+                             MaxLines="2" MinHeight="34" ToolTipService.ToolTip="{x:Bind Title}"/>
+                  <TextBlock Text="{x:Bind Subtitle}" Style="{StaticResource AuroraSubtitleStyle}" FontSize="11"
+                             MaxLines="1" ToolTipService.ToolTip="{x:Bind Subtitle}"/>
                 </StackPanel>
               </Border>
             </DataTemplate>

@@ -18,7 +18,7 @@ public sealed class ListRow
         IsCurrent = isCurrent;
         if (!string.IsNullOrEmpty(imageUrl) && Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri))
         {
-            Image = new BitmapImage(uri) { DecodePixelWidth = 96 };
+            Image = new BitmapImage(uri) { DecodePixelWidth = 256 };
         }
     }
 
