@@ -9,6 +9,7 @@ namespace MaSatellite.MaApi;
 public sealed class MaClient : IAsyncDisposable
 {
     private static readonly string[] SearchMediaTypes = ["artist", "album", "track", "playlist"];
+    private static readonly string[] RecentlyPlayedMediaTypes = ["track", "album"];
 
     private readonly MaConnection _connection;
     private readonly string _baseUrl;
@@ -60,7 +61,7 @@ public sealed class MaClient : IAsyncDisposable
         var result = await _connection.SendCommandAsync("music/recently_played_items", new Dictionary<string, object?>
         {
             ["limit"] = limit,
-            ["media_types"] = new[] { "track", "album" },
+            ["media_types"] = RecentlyPlayedMediaTypes,
         }, cancellationToken: ct).ConfigureAwait(false);
         return MaItemParser.ParseItems(result, _baseUrl);
     }
