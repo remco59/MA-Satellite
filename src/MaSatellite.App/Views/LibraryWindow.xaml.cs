@@ -282,12 +282,12 @@ public sealed partial class LibraryWindow : Window
             {
                 var client = await _controller.Service.GetClientAsync();
                 rows = (await client.GetLibraryAsync(MaMediaType.Album, limit: 60))
-                    .Select(ListRow.From).ToList();
+                    .Select(i => ListRow.From(i)).ToList();
                 try
                 {
                     recentRows = (await client.GetRecentlyPlayedAsync(20))
                         .Where(i => i.Type is MaMediaType.Album or MaMediaType.Track)
-                        .Select(ListRow.From).ToList();
+                        .Select(i => ListRow.From(i)).ToList();
                 }
                 catch (MaException)
                 {
@@ -328,8 +328,8 @@ public sealed partial class LibraryWindow : Window
             HomePlayButton.IsEnabled = _featuredAlbum is not null && SelectedTarget is not null;
             // A featured item never immediately repeats as the first shelf card.
             var featuredUri = featured?.Item?.Uri;
-            var recentShelf = isHome ? recentRows.Where(r => r.Item?.Uri != featuredUri).Take(16).ToList() : [];
-            var albumShelf = isHome ? rows.Where(r => r.Item?.Uri != featuredUri).Take(30).ToList() : [];
+            List<ListRow> recentShelf = isHome ? recentRows.Where(r => r.Item?.Uri != featuredUri).Take(16).ToList() : [];
+            List<ListRow> albumShelf = isHome ? rows.Where(r => r.Item?.Uri != featuredUri).Take(30).ToList() : [];
             HomeRecentGrid.ItemsSource = isHome ? recentShelf : null;
             HomeAlbumsGrid.ItemsSource = isHome ? albumShelf : null;
             HomeRecentSection.Visibility = recentShelf.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
