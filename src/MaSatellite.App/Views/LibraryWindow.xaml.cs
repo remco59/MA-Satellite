@@ -66,6 +66,7 @@ public sealed partial class LibraryWindow : Window
         HomeAlbumsGrid.ItemTemplate = AlbumGrid.ItemTemplate;
         HomeTimeGrid.ItemTemplate = AlbumGrid.ItemTemplate;
         HomePlaylistsGrid.ItemTemplate = AlbumGrid.ItemTemplate;
+        HomeTopTracksGrid.ItemTemplate = AlbumGrid.ItemTemplate;
         HomeSimilarGrid.ItemTemplate = AlbumGrid.ItemTemplate;
         AuroraWindowChrome.Apply(this);
         Title = "ma-satellite library";
@@ -353,7 +354,7 @@ public sealed partial class LibraryWindow : Window
             .Where(i => i.IsPlayable && !string.IsNullOrWhiteSpace(i.Uri))
             .GroupBy(i => i.Uri, StringComparer.OrdinalIgnoreCase)
             .OrderByDescending(g => g.Count()).Select(g => g.First());
-        return matching.Concat(frequentRecent).Concat(playlists)
+        return matching.Concat(frequentRecent)
             .Where(i => i.IsPlayable && !string.IsNullOrWhiteSpace(i.Uri))
             .DistinctBy(i => i.Uri, StringComparer.OrdinalIgnoreCase)
             .Take(12).Select(i => ListRow.From(i)).ToList();
@@ -411,6 +412,7 @@ public sealed partial class LibraryWindow : Window
             List<ListRow> recentRows = [];
             List<ListRow> timeRows = [];
             List<ListRow> playlistRows = [];
+            List<ListRow> topTracks = [];
             List<ListRow> similarRows = [];
             var playlistsRanked = false;
             MaItem? similarSeed = null;
@@ -456,6 +458,17 @@ public sealed partial class LibraryWindow : Window
                     // If play-count ordering is unavailable, show real playlists without a ranking claim.
                     try { playlistItems = await client.GetLibraryAsync(MaMediaType.Playlist, limit: 40); }
                     catch (MaException) { /* Keep the rest of Home usable. */ }
+                }
+
+                try
+                {
+                    topTracks = (await client.GetLibraryAsync(MaMediaType.Track, limit: 20,
+                        sortField: "play_count", sortDirection: "desc"))
+                        .Where(t => t.IsPlayable).Select(t => ListRow.From(t)).ToList();
+                }
+                catch (MaException)
+                {
+                    // Only advertise "On repeat" when the server can actually rank play counts.
                 }
 
                 playlistRows = playlistItems.Where(i => i.IsPlayable).Take(20)
@@ -535,11 +548,13 @@ public sealed partial class LibraryWindow : Window
             HomeAlbumsGrid.ItemsSource = isHome ? albumShelf : null;
             HomeTimeGrid.ItemsSource = isHome ? timeRows : null;
             HomePlaylistsGrid.ItemsSource = isHome ? playlistRows : null;
+            HomeTopTracksGrid.ItemsSource = isHome ? topTracks : null;
             HomeSimilarGrid.ItemsSource = isHome ? similarRows : null;
             HomeRecentSection.Visibility = isHome && recentShelf.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             HomeAlbumSection.Visibility = isHome && albumShelf.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             HomeTimeSection.Visibility = isHome && timeRows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             HomePlaylistsSection.Visibility = isHome && playlistRows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            HomeTopTracksSection.Visibility = isHome && topTracks.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             HomeSimilarSection.Visibility = isHome && similarRows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             HomeTimeTitle.Text = TimeOfDayTitle(DateTime.Now.Hour);
             HomePlaylistsTitle.Text = playlistsRanked ? "Your most played playlists" : "Playlists from your library";
@@ -558,6 +573,7 @@ public sealed partial class LibraryWindow : Window
             AlbumGrid.ItemsSource = null;
             HomeTimeGrid.ItemsSource = null;
             HomePlaylistsGrid.ItemsSource = null;
+            HomeTopTracksGrid.ItemsSource = null;
             HomeSimilarGrid.ItemsSource = null;
             ShowError(ex);
         }
