@@ -82,6 +82,35 @@ internal sealed partial class MiniPlayerWindow : Window
 
     public bool IsShown { get; private set; }
 
+    /// <summary>Hover previews do not take focus and may close when the cursor moves away.</summary>
+    public bool IsHoverPreview { get; private set; }
+
+    public bool ContainsScreenPoint(Point point)
+    {
+        if (!IsShown)
+        {
+            return false;
+        }
+
+        // AppWindow and Shell_NotifyIconGetRect use physical screen pixels (including on scaled displays).
+        var position = AppWindow.Position;
+        var size = AppWindow.Size;
+        return point.X >= position.X && point.X < position.X + size.Width
+            && point.Y >= position.Y && point.Y < position.Y + size.Height;
+    }
+
+    /// <summary>A click on a hover preview keeps it open for interactive controls.</summary>
+    public void PinFlyout()
+    {
+        if (!IsShown)
+        {
+            return;
+        }
+
+        IsHoverPreview = false;
+        Activate();
+    }
+
     /// <summary>Shows the flyout, or hides it when it is already open. Ignores the click that merely dismissed it.</summary>
     public void Toggle()
     {
@@ -95,15 +124,21 @@ internal sealed partial class MiniPlayerWindow : Window
         }
     }
 
-    public void ShowFlyout()
+    public void ShowFlyout(bool activate = true)
     {
         LoadDevices();
         Refresh();
         Position();
-        AppWindow.Show();
-        Activate();
-        _progressTimer.Start();
+        // Showing a hover preview must not interrupt the application currently in focus.
+        AppWindow.Show(activate);
         IsShown = true;
+        IsHoverPreview = !activate;
+        if (activate)
+        {
+            Activate();
+        }
+
+        _progressTimer.Start();
     }
 
     public void HideFlyout()
@@ -111,14 +146,29 @@ internal sealed partial class MiniPlayerWindow : Window
         _progressTimer.Stop();
         AppWindow.Hide();
         IsShown = false;
+        IsHoverPreview = false;
         _hiddenAtTicks = Environment.TickCount64;
     }
 
     private void OnActivated(object sender, WindowActivatedEventArgs args)
     {
-        if (args.WindowActivationState == WindowActivationState.Deactivated && IsShown)
+        if (!IsShown)
         {
-            HideFlyout();
+            return;
+        }
+
+        if (args.WindowActivationState == WindowActivationState.Deactivated)
+        {
+            // Hover previews were never activated, so their lifetime is controlled by the mouse.
+            if (!IsHoverPreview)
+            {
+                HideFlyout();
+            }
+        }
+        else if (IsHoverPreview)
+        {
+            // A click inside the preview activates the window and pins it until normal dismissal.
+            IsHoverPreview = false;
         }
     }
 
