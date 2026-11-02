@@ -13,7 +13,7 @@ Built with **.NET 8**, **WinUI 3**, and **WASAPI**. The **Dark Aurora** interfac
 | **Music Assistant player** | Exposes your Windows PC as a Sendspin playback target, with clock-synchronized PCM audio over WASAPI. |
 | **Desktop library** | Browse albums, artists, tracks, and playlists; search Music Assistant and its providers; open albums and playlists. |
 | **Library views and sorting** | Switch between grid and list layouts for albums, artists, tracks, and playlists. Sort by name, date added, last played, or play count; albums also offer release year. Unsupported server-side sorts fall back to default order. |
-| **Personalized Home** | Continue recent listening; browse albums, frequently played playlists and tracks, time-of-day suggestions from your own playlists/history, and similar artists when the provider supports them. All recommendations use Music Assistant data, not fabricated content. |
+| **Personalized Home** | A Spotify-style, playlist-first page with a personal greeting and quick-access tiles for your most played playlists, plus shelves for time-of-day playlists, recent listening, new playlists, frequently played tracks, albums and similar artists when the provider supports them. Shelves scroll with chevron buttons only, so the mouse wheel always scrolls the page. All recommendations use Music Assistant data, not fabricated content. |
 | **Playback control** | Play now, play next, add to queue, choose a target player, control playback and seeking, and transfer a queue between players. A persistent player footer includes track info, transport, volume, shuffle/repeat, and queue access. |
 | **Windows integration** | Tray mini-player, media-key and System Media Transport Controls (SMTC) integration, output-device selection, and optional startup with Windows. |
 | **Desktop widgets** | Loopback-only now-playing HTTP/WebSocket API and a ready-to-use [Lively Wallpaper widget](widgets/lively/README.md). |
@@ -71,7 +71,7 @@ The token is stored encrypted using Windows DPAPI for your account, not in plain
 
 ### 3. Explore and control playback
 
-- **Home:** Recently played, albums, your playlists, frequently played tracks, time-of-day selections, and similar artists where supported.
+- **Home:** Greeting and quick-access playlists, then playlist shelves (most played, time of day, recently added), recent listening, frequently played tracks, albums and similar artists where supported.
 - **Library / Playlists:** Toggle **List** or **Grid** and use **Sort library**. View/sort choices are tracked separately per section during the app session.
 - **Search:** Find music across the connected Music Assistant providers.
 - **Now playing / Queue:** See the selected target's current track, control playback, play a queue item, or transfer the queue to another player.
