@@ -746,8 +746,9 @@ public sealed partial class LibraryWindow : Window
         DetailArtwork.Source = Uri.TryCreate(item.ImageUrl ?? _openedItem?.ImageUrl,
             UriKind.Absolute, out var artworkUri) ? new BitmapImage(artworkUri) { DecodePixelWidth = 512 } : null;
 
-        var byline = item.Type == MaMediaType.Playlist && !string.IsNullOrWhiteSpace(item.Subtitle)
-            ? $"By {item.Subtitle}" : item.Subtitle;
+        var subtitle = !string.IsNullOrWhiteSpace(item.Subtitle) ? item.Subtitle : _openedItem?.Subtitle;
+        var byline = item.Type == MaMediaType.Playlist && !string.IsNullOrWhiteSpace(subtitle)
+            ? $"By {subtitle}" : subtitle;
         DetailByline.Text = byline ?? string.Empty;
         DetailByline.Visibility = string.IsNullOrWhiteSpace(byline) ? Visibility.Collapsed : Visibility.Visible;
 
@@ -761,6 +762,11 @@ public sealed partial class LibraryWindow : Window
             facts.Add($"{children.Count} {(children.Count == 1 ? "album" : "albums")}");
         }
 
+        if (item.Type == MaMediaType.Track && !string.IsNullOrWhiteSpace(item.AlbumName))
+        {
+            facts.Add(item.AlbumName);
+        }
+
         if (item.Year is { } year)
         {
             facts.Add(year.ToString());
@@ -768,7 +774,10 @@ public sealed partial class LibraryWindow : Window
 
         if (item.Type == MaMediaType.Track && item.DurationSeconds is > 0)
         {
-            facts.Add(FormatDetailDuration(item.DurationSeconds.Value));
+            var duration = TimeSpan.FromSeconds(item.DurationSeconds.Value);
+            facts.Add(duration.TotalHours >= 1
+                ? duration.ToString(@"h\:mm\:ss")
+                : duration.ToString(@"m\:ss"));
         }
         else if (children.Count > 0 && children.All(c => c.DurationSeconds is > 0))
         {
