@@ -105,12 +105,35 @@ public sealed class MaClient : IAsyncDisposable
         };
         if (!string.IsNullOrWhiteSpace(sortField))
         {
-            args["sort_field"] = sortField;
-            args["sort_direction"] = sortDirection is "asc" or "desc" ? sortDirection : "asc";
+            // Music Assistant 2.11 switched from the legacy order_by parameter
+            // (e.g. "year_desc") to the typed sort_field/sort_direction API.
+            // Older servers silently ignore unknown arguments, leaving the UI
+            // looking alphabetically sorted even with a different sort selected.
+            var direction = sortDirection is "asc" or "desc" ? sortDirection : "asc";
+            if (SupportsTypedLibrarySorting(ServerInfo?.ServerVersion))
+            {
+                args["sort_field"] = sortField;
+                args["sort_direction"] = direction;
+            }
+            else
+            {
+                args["order_by"] = direction == "desc" ? $"{sortField}_desc" : sortField;
+            }
         }
 
         var result = await _connection.SendCommandAsync(command, args, cancellationToken: ct).ConfigureAwait(false);
         return MaItemParser.ParseItems(result, _baseUrl);
+    }
+
+    /// <summary>Typed sort parameters were introduced in Music Assistant 2.11.</summary>
+    /// <remarks>Use legacy order_by when the server version is unavailable.</remarks>
+    private static bool SupportsTypedLibrarySorting(string? serverVersion)
+    {
+        var parts = serverVersion?.TrimStart('v', 'V').Split('.');
+        return parts is { Length: >= 2 }
+            && int.TryParse(parts[0], out var major)
+            && int.TryParse(parts[1], out var minor)
+            && (major > 2 || major == 2 && minor >= 11);
     }
 
     public async Task<IReadOnlyList<MaItem>> GetChildrenAsync(MaItem parent, CancellationToken ct = default)

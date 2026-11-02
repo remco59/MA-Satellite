@@ -14,10 +14,11 @@ internal sealed class FakeMaServer : IAsyncDisposable
     private readonly Task _loop;
     private WebSocket? _socket;
 
-    public FakeMaServer(int schemaVersion = 30, string? requiredToken = "secret")
+    public FakeMaServer(int schemaVersion = 30, string? requiredToken = "secret", string serverVersion = "2.10.8")
     {
         SchemaVersion = schemaVersion;
         RequiredToken = requiredToken;
+        ServerVersion = serverVersion;
         var l = new TcpListener(IPAddress.Loopback, 0);
         l.Start();
         Port = ((IPEndPoint)l.LocalEndpoint).Port;
@@ -30,6 +31,8 @@ internal sealed class FakeMaServer : IAsyncDisposable
     public int Port { get; }
 
     public int SchemaVersion { get; }
+
+    public string ServerVersion { get; }
 
     public string? RequiredToken { get; }
 
@@ -100,7 +103,7 @@ internal sealed class FakeMaServer : IAsyncDisposable
 
     private async Task ServeAsync(WebSocket ws)
     {
-        await SendAsync(new { server_id = "fake", server_version = "2.10.8", schema_version = SchemaVersion, min_supported_schema_version = 24, name = "Fake MA" });
+        await SendAsync(new { server_id = "fake", server_version = ServerVersion, schema_version = SchemaVersion, min_supported_schema_version = 24, name = "Fake MA" });
         var authed = SchemaVersion < 28;
         var buffer = new byte[64 * 1024];
         try
