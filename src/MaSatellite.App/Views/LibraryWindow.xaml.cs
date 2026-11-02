@@ -535,7 +535,8 @@ public sealed partial class LibraryWindow : Window
                     // and its tracks should remain accessible regardless.
                 }
 
-                rows = detailChildren.Select(i => ListRow.From(i)).ToList();
+                rows = detailChildren.Select((i, index) => ListRow.From(i,
+                    position: parent.Type == MaMediaType.Artist ? null : index + 1)).ToList();
             }
             else if (_tab is "queue" or "now")
             {
