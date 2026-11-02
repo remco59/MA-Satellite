@@ -441,11 +441,12 @@ public sealed partial class LibraryWindow : Window
     private async Task LoadTabAsync(bool backgroundRefresh = false)
     {
         var id = ++_loadId;
+        // Queue refreshes can turn an empty state into a populated list without a navigation.
+        EmptyState.Visibility = Visibility.Collapsed;
+        RetryButton.Visibility = Visibility.Collapsed;
         if (!backgroundRefresh)
         {
             Message.IsOpen = false;
-            EmptyState.Visibility = Visibility.Collapsed;
-            RetryButton.Visibility = Visibility.Collapsed;
             LoadingLabel.Text = _openedItem is not null ? "Opening selection…" : _tab switch
             {
                 "home" => "Preparing your home…",
