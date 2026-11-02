@@ -34,6 +34,8 @@ internal sealed class SatelliteShell : IDisposable
     private AutostartReconciler? _autostart;
     private AutostartState _autostartState = AutostartState.Unavailable;
     private TrayIcon? _tray;
+    private readonly TrayHoverController _trayHover = new();
+    private DispatcherQueueTimer? _trayHoverTimer;
     private Window? _keepAlive;
     private SettingsWindow? _settingsWindow;
     private MiniPlayerWindow? _miniPlayer;
@@ -80,6 +82,13 @@ internal sealed class SatelliteShell : IDisposable
         _tray.Show();
         _tray.SetTooltip($"ma-satellite — {settings.PlayerName}");
 
+        // An inexpensive cursor check handles both visible and overflow-area tray icons.
+        // The same timer dismisses hover previews after the pointer leaves the icon and player.
+        _trayHoverTimer = _ui!.CreateTimer();
+        _trayHoverTimer.Interval = TimeSpan.FromMilliseconds(100);
+        _trayHoverTimer.Tick += (_, _) => CheckTrayHover();
+        _trayHoverTimer.Start();
+
         StartPlayer(version, settings);
     }
 
@@ -91,6 +100,7 @@ internal sealed class SatelliteShell : IDisposable
         }
 
         _disposed = true;
+        _trayHoverTimer?.Stop();
         _tray?.Dispose();
         _miniPlayer?.Close();
         _miniPlayer = null;
@@ -239,15 +249,71 @@ internal sealed class SatelliteShell : IDisposable
         }
     }
 
-    private void ToggleMiniPlayer()
+    private MiniPlayerWindow? EnsureMiniPlayer()
     {
         if (_settings is null || _host is null || _tray is null)
+        {
+            return null;
+        }
+
+        return _miniPlayer ??= new MiniPlayerWindow(_host, _settings, _devices, ShowSettings, ShowLibrary, () => _tray?.GetScreenRect());
+    }
+
+    private void ToggleMiniPlayer()
+    {
+        _trayHover.SuppressUntilIconExit();
+        var player = EnsureMiniPlayer();
+        if (player is null)
         {
             return;
         }
 
-        _miniPlayer ??= new MiniPlayerWindow(_host, _settings, _devices, ShowSettings, ShowLibrary, () => _tray?.GetScreenRect());
-        _miniPlayer.Toggle();
+        if (player is { IsShown: true, IsHoverPreview: true })
+        {
+            // The first click on a hover preview pins it rather than unexpectedly closing it.
+            player.PinFlyout();
+        }
+        else
+        {
+            player.Toggle();
+        }
+    }
+
+    private void CheckTrayHover()
+    {
+        if (_disposed || _tray is null || _host is null || _settings is null)
+        {
+            return;
+        }
+
+        var cursor = TrayIcon.GetCursorScreenPosition();
+        if (cursor is null)
+        {
+            return;
+        }
+
+        var onIcon = _tray.GetScreenRect()?.Contains(cursor.Value) == true;
+        var onPlayer = _miniPlayer?.ContainsScreenPoint(cursor.Value) == true;
+        var action = _trayHover.Update(
+            Environment.TickCount64,
+            onIcon,
+            onPlayer,
+            _miniPlayer?.IsShown == true,
+            _miniPlayer?.IsHoverPreview == true);
+
+        switch (action)
+        {
+            case TrayHoverAction.Show:
+                EnsureMiniPlayer()?.ShowFlyout(activate: false);
+                break;
+            case TrayHoverAction.Hide:
+                if (_miniPlayer?.IsHoverPreview == true)
+                {
+                    _miniPlayer.HideFlyout();
+                }
+
+                break;
+        }
     }
 
     private void ShowLibrary()

@@ -57,6 +57,10 @@ public sealed class TrayIcon : IDisposable
         }
     }
 
+    /// <summary>The cursor and tray-icon bounds use the same physical screen coordinates.</summary>
+    public static Point? GetCursorScreenPosition() =>
+        GetCursorPos(out var point) ? new Point(point.X, point.Y) : null;
+
     /// <summary>Screen rectangle of the icon, used to anchor the flyout. Null if the shell cannot report it.</summary>
     public Rectangle? GetScreenRect()
     {
