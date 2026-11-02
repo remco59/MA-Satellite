@@ -28,7 +28,7 @@ public sealed class SendspinSession : ISendspinSession
     private CancellationTokenSource? _syncDebounce;
     private int _artworkVersion;
     private bool _helloDone;
-    private bool _disposed;
+    private volatile bool _disposed;
     private Task? _timeTask;
 
     public SendspinSession(
@@ -169,6 +169,12 @@ public sealed class SendspinSession : ISendspinSession
     /// <summary>Tells the server why we leave, then closes. Safe to call more than once.</summary>
     public async Task DisconnectAsync(string reason)
     {
+        // The service may call this with a session it captured just before the run loop disposed it.
+        if (_disposed)
+        {
+            return;
+        }
+
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
@@ -180,7 +186,14 @@ public sealed class SendspinSession : ISendspinSession
         }
         finally
         {
-            await _lifetime.CancelAsync().ConfigureAwait(false);
+            try
+            {
+                await _lifetime.CancelAsync().ConfigureAwait(false);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Disposed concurrently by the run loop; the lifetime is already cancelled.
+            }
         }
     }
 
