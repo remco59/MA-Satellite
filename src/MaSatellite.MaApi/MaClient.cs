@@ -136,6 +136,19 @@ public sealed class MaClient : IAsyncDisposable
             && (major > 2 || major == 2 && minor >= 11);
     }
 
+    /// <summary>Fetch the full server-side metadata instead of relying on a library/search item mapping.</summary>
+    public async Task<MaItem> GetItemDetailsAsync(MaItem item, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        var result = await _connection.SendCommandAsync("music/item_by_uri", new Dictionary<string, object?>
+        {
+            ["uri"] = item.Uri,
+        }, cancellationToken: ct).ConfigureAwait(false);
+        return result.ValueKind == JsonValueKind.Object
+            ? MaItemParser.ParseItem(result, _baseUrl, imageSize: 512)
+            : item;
+    }
+
     public async Task<IReadOnlyList<MaItem>> GetChildrenAsync(MaItem parent, CancellationToken ct = default)
     {
         var command = parent.Type switch
