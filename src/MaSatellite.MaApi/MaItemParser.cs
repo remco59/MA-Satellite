@@ -47,6 +47,22 @@ public static class MaItemParser
 
         int? year = e.TryGetProperty("year", out var y) && y.ValueKind == JsonValueKind.Number && y.TryGetInt32(out var yy) && yy > 0 ? yy : null;
 
+        string? overview = Str(e, "description");
+        IReadOnlyList<string>? genres = null;
+        if (e.TryGetProperty("metadata", out var metadata) && metadata.ValueKind == JsonValueKind.Object)
+        {
+            overview = Str(metadata, "description") ?? Str(metadata, "review")
+                ?? Str(metadata, "biography") ?? overview;
+            if (metadata.TryGetProperty("genres", out var genreArray) && genreArray.ValueKind == JsonValueKind.Array)
+            {
+                genres = genreArray.EnumerateArray()
+                    .Where(g => g.ValueKind == JsonValueKind.String)
+                    .Select(g => g.GetString()!)
+                    .Where(g => !string.IsNullOrWhiteSpace(g))
+                    .ToList();
+            }
+        }
+
         return new MaItem(
             type,
             Str(e, "item_id") ?? string.Empty,
@@ -55,10 +71,12 @@ public static class MaItemParser
             Str(e, "uri") ?? string.Empty,
             subtitle,
             type == MaMediaType.Track ? album : null,
-            type == MaMediaType.Album ? year : null,
+            type is MaMediaType.Album or MaMediaType.Track ? year : null,
             duration,
             ImageUrl(e, baseUrl, imageSize),
-            !e.TryGetProperty("is_playable", out var p) || p.ValueKind != JsonValueKind.False);
+            !e.TryGetProperty("is_playable", out var p) || p.ValueKind != JsonValueKind.False,
+            overview,
+            genres);
     }
 
     public static IReadOnlyList<MaItem> ParseItems(JsonElement array, string baseUrl, int imageSize = 256)

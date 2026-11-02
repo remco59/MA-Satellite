@@ -169,7 +169,46 @@
         </StackPanel>
       </Grid>
       <Grid Grid.Row="4" RowSpacing="16">
-        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <!-- Detail hero shares the current Aurora palette with Home and Now Playing. -->
+        <Border x:Name="DetailHero" Grid.Row="0" Visibility="Collapsed" Background="{StaticResource AuroraHeroGradient}"
+                BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" CornerRadius="18" Padding="20">
+          <Grid ColumnSpacing="23">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Border Width="164" Height="164" CornerRadius="13" Background="{StaticResource AuroraCard}" VerticalAlignment="Top">
+              <Grid>
+                <FontIcon Glyph="&#xE8D6;" FontSize="40" Foreground="{StaticResource AuroraMuted}" Opacity="0.5"/>
+                <Image x:Name="DetailArtwork" Stretch="UniformToFill"/>
+              </Grid>
+            </Border>
+            <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
+              <TextBlock x:Name="DetailKind" Style="{StaticResource AuroraSectionLabelStyle}" Text="PLAYLIST"/>
+              <TextBlock x:Name="DetailTitle" FontSize="28" FontWeight="Bold" Foreground="{StaticResource AuroraText}"
+                         TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2"/>
+              <TextBlock x:Name="DetailByline" FontSize="13" Foreground="{StaticResource AuroraMuted}"
+                         TextTrimming="CharacterEllipsis" MaxLines="1" Visibility="Collapsed"/>
+              <TextBlock x:Name="DetailStats" FontSize="12" Foreground="{StaticResource AuroraText}"
+                         TextWrapping="Wrap" Visibility="Collapsed"/>
+              <TextBlock x:Name="DetailGenres" FontSize="12" Foreground="{StaticResource AuroraMuted}"
+                         TextWrapping="Wrap" MaxLines="2" Visibility="Collapsed"/>
+              <TextBlock x:Name="DetailOverview" FontSize="12" Foreground="{StaticResource AuroraMuted}"
+                         TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="3" Visibility="Collapsed"/>
+              <StackPanel x:Name="DetailActions" Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
+                <Button Click="OnContextPlay" Style="{StaticResource AuroraPrimaryButtonStyle}" AutomationProperties.Name="Play selection">
+                  <StackPanel Orientation="Horizontal" Spacing="7">
+                    <FontIcon Glyph="&#xE768;" FontSize="13"/><TextBlock Text="Play" VerticalAlignment="Center"/>
+                  </StackPanel>
+                </Button>
+                <Button Content="Play next" Click="OnContextPlayNext" Style="{StaticResource AuroraButtonStyle}"/>
+                <Button Content="Add to queue" Click="OnContextAdd" Style="{StaticResource AuroraButtonStyle}"/>
+              </StackPanel>
+            </StackPanel>
+          </Grid>
+        </Border>
+        <StackPanel x:Name="DetailSection" Grid.Row="1" Spacing="4" Visibility="Collapsed">
+          <TextBlock x:Name="DetailSectionTitle" FontSize="19" FontWeight="SemiBold"
+                     Foreground="{StaticResource AuroraText}" Text="Tracks"/>
+        </StackPanel>
         <Border x:Name="NowPlayingHero" Visibility="Collapsed" Background="{StaticResource AuroraHeroGradient}"
                 BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" CornerRadius="19" Padding="22">
           <Grid ColumnSpacing="25">
@@ -193,7 +232,7 @@
         </Border>
 
         <!-- Home: a personal, playlist-first landing page. Real library and listening data only. -->
-        <ScrollViewer x:Name="HomeShelves" Grid.Row="1" Visibility="Collapsed"
+        <ScrollViewer x:Name="HomeShelves" Grid.Row="2" Visibility="Collapsed"
                       HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="26" Padding="0,0,0,18">
             <StackPanel Spacing="14">
@@ -243,7 +282,7 @@
         </ScrollViewer>
 
         <!-- Shared virtualized grid cards for albums, artists, tracks and playlists. -->
-        <GridView x:Name="AlbumGrid" Grid.Row="1" IsItemClickEnabled="True" SelectionMode="None"
+        <GridView x:Name="AlbumGrid" Grid.Row="2" IsItemClickEnabled="True" SelectionMode="None"
                   ItemClick="OnItemClick" Visibility="Collapsed"
                   HorizontalContentAlignment="Stretch" AutomationProperties.Name="Library grid">
           <GridView.ItemTemplate>
@@ -284,24 +323,33 @@
           </GridView.ItemTemplate>
         </GridView>
 
-        <ListView x:Name="List" Grid.Row="1" IsItemClickEnabled="True" SelectionMode="None" ItemClick="OnItemClick"
+        <ListView x:Name="List" Grid.Row="2" IsItemClickEnabled="True" SelectionMode="None" ItemClick="OnItemClick"
                   AutomationProperties.Name="Library and queue items">
           <ListView.ItemTemplate>
             <DataTemplate x:DataType="local:ListRow">
               <Grid Padding="9,7" ColumnSpacing="13" MinHeight="66">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <Border Width="54" Height="54" CornerRadius="10" Background="{StaticResource AuroraCard}">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{x:Bind PositionLabel}" Visibility="{x:Bind PositionVisibility}"
+                           Width="25" TextAlignment="Right" VerticalAlignment="Center"
+                           Foreground="{StaticResource AuroraMuted}" FontSize="12"/>
+                <Border Grid.Column="1" Width="54" Height="54" CornerRadius="10" Background="{StaticResource AuroraCard}">
                   <Grid>
                     <FontIcon Glyph="&#xE8D6;" Opacity="0.5" Visibility="{x:Bind PlaceholderVisibility}" Foreground="{StaticResource AuroraMuted}"/>
                     <Image Source="{x:Bind Image}" Stretch="UniformToFill"/>
                   </Grid>
                 </Border>
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="4">
                   <TextBlock Text="{x:Bind Title}" TextTrimming="CharacterEllipsis" MaxLines="1"
                              Foreground="{StaticResource AuroraText}" FontWeight="{x:Bind Weight}" ToolTipService.ToolTip="{x:Bind Title}"/>
                   <TextBlock Text="{x:Bind Subtitle}" Style="{StaticResource AuroraSubtitleStyle}" MaxLines="1"/>
                 </StackPanel>
-                <Button Grid.Column="2" Tag="{x:Bind}" Click="OnRowMenu" Visibility="{x:Bind MenuVisibility}"
+                <TextBlock Grid.Column="3" Text="{x:Bind DurationLabel}" Visibility="{x:Bind DurationVisibility}"
+                           Foreground="{StaticResource AuroraMuted}" FontSize="12" VerticalAlignment="Center"
+                           Margin="0,0,10,0"/>
+                <Button Grid.Column="4" Tag="{x:Bind}" Click="OnRowMenu" Visibility="{x:Bind MenuVisibility}"
                         ToolTipService.ToolTip="Play options" VerticalAlignment="Center"
                         Style="{StaticResource AuroraButtonStyle}" Padding="10">
                   <FontIcon Glyph="&#xE712;" FontSize="14"/>
@@ -311,7 +359,7 @@
           </ListView.ItemTemplate>
         </ListView>
         <!-- Distinct loading/empty/error surfaces keep the page understandable at all DPI settings. -->
-        <StackPanel x:Name="LoadingState" Grid.Row="1" Visibility="Collapsed" Spacing="22"
+        <StackPanel x:Name="LoadingState" Grid.Row="2" Visibility="Collapsed" Spacing="22"
                     HorizontalAlignment="Stretch" VerticalAlignment="Top" Padding="8,16,8,0"
                     AutomationProperties.LiveSetting="Polite">
           <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
@@ -355,7 +403,7 @@
                        Background="{StaticResource AuroraCardSoft}" HorizontalAlignment="Stretch"
                        AutomationProperties.Name="Loading progress"/>
         </StackPanel>
-        <Border x:Name="EmptyState" Grid.RowSpan="2" Visibility="Collapsed" HorizontalAlignment="Center"
+        <Border x:Name="EmptyState" Grid.Row="2" Visibility="Collapsed" HorizontalAlignment="Center"
                 VerticalAlignment="Center" MaxWidth="410" Padding="30,24" CornerRadius="18"
                 Background="{StaticResource AuroraSurfaceRaised}" BorderBrush="{StaticResource AuroraBorder}"
                 BorderThickness="1">

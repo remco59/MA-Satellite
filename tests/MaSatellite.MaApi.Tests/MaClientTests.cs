@@ -234,6 +234,40 @@ public class MaClientTests
     }
 
     [Fact]
+    public async Task Fetching_item_details_reads_full_music_assistant_metadata()
+    {
+        await using var server = new FakeMaServer();
+        server.Handlers["music/item_by_uri"] = _ => new
+        {
+            item_id = "52",
+            provider = "library",
+            name = "House Focus",
+            media_type = "playlist",
+            uri = "library://playlist/52",
+            owner = "Remco",
+            metadata = new
+            {
+                description = "A playlist for getting into the flow.",
+                genres = new[] { "House", "Electronic" },
+                images = new[] { new { type = "thumb", path = "/cover.jpg", provider = "filesystem", proxy_id = "cover52" } },
+            },
+        };
+        await using var client = await ConnectAsync(server);
+        var mapping = new MaItem(MaMediaType.Playlist, "52", "library", "House Focus",
+            "library://playlist/52", null, null, null, null, null);
+
+        var detailed = await client.GetItemDetailsAsync(mapping);
+
+        Assert.Equal("House Focus", detailed.Name);
+        Assert.Equal("Remco", detailed.Subtitle);
+        Assert.Equal("A playlist for getting into the flow.", detailed.Overview);
+        Assert.Equal(new[] { "House", "Electronic" }, detailed.Genres);
+        Assert.Contains("size=512", detailed.ImageUrl);
+        var args = server.Received.Last(r => r.Command == "music/item_by_uri").Args;
+        Assert.Equal("library://playlist/52", args.GetProperty("uri").GetString());
+    }
+
+    [Fact]
     public async Task Children_of_albums_playlists_and_artists_use_the_right_commands()
     {
         await using var server = new FakeMaServer();

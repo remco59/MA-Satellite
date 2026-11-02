@@ -464,7 +464,12 @@ public sealed partial class LibraryWindow : Window
         }
         UpdateNavigationState();
         ContextBar.Visibility = _openedItem is null ? Visibility.Collapsed : Visibility.Visible;
-        ContextActions.Visibility = _openedItem?.Type == MaMediaType.Artist ? Visibility.Collapsed : Visibility.Visible;
+        // Playback controls live in the detail hero, leaving the back bar uncluttered.
+        ContextActions.Visibility = Visibility.Collapsed;
+        DetailHero.Visibility = Visibility.Collapsed;
+        DetailSection.Visibility = Visibility.Collapsed;
+        ContentHeading.Visibility = _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
+        ContentDescription.Visibility = _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
         QueueBar.Visibility = (_tab is "queue" or "now") && _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
         NowPlayingHero.Visibility = _tab == "now" && _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
         var isHome = _tab == "home" && _openedItem is null;
@@ -499,6 +504,8 @@ public sealed partial class LibraryWindow : Window
         try
         {
             List<ListRow> rows;
+            MaItem? detailItem = null;
+            IReadOnlyList<MaItem> detailChildren = [];
             List<ListRow> recentRows = [];
             List<ListRow> timeRows = [];
             List<ListRow> playlistRows = [];
@@ -510,9 +517,27 @@ public sealed partial class LibraryWindow : Window
             string empty = "Nothing here yet.";
             if (_openedItem is { } parent)
             {
-                ContextTitle.Text = parent.Name;
+                ContextTitle.Text = $"{parent.Type} details";
                 var client = await _controller.Service.GetClientAsync();
-                rows = (await client.GetChildrenAsync(parent)).Select(i => ListRow.From(i)).ToList();
+                // Fetch richer metadata and child rows concurrently to avoid serial page loads.
+                // A track has its own detail view but no child list.
+                var metadataTask = client.GetItemDetailsAsync(parent);
+                detailChildren = parent.Type == MaMediaType.Track
+                    ? []
+                    : await client.GetChildrenAsync(parent);
+                detailItem = parent;
+                try
+                {
+                    detailItem = await metadataTask;
+                }
+                catch (MaException)
+                {
+                    // Older servers or providers may not offer full metadata. The playlist
+                    // and its tracks should remain accessible regardless.
+                }
+
+                rows = detailChildren.Select((i, index) => ListRow.From(i,
+                    position: parent.Type == MaMediaType.Artist ? null : index + 1)).ToList();
             }
             else if (_tab is "queue" or "now")
             {
@@ -632,6 +657,11 @@ public sealed partial class LibraryWindow : Window
                 return;
             }
 
+            if (detailItem is not null)
+            {
+                RenderDetail(detailItem, detailChildren);
+            }
+
             // Quick access: your most played playlists first, falling back to recent listening.
             var quickRows = isHome
                 ? (playlistRows.Count > 0 ? playlistRows : recentRows).Take(8).ToList()
@@ -665,18 +695,25 @@ public sealed partial class LibraryWindow : Window
             HomeShelves.Visibility = isHome ? Visibility.Visible : Visibility.Collapsed;
             AlbumGrid.Visibility = useGrid ? Visibility.Visible : Visibility.Collapsed;
             List.Visibility = (isHome || useGrid) ? Visibility.Collapsed : Visibility.Visible;
-            if (isHome ? rows.Count + recentRows.Count + playlistRows.Count + topTracks.Count == 0 : rows.Count == 0)
+            if ((isHome ? rows.Count + recentRows.Count + playlistRows.Count + topTracks.Count == 0 : rows.Count == 0)
+                && _openedItem?.Type != MaMediaType.Track)
             {
-                var detail = _tab switch
+                var detail = _openedItem?.Type switch
                 {
-                    "search" => string.IsNullOrWhiteSpace(_lastQuery)
-                        ? "Enter an artist, album or track above to begin."
-                        : "Try a different search term.",
-                    "queue" or "now" => "Add something to your selected player's queue to get started.",
-                    "home" => "Add music to your Music Assistant library to see it here.",
-                    _ => "Items you add to your Music Assistant library will appear here.",
+                    MaMediaType.Playlist => "Music Assistant returned no fixed tracks for this playlist. You can still try playing it.",
+                    MaMediaType.Album => "No tracks are available for this album.",
+                    MaMediaType.Artist => "No albums are available for this artist.",
+                    _ => _tab switch
+                    {
+                        "search" => string.IsNullOrWhiteSpace(_lastQuery)
+                            ? "Enter an artist, album or track above to begin."
+                            : "Try a different search term.",
+                        "queue" or "now" => "Add something to your selected player's queue to get started.",
+                        "home" => "Add music to your Music Assistant library to see it here.",
+                        _ => "Items you add to your Music Assistant library will appear here.",
+                    },
                 };
-                ShowEmptyState(empty, detail);
+                ShowEmptyState(_openedItem is null ? empty : "Nothing here yet", detail);
             }
             await RefreshPlaybackSummaryAsync();
         }
@@ -701,6 +738,82 @@ public sealed partial class LibraryWindow : Window
                 LoadingState.Visibility = Visibility.Collapsed;
             }
         }
+    }
+
+    private void RenderDetail(MaItem item, IReadOnlyList<MaItem> children)
+    {
+        DetailHero.Visibility = Visibility.Visible;
+        DetailKind.Text = item.Type.ToString().ToUpperInvariant();
+        DetailTitle.Text = item.Name;
+        DetailArtwork.Source = Uri.TryCreate(item.ImageUrl ?? _openedItem?.ImageUrl,
+            UriKind.Absolute, out var artworkUri) ? new BitmapImage(artworkUri) { DecodePixelWidth = 512 } : null;
+
+        var subtitle = !string.IsNullOrWhiteSpace(item.Subtitle) ? item.Subtitle : _openedItem?.Subtitle;
+        var byline = item.Type == MaMediaType.Playlist && !string.IsNullOrWhiteSpace(subtitle)
+            ? $"By {subtitle}" : subtitle;
+        DetailByline.Text = byline ?? string.Empty;
+        DetailByline.Visibility = string.IsNullOrWhiteSpace(byline) ? Visibility.Collapsed : Visibility.Visible;
+
+        var facts = new List<string>();
+        if (item.Type is MaMediaType.Playlist or MaMediaType.Album)
+        {
+            var unit = item.Type == MaMediaType.Playlist && children.Any(c => c.Type != MaMediaType.Track)
+                ? "item" : "track";
+            facts.Add($"{children.Count} {unit}{(children.Count == 1 ? "" : "s")}");
+        }
+        else if (item.Type == MaMediaType.Artist)
+        {
+            facts.Add($"{children.Count} {(children.Count == 1 ? "album" : "albums")}");
+        }
+
+        if (item.Type == MaMediaType.Track && !string.IsNullOrWhiteSpace(item.AlbumName))
+        {
+            facts.Add(item.AlbumName);
+        }
+
+        if (item.Year is { } year)
+        {
+            facts.Add(year.ToString());
+        }
+
+        if (item.Type == MaMediaType.Track && item.DurationSeconds is > 0)
+        {
+            var duration = TimeSpan.FromSeconds(item.DurationSeconds.Value);
+            facts.Add(duration.TotalHours >= 1
+                ? duration.ToString(@"h\:mm\:ss")
+                : duration.ToString(@"m\:ss"));
+        }
+        else if (children.Count > 0 && children.All(c => c.DurationSeconds is > 0))
+        {
+            facts.Add(FormatDetailDuration(children.Sum(c => (long)c.DurationSeconds!.Value)));
+        }
+
+        DetailStats.Text = string.Join("  ·  ", facts);
+        DetailStats.Visibility = facts.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+        var genres = item.Genres?.Where(g => !string.IsNullOrWhiteSpace(g)).Take(5).ToList() ?? [];
+        DetailGenres.Text = string.Join(" · ", genres);
+        DetailGenres.Visibility = genres.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        DetailOverview.Text = item.Overview ?? string.Empty;
+        DetailOverview.Visibility = string.IsNullOrWhiteSpace(item.Overview)
+            ? Visibility.Collapsed : Visibility.Visible;
+        DetailActions.Visibility = _openedItem?.IsPlayable == true
+            ? Visibility.Visible : Visibility.Collapsed;
+
+        DetailSection.Visibility = item.Type == MaMediaType.Track
+            ? Visibility.Collapsed : Visibility.Visible;
+        DetailSectionTitle.Text = item.Type == MaMediaType.Artist ? "Albums" : "Tracks";
+    }
+
+    private static string FormatDetailDuration(long seconds)
+    {
+        var time = TimeSpan.FromSeconds(seconds);
+        return time.TotalHours >= 1
+            ? $"{(long)time.TotalHours} hr {time.Minutes} min"
+            : time.TotalMinutes >= 1
+                ? $"{(long)time.TotalMinutes} min"
+                : $"{time.Seconds} sec";
     }
 
     private static void SetShelf(Shelf shelf, List<ListRow> rows, string? title = null)
@@ -745,7 +858,9 @@ public sealed partial class LibraryWindow : Window
             return;
         }
 
-        if (item.Type is MaMediaType.Album or MaMediaType.Artist or MaMediaType.Playlist)
+        // Clicking opens a detail page for every media type. The cover play button
+        // and the row menu still offer immediate playback without navigating.
+        if (item.Type is MaMediaType.Album or MaMediaType.Artist or MaMediaType.Playlist or MaMediaType.Track)
         {
             if (_openedItem is not null)
             {
@@ -757,6 +872,7 @@ public sealed partial class LibraryWindow : Window
         }
         else
         {
+            // Radio or an unrecognised playable item keeps its original one-click behaviour.
             await PlayAsync(item, MaQueueOption.Replace);
         }
     }

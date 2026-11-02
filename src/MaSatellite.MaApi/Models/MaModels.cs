@@ -22,7 +22,9 @@ public sealed record MaItem(
     int? Year,
     int? DurationSeconds,
     string? ImageUrl,
-    bool IsPlayable = true)
+    bool IsPlayable = true,
+    string? Overview = null,
+    IReadOnlyList<string>? Genres = null)
 {
     /// <summary>"Artist · Album" style one-liner for lists.</summary>
     public string Description => string.Join(" · ", new[] { Subtitle, AlbumName, Year?.ToString() }.Where(s => !string.IsNullOrWhiteSpace(s)));
