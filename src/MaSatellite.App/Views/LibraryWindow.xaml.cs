@@ -53,6 +53,11 @@ public sealed partial class LibraryWindow : Window
     private bool _remoteMuted;
     private bool _remoteShuffle;
     private string _remoteRepeat = "off";
+    private PlaybackFeedback? _pendingPlayback;
+    private string? _pendingTargetId;
+    private PlaybackSummary _latestPlayback = new("Nothing playing", "Choose a player", null, null, false, false);
+    private bool _canPlayPause;
+    private int _pendingPollTicks;
 
     internal LibraryWindow(LibraryController controller, SatelliteHost host, Action openSettings)
     {
@@ -76,7 +81,7 @@ public sealed partial class LibraryWindow : Window
         {
             if (_tab is "queue" or "now")
             {
-                _ = LoadTabAsync();
+                _ = LoadTabAsync(backgroundRefresh: true);
             }
             else
             {
@@ -86,7 +91,27 @@ public sealed partial class LibraryWindow : Window
 
         _footerProgressTimer = DispatcherQueue.CreateTimer();
         _footerProgressTimer.Interval = TimeSpan.FromMilliseconds(500);
-        _footerProgressTimer.Tick += (_, _) => UpdateFooterProgress();
+        _footerProgressTimer.Tick += (_, _) =>
+        {
+            UpdateFooterProgress();
+            if (_pendingPlayback is null || _closed)
+                return;
+
+            if (_pendingPlayback.HasTimedOut(DateTimeOffset.UtcNow))
+            {
+                ClearPendingPlayback();
+                ShowPlaybackWarning();
+            }
+            else if (SelectedTarget is { IsThisPc: true })
+            {
+                RefreshLocalPlayback();
+            }
+            else if (++_pendingPollTicks % 4 == 0)
+            {
+                // Server queue events normally arrive first; poll slowly as a fallback.
+                _ = RefreshPlaybackSummaryAsync();
+            }
+        };
         _footerProgressTimer.Start();
 
         _footerSeekDebounce = DispatcherQueue.CreateTimer();
@@ -207,6 +232,7 @@ public sealed partial class LibraryWindow : Window
 
         _footerSeekDebounce.Stop();
         _footerVolumeDebounce.Stop();
+        ClearPendingPlayback();
         _remoteMuted = false;
         ResetFooterControls();
         RefreshTransferTargets();
@@ -412,14 +438,27 @@ public sealed partial class LibraryWindow : Window
         _ => "After dark",
     };
 
-    private async Task LoadTabAsync()
+    private async Task LoadTabAsync(bool backgroundRefresh = false)
     {
         var id = ++_loadId;
-        Message.IsOpen = false;
-        EmptyState.Visibility = Visibility.Collapsed;
-        RetryButton.Visibility = Visibility.Collapsed;
-        LoadingState.Visibility = Visibility.Visible;
-        Busy.IsActive = true;
+        if (!backgroundRefresh)
+        {
+            Message.IsOpen = false;
+            EmptyState.Visibility = Visibility.Collapsed;
+            RetryButton.Visibility = Visibility.Collapsed;
+            LoadingLabel.Text = _openedItem is not null ? "Opening selection…" : _tab switch
+            {
+                "home" => "Preparing your home…",
+                "search" => "Searching Music Assistant…",
+                "queue" or "now" => "Loading your queue…",
+                "playlist" => "Loading playlists…",
+                "artist" => "Loading artists…",
+                "track" => "Loading tracks…",
+                _ => "Loading albums…",
+            };
+            LoadingState.Visibility = Visibility.Visible;
+            Busy.IsActive = true;
+        }
         UpdateNavigationState();
         ContextBar.Visibility = _openedItem is null ? Visibility.Collapsed : Visibility.Visible;
         ContextActions.Visibility = _openedItem?.Type == MaMediaType.Artist ? Visibility.Collapsed : Visibility.Visible;
@@ -429,9 +468,12 @@ public sealed partial class LibraryWindow : Window
         var useGrid = IsGridView;
         UpdateLibraryControls();
         _currentLibraryRows = [];
-        HomeShelves.Visibility = isHome ? Visibility.Visible : Visibility.Collapsed;
-        AlbumGrid.Visibility = useGrid ? Visibility.Visible : Visibility.Collapsed;
-        List.Visibility = (isHome || useGrid) ? Visibility.Collapsed : Visibility.Visible;
+        if (!backgroundRefresh)
+        {
+            HomeShelves.Visibility = Visibility.Collapsed;
+            AlbumGrid.Visibility = Visibility.Collapsed;
+            List.Visibility = Visibility.Collapsed;
+        }
         ContentHeading.Text = _openedItem?.Name ?? (_tab switch
         {
             "now" => "Now playing",
@@ -617,6 +659,9 @@ public sealed partial class LibraryWindow : Window
             _currentLibraryRows = rows;
             AlbumGrid.ItemsSource = useGrid ? rows : null;
             List.ItemsSource = (isHome || useGrid) ? null : rows;
+            HomeShelves.Visibility = isHome ? Visibility.Visible : Visibility.Collapsed;
+            AlbumGrid.Visibility = useGrid ? Visibility.Visible : Visibility.Collapsed;
+            List.Visibility = (isHome || useGrid) ? Visibility.Collapsed : Visibility.Visible;
             if (isHome ? rows.Count + recentRows.Count + playlistRows.Count + topTracks.Count == 0 : rows.Count == 0)
             {
                 var detail = _tab switch
@@ -687,7 +732,8 @@ public sealed partial class LibraryWindow : Window
 
         if (row.QueueItem is { } queueItem && SelectedTarget is { } target)
         {
-            await RunAsync(() => _controller.PlayQueueIndexAsync(target, queueItem.Index));
+            await StartPlaybackAsync(target, () => _controller.PlayQueueIndexAsync(target, queueItem.Index),
+                "Starting selected track…", waitForTrackChange: true);
             return;
         }
 
@@ -763,13 +809,24 @@ public sealed partial class LibraryWindow : Window
             return;
         }
 
-        await RunAsync(() => _controller.PlayAsync(item, target, option));
-        ShowInfo(option switch
+        if (option == MaQueueOption.Replace)
         {
-            MaQueueOption.Next => $"'{item.Name}' will play next on {target.Name}.",
-            MaQueueOption.Add => $"Added '{item.Name}' to the queue of {target.Name}.",
-            _ => $"Playing '{item.Name}' on {target.Name}.",
-        });
+            await StartPlaybackAsync(target, () => _controller.PlayAsync(item, target, option),
+                $"Starting {item.Name}…", waitForTrackChange: true);
+            return;
+        }
+
+        try
+        {
+            await _controller.PlayAsync(item, target, option);
+            ShowInfo(option == MaQueueOption.Next
+                ? $"'{item.Name}' will play next on {target.Name}."
+                : $"Added '{item.Name}' to the queue of {target.Name}.");
+        }
+        catch (MaException ex)
+        {
+            ShowError(ex);
+        }
     }
 
     private async void OnQueuePlayPause(object sender, RoutedEventArgs e) => await QueueCommandAsync("play_pause");
@@ -781,33 +838,41 @@ public sealed partial class LibraryWindow : Window
     private async Task QueueCommandAsync(string command)
     {
         if (SelectedTarget is not { } target)
-        {
             return;
-        }
 
-        // Sendspin commands are authoritative for the local player, just like the tray mini-player.
-        if (target.IsThisPc && _host.Status.Connection == ConnectionState.Connected)
+        async Task SendCommandAsync()
         {
-            var session = _host.Status.Session;
-            var localCommand = command switch
+            // Local Sendspin playback status is authoritative, not a potentially stale MA queue.
+            if (target.IsThisPc && _host.Status.Connection == ConnectionState.Connected)
             {
-                "play_pause" => TransportLogic.PlayPause(session),
-                "next" => TransportLogic.Next(session),
-                "previous" => TransportLogic.Previous(session),
-                _ => null,
-            };
+                var session = _host.Status.Session;
+                var localCommand = command switch
+                {
+                    "play_pause" => TransportLogic.PlayPause(session),
+                    "next" => TransportLogic.Next(session),
+                    "previous" => TransportLogic.Previous(session),
+                    _ => null,
+                };
 
-            if (localCommand is not null)
-            {
-                await _host.SendCommandAsync(localCommand);
-                RefreshLocalPlayback();
+                if (localCommand is not null)
+                    await _host.SendCommandAsync(localCommand);
+                return;
             }
 
-            return;
+            await _controller.QueueControlAsync(target, command);
         }
 
-        await RunAsync(() => _controller.QueueControlAsync(target, command));
-        await RefreshPlaybackSummaryAsync();
+        if (command == "play_pause")
+        {
+            var desiredPlaying = !_latestPlayback.IsPlaying;
+            await StartPlaybackAsync(target, SendCommandAsync,
+                desiredPlaying ? "Starting playback…" : "Pausing playback…", desiredPlaying);
+        }
+        else
+        {
+            await RunAsync(SendCommandAsync);
+            await RefreshPlaybackSummaryAsync();
+        }
     }
 
     private async void OnTransfer(object sender, RoutedEventArgs e)
@@ -821,6 +886,76 @@ public sealed partial class LibraryWindow : Window
         await RunAsync(() => _controller.TransferAsync(from, to));
         ShowInfo($"Moved the queue from {from.Name} to {to.Name}.");
         TargetBox.SelectedItem = TargetBox.Items.Cast<ComboBoxItem>().FirstOrDefault(i => (i.Tag as PlayTarget)?.QueueId == to.QueueId) ?? TargetBox.SelectedItem;
+    }
+
+    private async Task StartPlaybackAsync(PlayTarget target, Func<Task> action, string label,
+        bool desiredPlaying = true, bool waitForTrackChange = false)
+    {
+        if (_pendingPlayback is not null)
+            return; // Prevent duplicate commands while the player is still responding.
+
+        _pendingTargetId = target.QueueId;
+        _pendingPlayback = new PlaybackFeedback(label, desiredPlaying,
+            _latestPlayback.IsPlaying, _latestPlayback.Title, waitForTrackChange);
+        _pendingPollTicks = 0;
+        UpdatePlaybackFeedbackUi();
+
+        try
+        {
+            await action();
+            // An accepted command is not confirmation of actual audio playback.
+            if (!_closed && SelectedTarget?.QueueId == target.QueueId)
+                await RefreshPlaybackSummaryAsync();
+        }
+        catch (MaException ex)
+        {
+            if (_pendingTargetId == target.QueueId)
+                ClearPendingPlayback();
+            ShowError(ex);
+        }
+        catch (Exception)
+        {
+            if (_pendingTargetId == target.QueueId)
+                ClearPendingPlayback();
+            ShowPlaybackWarning();
+        }
+    }
+
+    private void ClearPendingPlayback()
+    {
+        _pendingPlayback = null;
+        _pendingTargetId = null;
+        UpdatePlaybackFeedbackUi();
+    }
+
+    private void UpdatePlaybackFeedbackUi()
+    {
+        if (_closed)
+            return;
+
+        var pending = _pendingPlayback is not null && SelectedTarget?.QueueId == _pendingTargetId;
+        FooterPlayPauseSpinner.IsActive = QueuePlayPauseSpinner.IsActive = pending;
+        FooterPlayPauseSpinner.Visibility = QueuePlayPauseSpinner.Visibility =
+            pending ? Visibility.Visible : Visibility.Collapsed;
+        FooterPlayPauseIcon.Visibility = QueuePlayPauseIcon.Visibility =
+            pending ? Visibility.Collapsed : Visibility.Visible;
+        FooterPlayPauseButton.IsEnabled = QueuePlayPauseButton.IsEnabled = _canPlayPause && !pending;
+        var target = SelectedTarget?.Name ?? "No player selected";
+        var state = _latestPlayback.HasTrack
+            ? (_latestPlayback.IsPlaying ? "Playing" : "Paused")
+            : "Idle";
+        FooterState.Text = NowPlayingState.Text = pending
+            ? $"{_pendingPlayback!.Label} · {target}"
+            : $"{state} · {target}";
+    }
+
+    private void ShowPlaybackWarning()
+    {
+        Message.Severity = InfoBarSeverity.Warning;
+        Message.Title = "Playback not confirmed";
+        Message.Message = "Music Assistant hasn't confirmed the command yet. Check your player or try again.";
+        SetupButton.Visibility = Visibility.Collapsed;
+        Message.IsOpen = true;
     }
 
     private async Task RunAsync(Func<Task> action)
@@ -902,10 +1037,13 @@ public sealed partial class LibraryWindow : Window
         NowPlayingTitle.Text = summary.Title;
         NowPlayingArtist.Text = summary.Artist;
 
-        var state = summary.HasTrack ? (summary.IsPlaying ? "Playing" : "Paused") : "Idle";
-        var targetName = SelectedTarget?.Name ?? "No player selected";
-        FooterState.Text = $"{state} · {targetName}";
-        NowPlayingState.Text = $"{state} · {targetName}";
+        _latestPlayback = summary;
+        if (_pendingPlayback is not null && SelectedTarget?.QueueId == _pendingTargetId &&
+            _pendingPlayback.IsConfirmed(summary.IsPlaying, summary.Title))
+        {
+            _pendingPlayback = null;
+            _pendingTargetId = null;
+        }
 
         var icon = summary.IsPlaying ? "\uE769" : "\uE768";
         FooterPlayPauseIcon.Glyph = icon;
@@ -914,18 +1052,19 @@ public sealed partial class LibraryWindow : Window
         if (SelectedTarget is { IsThisPc: true } && _host.Status.Connection == ConnectionState.Connected)
         {
             var transport = TransportLogic.Describe(_host.Status.Session);
-            FooterPlayPauseButton.IsEnabled = QueuePlayPauseButton.IsEnabled = transport.CanPlayPause;
+            _canPlayPause = transport.CanPlayPause;
             FooterPreviousButton.IsEnabled = QueuePreviousButton.IsEnabled = transport.CanPrevious;
             FooterNextButton.IsEnabled = QueueNextButton.IsEnabled = transport.CanNext;
         }
         else
         {
             var enabled = SelectedTarget is not null;
-            FooterPlayPauseButton.IsEnabled = QueuePlayPauseButton.IsEnabled = enabled;
+            _canPlayPause = enabled;
             FooterPreviousButton.IsEnabled = QueuePreviousButton.IsEnabled = enabled;
             FooterNextButton.IsEnabled = QueueNextButton.IsEnabled = enabled;
         }
 
+        UpdatePlaybackFeedbackUi();
         UpdatePlaybackArtwork(summary);
         if (SelectedTarget is null)
         {

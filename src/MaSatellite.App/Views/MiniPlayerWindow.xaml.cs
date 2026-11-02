@@ -38,6 +38,7 @@ internal sealed partial class MiniPlayerWindow : Window
     private int _artworkVersion = -1;
     private long _hiddenAtTicks;
     private long _pendingSeekMs;
+    private PlaybackFeedback? _pendingPlayback;
 
     public MiniPlayerWindow(SatelliteHost host, SettingsStore settings, IAudioDeviceCatalog catalog, Action openSettings, Action openLibrary, Func<Rectangle?> trayRect)
     {
@@ -170,22 +171,32 @@ internal sealed partial class MiniPlayerWindow : Window
         var session = status.Session;
         var md = session.Metadata;
         var view = TransportLogic.Describe(session);
+        if (_pendingPlayback is not null &&
+            (_pendingPlayback.IsConfirmed(view.IsPlaying, md.Title) ||
+             _pendingPlayback.HasTimedOut(DateTimeOffset.UtcNow)))
+        {
+            _pendingPlayback = null;
+        }
+
         _updating = true;
         try
         {
             SetMetadataText(TitleText, string.IsNullOrEmpty(md.Title) ? "Nothing playing" : md.Title);
             SetMetadataText(ArtistText, md.Artist);
             SetMetadataText(AlbumText, md.Album);
-            SetMetadataText(StatusText, status.Connection switch
+            SetMetadataText(StatusText, _pendingPlayback?.Label ?? (status.Connection switch
             {
                 ConnectionState.Connected => $"{(view.IsPlaying ? "Playing on" : "Connected to")} {status.ServerName}" + (string.IsNullOrEmpty(session.Group.GroupName) ? string.Empty : $" · {session.Group.GroupName}"),
                 ConnectionState.Listening => status.Detail ?? "Waiting for Music Assistant",
                 ConnectionState.Connecting => status.Detail ?? "Connecting…",
                 _ => "Stopped",
-            });
+            }));
 
             PlayPauseIcon.Glyph = view.IsPlaying ? "" : "";
-            PlayPauseButton.IsEnabled = view.CanPlayPause;
+            PlayPauseSpinner.IsActive = _pendingPlayback is not null;
+            PlayPauseSpinner.Visibility = _pendingPlayback is not null ? Visibility.Visible : Visibility.Collapsed;
+            PlayPauseIcon.Visibility = _pendingPlayback is not null ? Visibility.Collapsed : Visibility.Visible;
+            PlayPauseButton.IsEnabled = view.CanPlayPause && _pendingPlayback is null;
             PrevButton.IsEnabled = view.CanPrevious;
             NextButton.IsEnabled = view.CanNext;
 
@@ -266,7 +277,32 @@ internal sealed partial class MiniPlayerWindow : Window
 
     private void OnSystemVolumeChanged() => DispatcherQueue.TryEnqueue(Refresh);
 
-    private async void OnPlayPause(object sender, RoutedEventArgs e) => await Send(TransportLogic.PlayPause(_host.Status.Session));
+    private async void OnPlayPause(object sender, RoutedEventArgs e)
+    {
+        if (_pendingPlayback is not null)
+            return;
+
+        var session = _host.Status.Session;
+        var command = TransportLogic.PlayPause(session);
+        if (command is null)
+            return;
+
+        var playing = TransportLogic.Describe(session).IsPlaying;
+        _pendingPlayback = new PlaybackFeedback(playing ? "Pausing playback…" : "Starting playback…",
+            !playing, playing, session.Metadata.Title);
+        Refresh();
+        try
+        {
+            await Send(command);
+            Refresh();
+        }
+        catch (Exception)
+        {
+            _pendingPlayback = null;
+            Refresh();
+            SetMetadataText(StatusText, "Couldn't send playback command.");
+        }
+    }
 
     private async void OnPrevious(object sender, RoutedEventArgs e) => await Send(TransportLogic.Previous(_host.Status.Session));
 

@@ -65,7 +65,11 @@
       <Button x:Name="PlayPauseButton" Click="OnPlayPause" Width="64" Height="48" Padding="0"
               Style="{StaticResource AuroraPrimaryButtonStyle}" ToolTipService.ToolTip="Play or pause"
               AutomationProperties.Name="Play or pause">
-        <FontIcon x:Name="PlayPauseIcon" Glyph="&#xE768;" FontSize="23"/>
+        <Grid Width="23" Height="23">
+          <FontIcon x:Name="PlayPauseIcon" Glyph="&#xE768;" FontSize="23" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          <ProgressRing x:Name="PlayPauseSpinner" IsActive="False" Visibility="Collapsed" Foreground="#10192B"
+                        Width="22" Height="22"/>
+        </Grid>
       </Button>
       <Button x:Name="NextButton" Click="OnNext" Width="44" Height="44" Style="{StaticResource AuroraButtonStyle}"
               Padding="0" ToolTipService.ToolTip="Next track" AutomationProperties.Name="Next track">
@@ -102,7 +106,7 @@
           <FontIcon Glyph="&#xE713;" FontSize="17"/>
         </Button>
       </StackPanel>
-      <TextBlock x:Name="StatusText" Grid.Row="1" Grid.ColumnSpan="2" MaxLines="1"
+      <TextBlock x:Name="StatusText" Grid.Row="1" Grid.ColumnSpan="2" MaxLines="1" AutomationProperties.LiveSetting="Polite"
                  TextTrimming="CharacterEllipsis" Foreground="{StaticResource AuroraGood}" FontSize="11"/>
     </Grid>
   </Grid>

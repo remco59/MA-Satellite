@@ -151,7 +151,11 @@
         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Button x:Name="QueuePreviousButton" Click="OnQueuePrevious" Style="{StaticResource AuroraButtonStyle}" ToolTipService.ToolTip="Previous"><FontIcon Glyph="&#xE892;"/></Button>
-          <Button x:Name="QueuePlayPauseButton" Click="OnQueuePlayPause" Style="{StaticResource AuroraPrimaryButtonStyle}" ToolTipService.ToolTip="Play or pause"><FontIcon x:Name="QueuePlayPauseIcon" Glyph="&#xE768;"/></Button>
+          <Button x:Name="QueuePlayPauseButton" Click="OnQueuePlayPause" Style="{StaticResource AuroraPrimaryButtonStyle}" ToolTipService.ToolTip="Play or pause"><Grid Width="18" Height="18">
+              <FontIcon x:Name="QueuePlayPauseIcon" Glyph="&#xE768;" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              <ProgressRing x:Name="QueuePlayPauseSpinner" IsActive="False" Visibility="Collapsed"
+                            Foreground="#10192B" Width="18" Height="18"/>
+            </Grid></Button>
           <Button x:Name="QueueNextButton" Click="OnQueueNext" Style="{StaticResource AuroraButtonStyle}" ToolTipService.ToolTip="Next"><FontIcon Glyph="&#xE893;"/></Button>
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
@@ -177,7 +181,7 @@
                          TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2" Foreground="{StaticResource AuroraText}"/>
               <TextBlock x:Name="NowPlayingArtist" Text="Select a player to begin" FontSize="14"
                          TextTrimming="CharacterEllipsis" MaxLines="1" Foreground="{StaticResource AuroraMuted}"/>
-              <TextBlock x:Name="NowPlayingState" Text="Idle" Foreground="{StaticResource AuroraGood}" FontSize="12" TextTrimming="CharacterEllipsis"/>
+              <TextBlock x:Name="NowPlayingState" Text="Idle" AutomationProperties.LiveSetting="Polite" Foreground="{StaticResource AuroraGood}" FontSize="12" TextTrimming="CharacterEllipsis"/>
               <TextBlock Text="Up next in your Music Assistant queue" Foreground="{StaticResource AuroraMuted}" FontSize="12"/>
             </StackPanel>
           </Grid>
@@ -302,12 +306,49 @@
           </ListView.ItemTemplate>
         </ListView>
         <!-- Distinct loading/empty/error surfaces keep the page understandable at all DPI settings. -->
-        <StackPanel x:Name="LoadingState" Grid.RowSpan="2" Visibility="Collapsed"
-                    HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-          <ProgressRing x:Name="Busy" IsActive="False" Width="42" Height="42"
-                        AutomationProperties.Name="Loading your music"/>
-          <TextBlock Text="Loading your music…" Foreground="{StaticResource AuroraMuted}" FontSize="13"
-                     HorizontalAlignment="Center"/>
+        <StackPanel x:Name="LoadingState" Grid.Row="1" Visibility="Collapsed" Spacing="22"
+                    HorizontalAlignment="Stretch" VerticalAlignment="Top" Padding="8,16,8,0"
+                    AutomationProperties.LiveSetting="Polite">
+          <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+            <ProgressRing x:Name="Busy" IsActive="False" Width="26" Height="26"
+                          Foreground="{StaticResource AuroraAccent}" AutomationProperties.Name="Loading music"/>
+            <StackPanel Spacing="3" VerticalAlignment="Center">
+              <TextBlock x:Name="LoadingLabel" Text="Loading your music…" FontSize="15" FontWeight="SemiBold"
+                         Foreground="{StaticResource AuroraText}"/>
+              <TextBlock Text="Getting everything ready from Music Assistant" FontSize="12"
+                         Foreground="{StaticResource AuroraMuted}"/>
+            </StackPanel>
+          </StackPanel>
+          <!-- Stable placeholders avoid a blank page while MA fetches its library. -->
+          <StackPanel Orientation="Horizontal" Spacing="14" Opacity="0.7">
+            <Border Width="148" Height="185" CornerRadius="14" Background="{StaticResource AuroraCardSoft}"
+                    BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1">
+              <StackPanel Spacing="10" Padding="10">
+                <Border Height="120" CornerRadius="9" Background="{StaticResource AuroraAccentSoft}"/>
+                <Border Height="9" Width="100" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraBorder}"/>
+                <Border Height="7" Width="64" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraBorder}"/>
+              </StackPanel>
+            </Border>
+            <Border Width="148" Height="185" CornerRadius="14" Background="{StaticResource AuroraCardSoft}"
+                    BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1">
+              <StackPanel Spacing="10" Padding="10">
+                <Border Height="120" CornerRadius="9" Background="{StaticResource AuroraAccentSoft}"/>
+                <Border Height="9" Width="94" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraBorder}"/>
+                <Border Height="7" Width="78" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraBorder}"/>
+              </StackPanel>
+            </Border>
+            <Border Width="148" Height="185" CornerRadius="14" Background="{StaticResource AuroraCardSoft}"
+                    BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1">
+              <StackPanel Spacing="10" Padding="10">
+                <Border Height="120" CornerRadius="9" Background="{StaticResource AuroraAccentSoft}"/>
+                <Border Height="9" Width="112" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraBorder}"/>
+                <Border Height="7" Width="58" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraBorder}"/>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+          <ProgressBar IsIndeterminate="True" Height="3" Foreground="{StaticResource AuroraAccent}"
+                       Background="{StaticResource AuroraCardSoft}" HorizontalAlignment="Stretch"
+                       AutomationProperties.Name="Loading progress"/>
         </StackPanel>
         <Border x:Name="EmptyState" Grid.RowSpan="2" Visibility="Collapsed" HorizontalAlignment="Center"
                 VerticalAlignment="Center" MaxWidth="410" Padding="30,24" CornerRadius="18"
@@ -363,7 +404,7 @@
             <TextBlock x:Name="FooterTitle" Text="Nothing playing" Foreground="{StaticResource AuroraText}" FontSize="12"
                        FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1"/>
             <TextBlock x:Name="FooterArtist" Text="Choose a player" Style="{StaticResource AuroraSubtitleStyle}" FontSize="11" MaxLines="1"/>
-            <TextBlock x:Name="FooterState" Text="Idle" Foreground="{StaticResource AuroraGood}" FontSize="10"
+            <TextBlock x:Name="FooterState" Text="Idle" AutomationProperties.LiveSetting="Polite" Foreground="{StaticResource AuroraGood}" FontSize="10"
                        TextTrimming="CharacterEllipsis" MaxLines="1"/>
           </StackPanel>
           <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="3">
@@ -377,7 +418,11 @@
             </Button>
             <Button x:Name="FooterPlayPauseButton" Click="OnQueuePlayPause" ToolTipService.ToolTip="Play or pause"
                     AutomationProperties.Name="Play or pause" Style="{StaticResource AuroraPrimaryButtonStyle}" Padding="11">
-              <FontIcon x:Name="FooterPlayPauseIcon" Glyph="&#xE768;"/>
+              <Grid Width="18" Height="18">
+                <FontIcon x:Name="FooterPlayPauseIcon" Glyph="&#xE768;" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <ProgressRing x:Name="FooterPlayPauseSpinner" IsActive="False" Visibility="Collapsed"
+                              Foreground="#10192B" Width="18" Height="18"/>
+              </Grid>
             </Button>
             <Button x:Name="FooterNextButton" Click="OnQueueNext" ToolTipService.ToolTip="Next"
                     AutomationProperties.Name="Next" Style="{StaticResource AuroraButtonStyle}" Padding="8">
