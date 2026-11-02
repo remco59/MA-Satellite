@@ -161,27 +161,6 @@
       </Grid>
       <Grid Grid.Row="4" RowSpacing="16">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-        <Border x:Name="HomeHero" Visibility="Collapsed" Background="{StaticResource AuroraHeroGradient}"
-                BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" CornerRadius="19" Padding="22">
-          <Grid ColumnSpacing="18">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-            <StackPanel VerticalAlignment="Center" Spacing="9">
-              <TextBlock Text="PICK UP WHERE YOU LEFT OFF" Foreground="{StaticResource AuroraGood}" Style="{StaticResource AuroraSectionLabelStyle}"/>
-              <TextBlock x:Name="HomeTitle" Text="Your music, ready to play" Foreground="{StaticResource AuroraText}"
-                         FontSize="23" FontWeight="Bold" TextTrimming="CharacterEllipsis" MaxLines="1"/>
-              <TextBlock x:Name="HomeArtist" Text="Explore your albums and playlists." Foreground="{StaticResource AuroraMuted}"
-                         FontSize="12" TextTrimming="CharacterEllipsis" MaxLines="1"/>
-              <Button x:Name="HomePlayButton" Click="OnHomePlay" Content="Play selection" AutomationProperties.Name="Play featured selection"
-                      Style="{StaticResource AuroraPrimaryButtonStyle}" HorizontalAlignment="Left" Margin="0,7,0,0"/>
-            </StackPanel>
-            <Border x:Name="HomeHeroArtwork" Grid.Column="1" Width="128" Height="128" Background="{StaticResource AuroraCard}" CornerRadius="14">
-              <Grid>
-                <FontIcon Glyph="&#xE8D6;" FontSize="35" Foreground="{StaticResource AuroraMuted}"/>
-                <Image x:Name="HomeArtwork" Stretch="UniformToFill"/>
-              </Grid>
-            </Border>
-          </Grid>
-        </Border>
         <Border x:Name="NowPlayingHero" Visibility="Collapsed" Background="{StaticResource AuroraHeroGradient}"
                 BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" CornerRadius="19" Padding="22">
           <Grid ColumnSpacing="25">
@@ -204,82 +183,53 @@
           </Grid>
         </Border>
 
-        <!-- Browse real recent listening history separately from the broader album library. -->
+        <!-- Home: a personal, playlist-first landing page. Real library and listening data only. -->
         <ScrollViewer x:Name="HomeShelves" Grid.Row="1" Visibility="Collapsed"
                       HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <StackPanel Spacing="15">
-            <StackPanel x:Name="HomeRecentSection" Spacing="6">
-              <TextBlock Text="Recently played" Foreground="{StaticResource AuroraText}" FontSize="18" FontWeight="SemiBold"/>
-              <TextBlock Text="Pick up an album or track you listened to earlier." Style="{StaticResource AuroraSubtitleStyle}"/>
-              <GridView x:Name="HomeRecentGrid" Height="284" IsItemClickEnabled="True" SelectionMode="None"
-                        ItemClick="OnItemClick" AutomationProperties.Name="Recently played"
-                        ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                        ScrollViewer.VerticalScrollMode="Disabled">
-                <GridView.ItemsPanel>
-                  <ItemsPanelTemplate><ItemsStackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
-                </GridView.ItemsPanel>
+          <StackPanel Spacing="26" Padding="0,0,0,18">
+            <StackPanel Spacing="14">
+              <TextBlock x:Name="HomeGreeting" Text="Welcome back" Foreground="{StaticResource AuroraText}" FontSize="28" FontWeight="Bold"/>
+              <GridView x:Name="HomeQuickGrid" IsItemClickEnabled="True" SelectionMode="None" ItemClick="OnItemClick"
+                        ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.HorizontalScrollMode="Disabled"
+                        AutomationProperties.Name="Quick access">
+                <GridView.ItemTemplate>
+                  <DataTemplate x:DataType="local:ListRow">
+                    <Grid Width="270" Height="60" ColumnSpacing="12" Background="{StaticResource AuroraCardSoft}" CornerRadius="10"
+                          AutomationProperties.Name="{x:Bind Title}">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="60"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+                      </Grid.ColumnDefinitions>
+                      <Border CornerRadius="10,0,0,10" Background="{StaticResource AuroraHeroGradient}">
+                        <Grid>
+                          <FontIcon Glyph="&#xE8D6;" Foreground="{StaticResource AuroraMuted}" Opacity="0.5" Visibility="{x:Bind PlaceholderVisibility}"/>
+                          <Image Source="{x:Bind Image}" Stretch="UniformToFill"/>
+                        </Grid>
+                      </Border>
+                      <TextBlock Grid.Column="1" Text="{x:Bind Title}" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold"
+                                 Foreground="{StaticResource AuroraText}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2"
+                                 ToolTipService.ToolTip="{x:Bind Title}"/>
+                      <Button Grid.Column="2" Tag="{x:Bind}" Click="OnCardPlay" Visibility="{x:Bind MenuVisibility}"
+                              Style="{StaticResource AuroraPrimaryButtonStyle}" Width="34" Height="34" MinHeight="34" Padding="0"
+                              CornerRadius="17" Margin="0,0,12,0" ToolTipService.ToolTip="Play now" AutomationProperties.Name="Play now">
+                        <FontIcon Glyph="&#xE768;" FontSize="14"/>
+                      </Button>
+                    </Grid>
+                  </DataTemplate>
+                </GridView.ItemTemplate>
               </GridView>
             </StackPanel>
-            <StackPanel x:Name="HomeTimeSection" Spacing="6" Visibility="Collapsed">
-              <TextBlock x:Name="HomeTimeTitle" Text="For your time of day" Foreground="{StaticResource AuroraText}" FontSize="18" FontWeight="SemiBold"/>
-              <TextBlock Text="Selections from your playlists and recent listening." Style="{StaticResource AuroraSubtitleStyle}"/>
-              <GridView x:Name="HomeTimeGrid" Height="284" IsItemClickEnabled="True" SelectionMode="None"
-                        ItemClick="OnItemClick" AutomationProperties.Name="For your time of day"
-                        ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                        ScrollViewer.VerticalScrollMode="Disabled">
-                <GridView.ItemsPanel>
-                  <ItemsPanelTemplate><ItemsStackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
-                </GridView.ItemsPanel>
-              </GridView>
-            </StackPanel>
-            <StackPanel x:Name="HomeTopTracksSection" Spacing="6" Visibility="Collapsed">
-              <TextBlock Text="On repeat" Foreground="{StaticResource AuroraText}" FontSize="18" FontWeight="SemiBold"/>
-              <TextBlock Text="The tracks you play most, according to Music Assistant." Style="{StaticResource AuroraSubtitleStyle}"/>
-              <GridView x:Name="HomeTopTracksGrid" Height="284" IsItemClickEnabled="True" SelectionMode="None"
-                        ItemClick="OnItemClick" AutomationProperties.Name="Your most played tracks"
-                        ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                        ScrollViewer.VerticalScrollMode="Disabled">
-                <GridView.ItemsPanel>
-                  <ItemsPanelTemplate><ItemsStackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
-                </GridView.ItemsPanel>
-              </GridView>
-            </StackPanel>
-            <StackPanel x:Name="HomePlaylistsSection" Spacing="6" Visibility="Collapsed">
-              <TextBlock x:Name="HomePlaylistsTitle" Text="Your most played playlists" Foreground="{StaticResource AuroraText}" FontSize="18" FontWeight="SemiBold"/>
-              <TextBlock Text="Your playlists, ranked by Music Assistant listening stats." Style="{StaticResource AuroraSubtitleStyle}"/>
-              <GridView x:Name="HomePlaylistsGrid" Height="284" IsItemClickEnabled="True" SelectionMode="None"
-                        ItemClick="OnItemClick" AutomationProperties.Name="Your most played playlists"
-                        ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                        ScrollViewer.VerticalScrollMode="Disabled">
-                <GridView.ItemsPanel>
-                  <ItemsPanelTemplate><ItemsStackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
-                </GridView.ItemsPanel>
-              </GridView>
-            </StackPanel>
-            <StackPanel x:Name="HomeSimilarSection" Spacing="6" Visibility="Collapsed">
-              <TextBlock x:Name="HomeSimilarTitle" Text="Artists you may like" Foreground="{StaticResource AuroraText}" FontSize="18" FontWeight="SemiBold"/>
-              <TextBlock Text="Discover artists connected to what you listen to." Style="{StaticResource AuroraSubtitleStyle}"/>
-              <GridView x:Name="HomeSimilarGrid" Height="284" IsItemClickEnabled="True" SelectionMode="None"
-                        ItemClick="OnItemClick" AutomationProperties.Name="Artists you may like"
-                        ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                        ScrollViewer.VerticalScrollMode="Disabled">
-                <GridView.ItemsPanel>
-                  <ItemsPanelTemplate><ItemsStackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
-                </GridView.ItemsPanel>
-              </GridView>
-            </StackPanel>
-            <StackPanel x:Name="HomeAlbumSection" Spacing="6">
-              <TextBlock Text="From your library" Foreground="{StaticResource AuroraText}" FontSize="18" FontWeight="SemiBold"/>
-              <TextBlock Text="Explore albums you've added to Music Assistant." Style="{StaticResource AuroraSubtitleStyle}"/>
-              <GridView x:Name="HomeAlbumsGrid" Height="284" IsItemClickEnabled="True" SelectionMode="None"
-                        ItemClick="OnItemClick" AutomationProperties.Name="Albums from your library"
-                        ScrollViewer.HorizontalScrollMode="Enabled" ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                        ScrollViewer.VerticalScrollMode="Disabled">
-                <GridView.ItemsPanel>
-                  <ItemsPanelTemplate><ItemsStackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
-                </GridView.ItemsPanel>
-              </GridView>
-            </StackPanel>
+            <local:Shelf x:Name="HomeTimeShelf" Visibility="Collapsed" ItemClick="OnItemClick" Subtitle="Playlists that fit the moment."/>
+            <local:Shelf x:Name="HomePlaylistsShelf" Visibility="Collapsed" ItemClick="OnItemClick"/>
+            <local:Shelf x:Name="HomeRecentShelf" Visibility="Collapsed" ItemClick="OnItemClick"
+                         Title="Jump back in" Subtitle="Albums and tracks you listened to recently."/>
+            <local:Shelf x:Name="HomeNewPlaylistsShelf" Visibility="Collapsed" ItemClick="OnItemClick"
+                         Title="Recently added playlists" Subtitle="Fresh additions to your collection."/>
+            <local:Shelf x:Name="HomeTopTracksShelf" Visibility="Collapsed" ItemClick="OnItemClick"
+                         Title="On repeat" Subtitle="The tracks you play most."/>
+            <local:Shelf x:Name="HomeSimilarShelf" Visibility="Collapsed" ItemClick="OnItemClick"
+                         Title="Artists you may like" Subtitle="Discover artists connected to what you listen to."/>
+            <local:Shelf x:Name="HomeAlbumShelf" Visibility="Collapsed" ItemClick="OnItemClick"
+                         Title="From your library" Subtitle="Albums you've added to Music Assistant."/>
           </StackPanel>
         </ScrollViewer>
 

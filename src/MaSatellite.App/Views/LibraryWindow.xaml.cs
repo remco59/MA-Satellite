@@ -33,7 +33,6 @@ public sealed partial class LibraryWindow : Window
     private string? _configuredSortTab;
     private bool _configuringSort;
     private IReadOnlyList<ListRow> _currentLibraryRows = [];
-    private MaItem? _featuredAlbum;
     private string _lastQuery = string.Empty;
     private int _loadId;
     private bool _loadingTargets;
@@ -62,12 +61,10 @@ public sealed partial class LibraryWindow : Window
         _openSettings = openSettings;
         InitializeComponent();
         // Share the library's existing clickable album card template across Home shelves.
-        HomeRecentGrid.ItemTemplate = AlbumGrid.ItemTemplate;
-        HomeAlbumsGrid.ItemTemplate = AlbumGrid.ItemTemplate;
-        HomeTimeGrid.ItemTemplate = AlbumGrid.ItemTemplate;
-        HomePlaylistsGrid.ItemTemplate = AlbumGrid.ItemTemplate;
-        HomeTopTracksGrid.ItemTemplate = AlbumGrid.ItemTemplate;
-        HomeSimilarGrid.ItemTemplate = AlbumGrid.ItemTemplate;
+        foreach (var shelf in HomeShelfControls)
+        {
+            shelf.ItemTemplate = AlbumGrid.ItemTemplate;
+        }
         AuroraWindowChrome.Apply(this);
         Title = "ma-satellite library";
         AppWindow.Resize(new SizeInt32(1180, 790));
@@ -237,7 +234,6 @@ public sealed partial class LibraryWindow : Window
         FooterVolumeGroup.Visibility = width < 1040 ? Visibility.Collapsed : Visibility.Visible;
         FooterShuffleButton.Visibility = width < 820 ? Visibility.Collapsed : Visibility.Visible;
         FooterRepeatButton.Visibility = width < 820 ? Visibility.Collapsed : Visibility.Visible;
-        HomeHeroArtwork.Visibility = width < 710 ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private async void OnRetry(object sender, RoutedEventArgs e)
@@ -369,8 +365,30 @@ public sealed partial class LibraryWindow : Window
         _ => (null, null),
     };
 
-    // No AI-generated music, arbitrary genres or fake statistics: only real library and listening data.
-    private static List<ListRow> TimeOfDayPicks(IReadOnlyList<MaItem> playlists, IReadOnlyList<MaItem> history, int hour)
+    private IEnumerable<Shelf> HomeShelfControls =>
+    [
+        HomeTimeShelf, HomePlaylistsShelf, HomeRecentShelf, HomeNewPlaylistsShelf,
+        HomeTopTracksShelf, HomeSimilarShelf, HomeAlbumShelf,
+    ];
+
+    /// <summary>Personal greeting based on the clock and the signed-in Windows user's first name.</summary>
+    private static string HomeGreetingText(DateTime now)
+    {
+        var greeting = now.Hour switch
+        {
+            >= 5 and < 12 => "Good morning",
+            >= 12 and < 18 => "Good afternoon",
+            >= 18 and < 23 => "Good evening",
+            _ => "Good night",
+        };
+        var name = Environment.UserName;
+        return !string.IsNullOrWhiteSpace(name) && name.All(char.IsLetter)
+            ? $"{greeting}, {char.ToUpperInvariant(name[0])}{name[1..].ToLowerInvariant()}"
+            : greeting;
+    }
+
+    // No AI-generated music, arbitrary genres or fake statistics: only the user's own playlists.
+    private static List<ListRow> TimeOfDayPicks(IReadOnlyList<MaItem> playlists, int hour)
     {
         var keywords = hour switch
         {
@@ -379,22 +397,18 @@ public sealed partial class LibraryWindow : Window
             >= 18 and < 22 => new[] { "evening", "chill", "dinner", "relax", "sunset", "unwind" },
             _ => new[] { "night", "late", "afterhours", "party", "techno", "sleep", "ambient" },
         };
-        var matching = playlists.Where(p => keywords.Any(k => p.Name.Contains(k, StringComparison.OrdinalIgnoreCase)));
-        var frequentRecent = history
-            .Where(i => i.IsPlayable && !string.IsNullOrWhiteSpace(i.Uri))
-            .GroupBy(i => i.Uri, StringComparer.OrdinalIgnoreCase)
-            .OrderByDescending(g => g.Count()).Select(g => g.First());
-        return matching.Concat(frequentRecent)
-            .Where(i => i.IsPlayable && !string.IsNullOrWhiteSpace(i.Uri))
-            .DistinctBy(i => i.Uri, StringComparer.OrdinalIgnoreCase)
-            .Take(12).Select(i => ListRow.From(i)).ToList();
+        return playlists
+            .Where(p => p.IsPlayable && !string.IsNullOrWhiteSpace(p.Uri)
+                && keywords.Any(k => p.Name.Contains(k, StringComparison.OrdinalIgnoreCase)))
+            .DistinctBy(p => p.Uri, StringComparer.OrdinalIgnoreCase)
+            .Take(16).Select(p => ListRow.From(p)).ToList();
     }
 
     private static string TimeOfDayTitle(int hour) => hour switch
     {
-        >= 5 and < 12 => "Your morning rotation",
+        >= 5 and < 12 => "Your morning playlists",
         >= 12 and < 18 => "For your afternoon",
-        >= 18 and < 22 => "Your evening mix",
+        >= 18 and < 22 => "Your evening playlists",
         _ => "After dark",
     };
 
@@ -411,7 +425,6 @@ public sealed partial class LibraryWindow : Window
         ContextActions.Visibility = _openedItem?.Type == MaMediaType.Artist ? Visibility.Collapsed : Visibility.Visible;
         QueueBar.Visibility = (_tab is "queue" or "now") && _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
         NowPlayingHero.Visibility = _tab == "now" && _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
-        HomeHero.Visibility = _tab == "home" && _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
         var isHome = _tab == "home" && _openedItem is null;
         var useGrid = IsGridView;
         UpdateLibraryControls();
@@ -446,6 +459,7 @@ public sealed partial class LibraryWindow : Window
             List<ListRow> playlistRows = [];
             List<ListRow> topTracks = [];
             List<ListRow> similarRows = [];
+            List<ListRow> newPlaylistRows = [];
             var playlistsRanked = false;
             MaItem? similarSeed = null;
             string empty = "Nothing here yet.";
@@ -494,6 +508,17 @@ public sealed partial class LibraryWindow : Window
 
                 try
                 {
+                    newPlaylistRows = (await client.GetLibraryAsync(MaMediaType.Playlist, limit: 20,
+                        sortField: "timestamp_added", sortDirection: "desc"))
+                        .Where(i => i.IsPlayable).Select(i => ListRow.From(i)).ToList();
+                }
+                catch (MaException)
+                {
+                    // Sort by date added is server-dependent; hide the shelf if unsupported.
+                }
+
+                try
+                {
                     topTracks = (await client.GetLibraryAsync(MaMediaType.Track, limit: 20,
                         sortField: "play_count", sortDirection: "desc"))
                         .Where(t => t.IsPlayable).Select(t => ListRow.From(t)).ToList();
@@ -505,7 +530,7 @@ public sealed partial class LibraryWindow : Window
 
                 playlistRows = playlistItems.Where(i => i.IsPlayable).Take(20)
                     .Select(i => ListRow.From(i)).ToList();
-                timeRows = TimeOfDayPicks(playlistItems, recentItems, DateTime.Now.Hour);
+                timeRows = TimeOfDayPicks(playlistItems, DateTime.Now.Hour);
 
                 if (recentItems.Count > 0)
                 {
@@ -562,35 +587,33 @@ public sealed partial class LibraryWindow : Window
                 return;
             }
 
-            // Use actual library data for Home; there are no demo tracks or fake buttons.
-            var featured = isHome
-                ? recentRows.FirstOrDefault(r => r.Item?.IsPlayable == true)
-                    ?? rows.FirstOrDefault(r => r.Item?.IsPlayable == true)
-                : null;
-            _featuredAlbum = featured?.Item;
-            HomeTitle.Text = featured?.Title ?? "Your music, ready to play";
-            HomeArtist.Text = featured?.Subtitle ?? "Explore your albums and playlists.";
-            HomeArtwork.Source = featured?.Image;
-            HomePlayButton.IsEnabled = _featuredAlbum is not null && SelectedTarget is not null;
-            // A featured item never immediately repeats as the first shelf card.
-            var featuredUri = featured?.Item?.Uri;
-            List<ListRow> recentShelf = isHome ? recentRows.Where(r => r.Item?.Uri != featuredUri).Take(16).ToList() : [];
-            List<ListRow> albumShelf = isHome ? rows.Where(r => r.Item?.Uri != featuredUri).Take(30).ToList() : [];
-            HomeRecentGrid.ItemsSource = isHome ? recentShelf : null;
-            HomeAlbumsGrid.ItemsSource = isHome ? albumShelf : null;
-            HomeTimeGrid.ItemsSource = isHome ? timeRows : null;
-            HomePlaylistsGrid.ItemsSource = isHome ? playlistRows : null;
-            HomeTopTracksGrid.ItemsSource = isHome ? topTracks : null;
-            HomeSimilarGrid.ItemsSource = isHome ? similarRows : null;
-            HomeRecentSection.Visibility = isHome && recentShelf.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            HomeAlbumSection.Visibility = isHome && albumShelf.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            HomeTimeSection.Visibility = isHome && timeRows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            HomePlaylistsSection.Visibility = isHome && playlistRows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            HomeTopTracksSection.Visibility = isHome && topTracks.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            HomeSimilarSection.Visibility = isHome && similarRows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            HomeTimeTitle.Text = TimeOfDayTitle(DateTime.Now.Hour);
-            HomePlaylistsTitle.Text = playlistsRanked ? "Your most played playlists" : "Playlists from your library";
-            HomeSimilarTitle.Text = similarSeed is null ? "Artists you may like" : $"Because you listen to {similarSeed.Name}";
+            // Quick access: your most played playlists first, falling back to recent listening.
+            var quickRows = isHome
+                ? (playlistRows.Count > 0 ? playlistRows : recentRows).Take(8).ToList()
+                : [];
+            var quickUris = quickRows.Select(r => r.Item?.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            // Shelves below never immediately repeat what quick access already shows.
+            List<ListRow> playlistShelf = isHome ? playlistRows.Where(r => !quickUris.Contains(r.Item?.Uri)).ToList() : [];
+            if (playlistShelf.Count < 4)
+            {
+                playlistShelf = isHome ? playlistRows : [];
+            }
+
+            var newPlaylistShelf = isHome
+                ? newPlaylistRows.Where(r => !playlistRows.Any(p => p.Item?.Uri == r.Item?.Uri)).ToList()
+                : [];
+            HomeGreeting.Text = HomeGreetingText(DateTime.Now);
+            HomeQuickGrid.ItemsSource = isHome ? quickRows : null;
+            HomeQuickGrid.Visibility = quickRows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+            SetShelf(HomeTimeShelf, isHome ? timeRows : [], TimeOfDayTitle(DateTime.Now.Hour));
+            SetShelf(HomePlaylistsShelf, playlistShelf,
+                playlistsRanked ? "Your most played playlists" : "Playlists from your library");
+            SetShelf(HomeRecentShelf, isHome ? recentRows.Take(16).ToList() : []);
+            SetShelf(HomeNewPlaylistsShelf, newPlaylistShelf);
+            SetShelf(HomeTopTracksShelf, isHome ? topTracks : []);
+            SetShelf(HomeSimilarShelf, isHome ? similarRows : [],
+                similarSeed is null ? "Artists you may like" : $"Because you listen to {similarSeed.Name}");
+            SetShelf(HomeAlbumShelf, isHome ? rows.Take(30).ToList() : []);
             _currentLibraryRows = rows;
             AlbumGrid.ItemsSource = useGrid ? rows : null;
             List.ItemsSource = (isHome || useGrid) ? null : rows;
@@ -613,12 +636,12 @@ public sealed partial class LibraryWindow : Window
         {
             List.ItemsSource = null;
             AlbumGrid.ItemsSource = null;
-            HomeRecentGrid.ItemsSource = null;
-            HomeAlbumsGrid.ItemsSource = null;
-            HomeTimeGrid.ItemsSource = null;
-            HomePlaylistsGrid.ItemsSource = null;
-            HomeTopTracksGrid.ItemsSource = null;
-            HomeSimilarGrid.ItemsSource = null;
+            HomeQuickGrid.ItemsSource = null;
+            foreach (var shelf in HomeShelfControls)
+            {
+                SetShelf(shelf, []);
+            }
+
             ShowEmptyState("Couldn't load your music", "Check the Music Assistant connection and try again.", retry: true);
             ShowError(ex);
         }
@@ -630,6 +653,17 @@ public sealed partial class LibraryWindow : Window
                 LoadingState.Visibility = Visibility.Collapsed;
             }
         }
+    }
+
+    private static void SetShelf(Shelf shelf, List<ListRow> rows, string? title = null)
+    {
+        if (title is not null)
+        {
+            shelf.Title = title;
+        }
+
+        shelf.ItemsSource = rows.Count > 0 ? rows : null;
+        shelf.Visibility = rows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private async Task<List<ListRow>> LoadQueueRowsAsync()
@@ -711,14 +745,6 @@ public sealed partial class LibraryWindow : Window
         var item = new MenuFlyoutItem { Text = text };
         item.Click += async (_, _) => await action();
         return item;
-    }
-
-    private async void OnHomePlay(object sender, RoutedEventArgs e)
-    {
-        if (_featuredAlbum is { } album)
-        {
-            await PlayAsync(album, MaQueueOption.Replace);
-        }
     }
 
     private async void OnContextPlay(object sender, RoutedEventArgs e) => await PlayOpenedAsync(MaQueueOption.Replace);
