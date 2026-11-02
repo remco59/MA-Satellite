@@ -65,10 +65,12 @@
       <Button x:Name="PlayPauseButton" Click="OnPlayPause" Width="64" Height="48" Padding="0"
               Style="{StaticResource AuroraPrimaryButtonStyle}" ToolTipService.ToolTip="Play or pause"
               AutomationProperties.Name="Play or pause">
-        <Grid Width="23" Height="23">
+        <Grid Width="30" Height="30">
+          <Ellipse x:Name="PlayPauseTrack" Visibility="Collapsed" Width="28" Height="28"
+                   Stroke="#7899CB" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
           <FontIcon x:Name="PlayPauseIcon" Glyph="&#xE768;" FontSize="23" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-          <ProgressRing x:Name="PlayPauseSpinner" IsActive="False" Visibility="Collapsed" Foreground="#10192B"
-                        Width="22" Height="22"/>
+          <ProgressRing x:Name="PlayPauseSpinner" IsActive="False" Visibility="Collapsed"
+                        Foreground="#F5FBFF" Width="30" Height="30"/>
         </Grid>
       </Button>
       <Button x:Name="NextButton" Click="OnNext" Width="44" Height="44" Style="{StaticResource AuroraButtonStyle}"
