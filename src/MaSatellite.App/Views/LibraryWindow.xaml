@@ -323,19 +323,28 @@
           <ListView.ItemTemplate>
             <DataTemplate x:DataType="local:ListRow">
               <Grid Padding="9,7" ColumnSpacing="13" MinHeight="66">
-                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                <Border Width="54" Height="54" CornerRadius="10" Background="{StaticResource AuroraCard}">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{x:Bind PositionLabel}" Visibility="{x:Bind PositionVisibility}"
+                           Width="25" TextAlignment="Right" VerticalAlignment="Center"
+                           Foreground="{StaticResource AuroraMuted}" FontSize="12"/>
+                <Border Grid.Column="1" Width="54" Height="54" CornerRadius="10" Background="{StaticResource AuroraCard}">
                   <Grid>
                     <FontIcon Glyph="&#xE8D6;" Opacity="0.5" Visibility="{x:Bind PlaceholderVisibility}" Foreground="{StaticResource AuroraMuted}"/>
                     <Image Source="{x:Bind Image}" Stretch="UniformToFill"/>
                   </Grid>
                 </Border>
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="4">
                   <TextBlock Text="{x:Bind Title}" TextTrimming="CharacterEllipsis" MaxLines="1"
                              Foreground="{StaticResource AuroraText}" FontWeight="{x:Bind Weight}" ToolTipService.ToolTip="{x:Bind Title}"/>
                   <TextBlock Text="{x:Bind Subtitle}" Style="{StaticResource AuroraSubtitleStyle}" MaxLines="1"/>
                 </StackPanel>
-                <Button Grid.Column="2" Tag="{x:Bind}" Click="OnRowMenu" Visibility="{x:Bind MenuVisibility}"
+                <TextBlock Grid.Column="3" Text="{x:Bind DurationLabel}" Visibility="{x:Bind DurationVisibility}"
+                           Foreground="{StaticResource AuroraMuted}" FontSize="12" VerticalAlignment="Center"
+                           Margin="0,0,10,0"/>
+                <Button Grid.Column="4" Tag="{x:Bind}" Click="OnRowMenu" Visibility="{x:Bind MenuVisibility}"
                         ToolTipService.ToolTip="Play options" VerticalAlignment="Center"
                         Style="{StaticResource AuroraButtonStyle}" Padding="10">
                   <FontIcon Glyph="&#xE712;" FontSize="14"/>
