@@ -232,6 +232,7 @@ public sealed partial class LibraryWindow : Window
 
         _footerSeekDebounce.Stop();
         _footerVolumeDebounce.Stop();
+        _canPlayPause = false;
         ClearPendingPlayback();
         _remoteMuted = false;
         ResetFooterControls();
@@ -865,7 +866,10 @@ public sealed partial class LibraryWindow : Window
 
         if (command == "play_pause")
         {
-            var desiredPlaying = !_latestPlayback.IsPlaying;
+            var currentlyPlaying = target.IsThisPc && _host.Status.Connection == ConnectionState.Connected
+                ? TransportLogic.Describe(_host.Status.Session).IsPlaying
+                : _latestPlayback.IsPlaying;
+            var desiredPlaying = !currentlyPlaying;
             await StartPlaybackAsync(target, SendCommandAsync,
                 desiredPlaying ? "Starting playback…" : "Pausing playback…", desiredPlaying);
         }
