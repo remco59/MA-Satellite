@@ -193,10 +193,21 @@ internal sealed partial class MiniPlayerWindow : Window
             }));
 
             PlayPauseIcon.Glyph = view.IsPlaying ? "" : "";
-            PlayPauseSpinner.IsActive = _pendingPlayback is not null;
-            PlayPauseSpinner.Visibility = _pendingPlayback is not null ? Visibility.Visible : Visibility.Collapsed;
-            PlayPauseIcon.Visibility = _pendingPlayback is not null ? Visibility.Collapsed : Visibility.Visible;
-            PlayPauseButton.IsEnabled = view.CanPlayPause && _pendingPlayback is null;
+            var pending = _pendingPlayback is not null;
+            PlayPauseSpinner.IsActive = pending;
+            PlayPauseSpinner.Visibility = PlayPauseTrack.Visibility =
+                pending ? Visibility.Visible : Visibility.Collapsed;
+            PlayPauseIcon.Visibility = pending ? Visibility.Collapsed : Visibility.Visible;
+            // WinUI dims children of disabled controls. Block clicks without dimming the loader.
+            PlayPauseButton.IsEnabled = view.CanPlayPause || pending;
+            PlayPauseButton.IsHitTestVisible = !pending;
+            PlayPauseButton.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                pending ? "AuroraAccentSoft" : "AuroraAccentGradient"];
+            PlayPauseButton.BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraAccent"];
+            PlayPauseButton.BorderThickness = new Thickness(pending ? 1.5 : 0);
+            StatusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                pending ? "AuroraAccent" : "AuroraGood"];
+            AutomationProperties.SetName(PlayPauseButton, pending ? _pendingPlayback!.Label : "Play or pause");
             PrevButton.IsEnabled = view.CanPrevious;
             NextButton.IsEnabled = view.CanNext;
 

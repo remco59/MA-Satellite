@@ -942,9 +942,29 @@ public sealed partial class LibraryWindow : Window
         FooterPlayPauseSpinner.IsActive = QueuePlayPauseSpinner.IsActive = pending;
         FooterPlayPauseSpinner.Visibility = QueuePlayPauseSpinner.Visibility =
             pending ? Visibility.Visible : Visibility.Collapsed;
+        FooterPlayPauseTrack.Visibility = QueuePlayPauseTrack.Visibility =
+            pending ? Visibility.Visible : Visibility.Collapsed;
         FooterPlayPauseIcon.Visibility = QueuePlayPauseIcon.Visibility =
             pending ? Visibility.Collapsed : Visibility.Visible;
-        FooterPlayPauseButton.IsEnabled = QueuePlayPauseButton.IsEnabled = _canPlayPause && !pending;
+
+        // Disabling a WinUI Button fades its entire content, making its spinner barely visible.
+        // Keep the pending surface at full opacity and prevent repeated clicks via hit-testing
+        // (StartPlaybackAsync also guards against duplicate keyboard/automation commands).
+        FooterPlayPauseButton.IsEnabled = QueuePlayPauseButton.IsEnabled = _canPlayPause || pending;
+        FooterPlayPauseButton.IsHitTestVisible = QueuePlayPauseButton.IsHitTestVisible = !pending;
+        var background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+            pending ? "AuroraAccentSoft" : "AuroraAccentGradient"];
+        var accent = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraAccent"];
+        FooterPlayPauseButton.Background = QueuePlayPauseButton.Background = background;
+        FooterPlayPauseButton.BorderBrush = QueuePlayPauseButton.BorderBrush = accent;
+        FooterPlayPauseButton.BorderThickness = QueuePlayPauseButton.BorderThickness =
+            new Thickness(pending ? 1.5 : 0);
+        FooterState.Foreground = NowPlayingState.Foreground =
+            (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                pending ? "AuroraAccent" : "AuroraGood"];
+        var label = pending ? _pendingPlayback!.Label : "Play or pause";
+        AutomationProperties.SetName(FooterPlayPauseButton, label);
+        AutomationProperties.SetName(QueuePlayPauseButton, label);
         var target = SelectedTarget?.Name ?? "No player selected";
         var state = _latestPlayback.HasTrack
             ? (_latestPlayback.IsPlaying ? "Playing" : "Paused")

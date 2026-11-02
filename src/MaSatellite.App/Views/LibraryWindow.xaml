@@ -151,11 +151,16 @@
         <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Button x:Name="QueuePreviousButton" Click="OnQueuePrevious" Style="{StaticResource AuroraButtonStyle}" ToolTipService.ToolTip="Previous"><FontIcon Glyph="&#xE892;"/></Button>
-          <Button x:Name="QueuePlayPauseButton" Click="OnQueuePlayPause" Style="{StaticResource AuroraPrimaryButtonStyle}" ToolTipService.ToolTip="Play or pause"><Grid Width="18" Height="18">
+          <Button x:Name="QueuePlayPauseButton" Click="OnQueuePlayPause" Style="{StaticResource AuroraPrimaryButtonStyle}"
+                  ToolTipService.ToolTip="Play or pause" AutomationProperties.Name="Play or pause">
+            <Grid Width="28" Height="28">
+              <Ellipse x:Name="QueuePlayPauseTrack" Visibility="Collapsed" Width="26" Height="26"
+                       Stroke="#7899CB" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
               <FontIcon x:Name="QueuePlayPauseIcon" Glyph="&#xE768;" HorizontalAlignment="Center" VerticalAlignment="Center"/>
               <ProgressRing x:Name="QueuePlayPauseSpinner" IsActive="False" Visibility="Collapsed"
-                            Foreground="#10192B" Width="18" Height="18"/>
-            </Grid></Button>
+                            Foreground="#F5FBFF" Width="28" Height="28"/>
+            </Grid>
+          </Button>
           <Button x:Name="QueueNextButton" Click="OnQueueNext" Style="{StaticResource AuroraButtonStyle}" ToolTipService.ToolTip="Next"><FontIcon Glyph="&#xE893;"/></Button>
         </StackPanel>
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
@@ -418,10 +423,12 @@
             </Button>
             <Button x:Name="FooterPlayPauseButton" Click="OnQueuePlayPause" ToolTipService.ToolTip="Play or pause"
                     AutomationProperties.Name="Play or pause" Style="{StaticResource AuroraPrimaryButtonStyle}" Padding="11">
-              <Grid Width="18" Height="18">
+              <Grid Width="28" Height="28">
+                <Ellipse x:Name="FooterPlayPauseTrack" Visibility="Collapsed" Width="26" Height="26"
+                         Stroke="#7899CB" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 <FontIcon x:Name="FooterPlayPauseIcon" Glyph="&#xE768;" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 <ProgressRing x:Name="FooterPlayPauseSpinner" IsActive="False" Visibility="Collapsed"
-                              Foreground="#10192B" Width="18" Height="18"/>
+                              Foreground="#F5FBFF" Width="28" Height="28"/>
               </Grid>
             </Button>
             <Button x:Name="FooterNextButton" Click="OnQueueNext" ToolTipService.ToolTip="Next"
