@@ -518,16 +518,16 @@ public sealed partial class LibraryWindow : Window
             {
                 ContextTitle.Text = $"{parent.Type} details";
                 var client = await _controller.Service.GetClientAsync();
+                // Fetch richer metadata and child rows concurrently to avoid serial page loads.
                 // A track has its own detail view but no child list.
+                var metadataTask = client.GetItemDetailsAsync(parent);
                 detailChildren = parent.Type == MaMediaType.Track
                     ? []
                     : await client.GetChildrenAsync(parent);
                 detailItem = parent;
                 try
                 {
-                    // Listing results are usually lightweight mappings. Ask MA for the full
-                    // item only on navigation so biographies/descriptions and larger art appear.
-                    detailItem = await client.GetItemDetailsAsync(parent);
+                    detailItem = await metadataTask;
                 }
                 catch (MaException)
                 {
@@ -702,13 +702,13 @@ public sealed partial class LibraryWindow : Window
                     MaMediaType.Album => "No tracks are available for this album.",
                     MaMediaType.Artist => "No albums are available for this artist.",
                     _ => _tab switch
-                {
-                    "search" => string.IsNullOrWhiteSpace(_lastQuery)
-                        ? "Enter an artist, album or track above to begin."
-                        : "Try a different search term.",
-                    "queue" or "now" => "Add something to your selected player's queue to get started.",
-                    "home" => "Add music to your Music Assistant library to see it here.",
-                    _ => "Items you add to your Music Assistant library will appear here.",
+                    {
+                        "search" => string.IsNullOrWhiteSpace(_lastQuery)
+                            ? "Enter an artist, album or track above to begin."
+                            : "Try a different search term.",
+                        "queue" or "now" => "Add something to your selected player's queue to get started.",
+                        "home" => "Add music to your Music Assistant library to see it here.",
+                        _ => "Items you add to your Music Assistant library will appear here.",
                     },
                 };
                 ShowEmptyState(_openedItem is null ? empty : "Nothing here yet", detail);
