@@ -4,7 +4,7 @@ namespace MaSatellite.Windows.Tray;
 /// Decides when a tray hover preview should open or close. Uses caller-provided timestamps
 /// and hit tests so the behaviour can be tested without a Windows message loop.
 /// </summary>
-internal sealed class TrayHoverController
+public sealed class TrayHoverController
 {
     internal const int OpenDelayMs = 350;
     internal const int CloseDelayMs = 500;
@@ -67,7 +67,7 @@ internal sealed class TrayHoverController
     }
 }
 
-internal enum TrayHoverAction
+public enum TrayHoverAction
 {
     None,
     Show,
