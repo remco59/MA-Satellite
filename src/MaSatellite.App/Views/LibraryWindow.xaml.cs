@@ -699,7 +699,7 @@ public sealed partial class LibraryWindow : Window
             {
                 var detail = _openedItem?.Type switch
                 {
-                    MaMediaType.Playlist => "There are no tracks in this playlist yet.",
+                    MaMediaType.Playlist => "Music Assistant returned no fixed tracks for this playlist. You can still try playing it.",
                     MaMediaType.Album => "No tracks are available for this album.",
                     MaMediaType.Artist => "No albums are available for this artist.",
                     _ => _tab switch
@@ -756,7 +756,9 @@ public sealed partial class LibraryWindow : Window
         var facts = new List<string>();
         if (item.Type is MaMediaType.Playlist or MaMediaType.Album)
         {
-            facts.Add($"{children.Count} {(children.Count == 1 ? "track" : "tracks")}");
+            var unit = item.Type == MaMediaType.Playlist && children.Any(c => c.Type != MaMediaType.Track)
+                ? "item" : "track";
+            facts.Add($"{children.Count} {unit}{(children.Count == 1 ? "" : "s")}");
         }
         else if (item.Type == MaMediaType.Artist)
         {
@@ -866,6 +868,11 @@ public sealed partial class LibraryWindow : Window
 
             _openedItem = item;
             await LoadTabAsync();
+        }
+        else
+        {
+            // Radio or an unrecognised playable item keeps its original one-click behaviour.
+            await PlayAsync(item, MaQueueOption.Replace);
         }
     }
 
