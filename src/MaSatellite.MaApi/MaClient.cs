@@ -8,7 +8,7 @@ namespace MaSatellite.MaApi;
 /// <summary>Typed access to the parts of Music Assistant's API this app uses: library, search, queues and players.</summary>
 public sealed class MaClient : IAsyncDisposable
 {
-    private static readonly string[] SearchMediaTypes = ["artist", "album", "track", "playlist"];
+    private static readonly string[] SearchMediaTypes = ["track", "artist", "album", "playlist", "radio"];
     private static readonly string[] RecentlyPlayedMediaTypes = ["track", "album"];
 
     private readonly MaConnection _connection;
@@ -52,7 +52,7 @@ public sealed class MaClient : IAsyncDisposable
         IReadOnlyList<MaItem> Items(string name) =>
             result.ValueKind == JsonValueKind.Object && result.TryGetProperty(name, out var arr) ? MaItemParser.ParseItems(arr, _baseUrl) : [];
 
-        return new MaSearchResults(Items("artists"), Items("albums"), Items("tracks"), Items("playlists"));
+        return new MaSearchResults(Items("artists"), Items("albums"), Items("tracks"), Items("playlists"), Items("radio"));
     }
 
     /// <summary>Returns recent library listening history; the server is the source of truth.</summary>
@@ -99,6 +99,7 @@ public sealed class MaClient : IAsyncDisposable
             MaMediaType.Album => "music/albums/library_items",
             MaMediaType.Track => "music/tracks/library_items",
             MaMediaType.Playlist => "music/playlists/library_items",
+            MaMediaType.Radio => "music/radios/library_items",
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported library type"),
         };
 

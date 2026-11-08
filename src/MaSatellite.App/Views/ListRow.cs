@@ -45,6 +45,7 @@ public sealed class ListRow
     {
         MaMediaType.Playlist => string.IsNullOrWhiteSpace(Item.Subtitle) ? "Playlist" : $"Playlist · {Item.Subtitle}",
         MaMediaType.Artist => "Artist",
+        MaMediaType.Radio => "Radio",
         MaMediaType.Album or MaMediaType.Track when !string.IsNullOrWhiteSpace(Item.Subtitle) => Item.Subtitle,
         _ => Subtitle,
     };

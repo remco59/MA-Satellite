@@ -46,7 +46,7 @@ public sealed partial class LibraryWindow : Window
     private string _tab = "home";
     private readonly Dictionary<string, bool> _libraryGridViews = new()
     {
-        ["album"] = true, ["artist"] = true, ["track"] = false, ["playlist"] = true,
+        ["album"] = true, ["artist"] = true, ["track"] = false, ["playlist"] = true, ["radio"] = true,
     };
     private readonly Dictionary<string, string> _librarySorts = new();
     private string? _configuredSortTab;
@@ -322,7 +322,7 @@ public sealed partial class LibraryWindow : Window
         }
     }
 
-    private IEnumerable<ToggleButton> SearchChipButtons => [ChipAll, ChipAlbums, ChipArtists, ChipTracks, ChipPlaylists];
+    private IEnumerable<ToggleButton> SearchChipButtons => [ChipAll, ChipTracks, ChipArtists, ChipAlbums, ChipPlaylists, ChipRadio];
 
     private async void OnBack(object sender, RoutedEventArgs e) => await GoBackAsync();
 
@@ -483,7 +483,7 @@ public sealed partial class LibraryWindow : Window
     {
         var selected = (Style)Application.Current.Resources["AuroraNavSelectedButtonStyle"];
         var regular = (Style)Application.Current.Resources["AuroraNavButtonStyle"];
-        foreach (var button in new[] { NavHome, NavSearch, NavPlaylist, NavAlbum, NavArtist, NavTrack, NavNow, NavQueue })
+        foreach (var button in new[] { NavHome, NavSearch, NavPlaylist, NavAlbum, NavArtist, NavTrack, NavRadio, NavNow, NavQueue })
         {
             var active = (string?)button.Tag == _tab;
             button.Style = active ? selected : regular;
@@ -493,7 +493,7 @@ public sealed partial class LibraryWindow : Window
         ForwardButton.IsEnabled = _nav.CanGoForward;
     }
 
-    private bool IsLibraryRoot => _openedItem is null && _tab is "album" or "artist" or "track" or "playlist";
+    private bool IsLibraryRoot => _openedItem is null && _tab is "album" or "artist" or "track" or "playlist" or "radio";
 
     private bool IsGridView => IsLibraryRoot && _libraryGridViews.GetValueOrDefault(_tab);
 
@@ -666,7 +666,7 @@ public sealed partial class LibraryWindow : Window
 
     private IEnumerable<Shelf> HomeShelfControls =>
     [
-        HomeRecentPlaylistsShelf, HomeMadeForYouShelf, HomeRotationShelf, HomeNewPlaylistsShelf, HomeRecentShelf,
+        HomeRecentPlaylistsShelf, HomeMadeForYouShelf, HomeRotationShelf, HomeNewPlaylistsShelf, HomeRadioShelf, HomeRecentShelf,
     ];
 
     // Only the user's own playlists: matched by name, never generated or invented.
@@ -703,6 +703,7 @@ public sealed partial class LibraryWindow : Window
                 "playlist" => "Loading playlists…",
                 "artist" => "Loading artists…",
                 "track" => "Loading tracks…",
+                "radio" => "Loading radio stations…",
                 _ => "Loading albums…",
             };
             LoadingState.Visibility = Visibility.Visible;
@@ -743,6 +744,7 @@ public sealed partial class LibraryWindow : Window
             "artist" => "Artists",
             "playlist" => "Playlists",
             "track" => "Tracks",
+            "radio" => "Radio",
             _ => "Albums",
         };
         ContentDescription.Text = _tab switch
@@ -760,6 +762,7 @@ public sealed partial class LibraryWindow : Window
             IReadOnlyList<MaItem> detailChildren = [];
             HomeLayout? home = null;
             List<ListRow> jumpBackRows = [];
+            List<ListRow> radioRows = [];
             var playlistsRanked = false;
             var sortFallback = false;
             string empty = "Nothing here yet.";
@@ -801,7 +804,7 @@ public sealed partial class LibraryWindow : Window
                 IReadOnlyList<MaItem> recentItems = [];
                 try
                 {
-                    recentItems = await client.GetRecentlyPlayedAsync(80, ["playlist", "album", "track"]);
+                    recentItems = await client.GetRecentlyPlayedAsync(80, ["playlist", "album", "track", "radio"]);
                 }
                 catch (MaException)
                 {
@@ -838,7 +841,24 @@ public sealed partial class LibraryWindow : Window
                     .DistinctBy(i => i.Uri, StringComparer.OrdinalIgnoreCase).Take(20).ToList();
                 home = HomeComposer.Compose(playlistItems, playlistsRanked,
                     TimeOfDayPicks(playlistItems, DateTime.Now.Hour), newestItems, recentPlaylists);
-                jumpBackRows = recentItems.Where(i => i.Type is MaMediaType.Album or MaMediaType.Track)
+                try
+                {
+                    radioRows = (await client.GetLibraryAsync(MaMediaType.Radio, limit: 20,
+                            sortField: "play_count", sortDirection: "desc"))
+                        .Where(i => i.IsPlayable).Select(i => ListRow.From(i)).ToList();
+                }
+                catch (MaException)
+                {
+                    // Radio is provider-dependent (and sorting is server-dependent); hide the shelf if unavailable.
+                    try
+                    {
+                        radioRows = (await client.GetLibraryAsync(MaMediaType.Radio, limit: 20))
+                            .Where(i => i.IsPlayable).Select(i => ListRow.From(i)).ToList();
+                    }
+                    catch (MaException) { /* No radio stations on this server. */ }
+                }
+
+                jumpBackRows = recentItems.Where(i => i.Type is MaMediaType.Album or MaMediaType.Track or MaMediaType.Radio)
                     .DistinctBy(i => i.Uri, StringComparer.OrdinalIgnoreCase).Take(16)
                     .Select(i => ListRow.From(i)).ToList();
                 empty = "No music yet. Add playlists or albums to Music Assistant to get started.";
@@ -847,7 +867,8 @@ public sealed partial class LibraryWindow : Window
             {
                 var client = await _controller.Service.GetClientAsync();
                 var results = await client.SearchAsync(_lastQuery);
-                rows = results.Albums.Concat(results.Artists).Concat(results.Tracks).Concat(results.Playlists).Select(i => ListRow.From(i, showType: true)).ToList();
+                rows = results.InDisplayOrder.Select(i => ListRow.From(i, showType: true)).ToList();
+                ChipRadio.Content = $"Radio ({results.Radios.Count})";
                 ChipAlbums.Content = $"Albums ({results.Albums.Count})";
                 ChipArtists.Content = $"Artists ({results.Artists.Count})";
                 ChipTracks.Content = $"Tracks ({results.Tracks.Count})";
@@ -856,7 +877,7 @@ public sealed partial class LibraryWindow : Window
             }
             else
             {
-                var type = _tab switch { "artist" => MaMediaType.Artist, "playlist" => MaMediaType.Playlist, "track" => MaMediaType.Track, _ => MaMediaType.Album };
+                var type = _tab switch { "artist" => MaMediaType.Artist, "playlist" => MaMediaType.Playlist, "track" => MaMediaType.Track, "radio" => MaMediaType.Radio, _ => MaMediaType.Album };
                 var client = await _controller.Service.GetClientAsync();
                 var (sortField, sortDirection) = LibrarySortArguments(CurrentSort);
                 IReadOnlyList<MaItem> items;
@@ -876,7 +897,7 @@ public sealed partial class LibraryWindow : Window
                 empty = "Your library has no items of this kind.";
                 if (!sortFallback)
                 {
-                    var noun = _tab switch { "artist" => "artist", "playlist" => "playlist", "track" => "track", _ => "album" };
+                    var noun = _tab switch { "artist" => "artist", "playlist" => "playlist", "track" => "track", "radio" => "station", _ => "album" };
                     var count = rows.Count >= 300 ? "300+" : rows.Count.ToString();
                     ContentDescription.Text = $"{count} {noun}{(rows.Count == 1 ? "" : "s")}";
                 }
@@ -895,7 +916,7 @@ public sealed partial class LibraryWindow : Window
             var homeEmpty = true;
             if (isHome && home is not null)
             {
-                homeEmpty = RenderHome(home, jumpBackRows, playlistsRanked);
+                homeEmpty = RenderHome(home, jumpBackRows, radioRows, playlistsRanked);
             }
             else
             {
@@ -967,7 +988,7 @@ public sealed partial class LibraryWindow : Window
     }
 
     /// <summary>Fills Home from the composed layout. Returns true when there is nothing to show.</summary>
-    private bool RenderHome(HomeLayout layout, List<ListRow> jumpBackRows, bool playlistsRanked)
+    private bool RenderHome(HomeLayout layout, List<ListRow> jumpBackRows, List<ListRow> radioRows, bool playlistsRanked)
     {
         var hour = DateTime.Now.Hour;
         HomeGreeting.Text = Greeting.For(DateTime.Now, Environment.UserName);
@@ -984,9 +1005,10 @@ public sealed partial class LibraryWindow : Window
             playlistsRanked ? "Your most played playlists" : "Your playlists",
             playlistsRanked ? "Ranked by what you actually play." : string.Empty);
         SetShelf(HomeNewPlaylistsShelf, Rows(layout.Added));
+        SetShelf(HomeRadioShelf, radioRows);
         SetShelf(HomeRecentShelf, jumpBackRows);
         return !layout.Featured.Any() && layout.Recent.Count + layout.MadeForYou.Count + layout.Rotation.Count
-            + layout.Added.Count + jumpBackRows.Count == 0;
+            + layout.Added.Count + radioRows.Count + jumpBackRows.Count == 0;
     }
 
     private void ClearHome()

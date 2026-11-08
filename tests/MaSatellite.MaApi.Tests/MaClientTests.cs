@@ -78,14 +78,18 @@ public class MaClientTests
     public async Task Search_returns_typed_results_with_image_urls()
     {
         await using var server = new FakeMaServer();
-        server.Handlers["music/search"] = _ => new { artists = Array.Empty<object>(), albums = new[] { Album }, tracks = new[] { Track }, playlists = Array.Empty<object>() };
+        server.Handlers["music/search"] = _ => new { artists = Array.Empty<object>(), albums = new[] { Album }, tracks = new[] { Track }, playlists = Array.Empty<object>(), radio = new[] { new { media_type = "radio", name = "SLAM!", item_id = "r1", provider = "radiobrowser", uri = "radiobrowser://radio/r1" } } };
         await using var client = await ConnectAsync(server);
 
         var results = await client.SearchAsync("kid a");
 
         var req = server.Received.Last(r => r.Command == "music/search").Args;
         Assert.Equal("kid a", req.GetProperty("search_query").GetString());
-        Assert.Equal(["artist", "album", "track", "playlist"], req.GetProperty("media_types").EnumerateArray().Select(e => e.GetString()));
+        Assert.Equal(["track", "artist", "album", "playlist", "radio"], req.GetProperty("media_types").EnumerateArray().Select(e => e.GetString()));
+
+        var radio = Assert.Single(results.Radios);
+        Assert.Equal(MaMediaType.Radio, radio.Type);
+        Assert.Equal(["Idioteque (Remastered)", "Kid A", "SLAM!"], results.InDisplayOrder.Select(i => i.Name));
 
         var album = Assert.Single(results.Albums);
         Assert.Equal("Kid A", album.Name);
@@ -126,6 +130,23 @@ public class MaClientTests
         Assert.Equal(50, args.GetProperty("limit").GetInt32());
         Assert.Equal(100, args.GetProperty("offset").GetInt32());
         Assert.False(args.TryGetProperty("search", out _));
+    }
+
+    [Fact]
+    public async Task Radio_library_uses_the_radios_command_and_parses_stations()
+    {
+        await using var server = new FakeMaServer();
+        server.Handlers["music/radios/library_items"] = _ => new[]
+        {
+            new { media_type = "radio", name = "SLAM!", item_id = "r1", provider = "library", uri = "library://radio/r1" },
+        };
+        await using var client = await ConnectAsync(server);
+
+        var items = await client.GetLibraryAsync(MaMediaType.Radio, limit: 20);
+
+        var station = Assert.Single(items);
+        Assert.Equal(MaMediaType.Radio, station.Type);
+        Assert.Equal("SLAM!", station.Name);
     }
 
     [Fact]
