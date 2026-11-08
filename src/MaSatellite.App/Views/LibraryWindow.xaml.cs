@@ -76,6 +76,10 @@ public sealed partial class LibraryWindow : Window
     private PlaybackSummary _latestPlayback = new("Nothing playing", "Choose a player", null, null, false, false);
     private bool _canPlayPause;
     private int _pendingPollTicks;
+    private string? _dock; // "now", "queue" or null: which panel is expanded out of the playback bar
+    private DispatcherQueueTimer? _dockTween;
+    private Brush? _tintedBrush;
+    private int _queueLoadId;
 
     internal LibraryWindow(LibraryController controller, SatelliteHost host, Action openSettings)
     {
@@ -101,13 +105,10 @@ public sealed partial class LibraryWindow : Window
         _queueRefresh.IsRepeating = false;
         _queueRefresh.Tick += (_, _) =>
         {
-            if (_tab is "queue" or "now")
+            _ = RefreshPlaybackSummaryAsync();
+            if (_dock == "queue")
             {
-                _ = LoadTabAsync(backgroundRefresh: true);
-            }
-            else
-            {
-                _ = RefreshPlaybackSummaryAsync();
+                _ = LoadQueueDockAsync();
             }
         };
 
@@ -156,6 +157,7 @@ public sealed partial class LibraryWindow : Window
             _footerSeekDebounce.Stop();
             _footerVolumeDebounce.Stop();
             _sidebarTween?.Stop();
+            _dockTween?.Stop();
             _host.Volume.Changed -= OnFooterSystemVolumeChanged;
             ++_artworkRequestId;
             _controller.Service.ServerEvent -= OnServerEvent;
@@ -247,13 +249,122 @@ public sealed partial class LibraryWindow : Window
         _remoteMuted = false;
         ResetFooterControls();
         await RefreshFooterVolumeAsync();
-        if (_tab is "queue" or "now")
+        await RefreshPlaybackSummaryAsync();
+        if (_dock == "queue")
         {
-            await LoadTabAsync();
+            await LoadQueueDockAsync();
         }
-        else
+    }
+
+
+    // ---- Dock: Now playing and Queue, expanding out of the playback bar ----
+
+    private async void OnToggleDock(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string kind })
         {
-            await RefreshPlaybackSummaryAsync();
+            await SetDockAsync(_dock == kind ? null : kind);
+        }
+    }
+
+    private async void OnCloseDock(object sender, RoutedEventArgs e) => await SetDockAsync(null);
+
+    private double DockTargetHeight()
+    {
+        var window = LibraryRoot.ActualHeight;
+        if (window <= 0 || _dock is null)
+        {
+            return 0;
+        }
+
+        // Leave the library at least ~300 px so it stays usable while a panel is open.
+        var available = Math.Max(0, window - 40 - PlayerBar.ActualHeight - 300);
+        var wanted = _dock == "queue" ? Math.Clamp(window * 0.5, 280, 460) : Math.Clamp(window * 0.34, 200, 280);
+        return Math.Min(wanted, Math.Max(available, 160));
+    }
+
+    private async Task SetDockAsync(string? kind)
+    {
+        var wasOpen = _dock is not null;
+        _dock = kind;
+        NowView.Visibility = kind == "now" ? Visibility.Visible : Visibility.Collapsed;
+        QueueView.Visibility = kind == "queue" ? Visibility.Visible : Visibility.Collapsed;
+        ApplyDockBackground();
+        UpdateNavigationState();
+        FooterExpandIcon.Glyph = kind == "now" ? "\uE70D" : "\uE70E";
+
+        var target = DockTargetHeight();
+        DockPanel.Height = target;
+        _dockTween?.Stop();
+        if (kind is not null)
+        {
+            DockHost.Visibility = Visibility.Visible;
+        }
+
+        _dockTween = Motion.Tween(DispatcherQueue, DockRow.Height.Value, target, wasOpen == (kind is not null) ? 160 : 240,
+            height => DockRow.Height = new GridLength(Math.Max(0, height)),
+            done: () =>
+            {
+                if (_dock is null)
+                {
+                    DockHost.Visibility = Visibility.Collapsed;
+                }
+            });
+
+        if (kind == "now")
+        {
+            _ = EnsurePaletteAsync();
+        }
+        else if (kind == "queue")
+        {
+            await LoadQueueDockAsync();
+        }
+    }
+
+    /// <summary>Keeps the open panel sized to the window without animating on every resize tick.</summary>
+    private void FitDock()
+    {
+        if (_dock is null)
+        {
+            return;
+        }
+
+        var target = DockTargetHeight();
+        DockPanel.Height = target;
+        DockRow.Height = new GridLength(target);
+    }
+
+    private void OnDockHostSizeChanged(object sender, SizeChangedEventArgs e) =>
+        DockHost.Clip = new RectangleGeometry { Rect = new global::Windows.Foundation.Rect(0, 0, e.NewSize.Width, e.NewSize.Height) };
+
+    private void ApplyDockBackground() =>
+        DockPanel.Background = _dock == "now" && _tintedBrush is not null
+            ? _tintedBrush
+            : (Brush)Application.Current.Resources["AuroraHeroGradient"];
+
+    private async Task LoadQueueDockAsync()
+    {
+        var id = ++_queueLoadId;
+        try
+        {
+            var rows = await LoadQueueRowsAsync();
+            if (_closed || id != _queueLoadId || _dock != "queue")
+            {
+                return;
+            }
+
+            QueueList.ItemsSource = rows;
+            QueueEmpty.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            QueueSubtitle.Text = rows.Count == 0
+                ? "Add something to your selected player's queue to get started."
+                : $"{rows.Count} {(rows.Count == 1 ? "track" : "tracks")} in the queue";
+        }
+        catch (MaException ex)
+        {
+            if (!_closed && id == _queueLoadId)
+            {
+                ShowError(ex);
+            }
         }
     }
 
@@ -440,6 +551,8 @@ public sealed partial class LibraryWindow : Window
         FooterShuffleButton.Visibility = width < 820 ? Visibility.Collapsed : Visibility.Visible;
         FooterRepeatButton.Visibility = width < 820 ? Visibility.Collapsed : Visibility.Visible;
 
+        FitDock();
+
         var stack = width < 1060;
         if (stack != _stackFeatured)
         {
@@ -485,7 +598,7 @@ public sealed partial class LibraryWindow : Window
         var regular = (Style)Application.Current.Resources["AuroraNavButtonStyle"];
         foreach (var button in new[] { NavHome, NavSearch, NavPlaylist, NavAlbum, NavArtist, NavTrack, NavRadio, NavNow, NavQueue })
         {
-            var active = (string?)button.Tag == _tab;
+            var active = button.Tag is "now" or "queue" ? (string?)button.Tag == _dock : (string?)button.Tag == _tab;
             button.Style = active ? selected : regular;
         }
 
@@ -699,7 +812,6 @@ public sealed partial class LibraryWindow : Window
             {
                 "home" => "Preparing your home…",
                 "search" => "Searching Music Assistant…",
-                "queue" or "now" => "Loading your queue…",
                 "playlist" => "Loading playlists…",
                 "artist" => "Loading artists…",
                 "track" => "Loading tracks…",
@@ -713,20 +825,12 @@ public sealed partial class LibraryWindow : Window
         UpdateNavigationState();
         var detailOpen = _openedItem is not null;
         var isHome = _tab == "home" && !detailOpen;
-        var isNow = _tab == "now" && !detailOpen;
         DetailHero.Visibility = Visibility.Collapsed;
         DetailSection.Visibility = Visibility.Collapsed;
-        // Home has its own greeting, Now Playing and detail pages their own hero: no extra page title there.
-        var showHeading = !detailOpen && !isHome && !isNow;
+        // Home has its own greeting and detail pages their own hero: no extra page title there.
+        var showHeading = !detailOpen && !isHome;
         ContentHeading.Visibility = ContentDescription.Visibility = showHeading ? Visibility.Visible : Visibility.Collapsed;
-        QueueBar.Visibility = (_tab is "queue" or "now") && !detailOpen ? Visibility.Visible : Visibility.Collapsed;
         SearchChips.Visibility = _tab == "search" && !detailOpen ? Visibility.Visible : Visibility.Collapsed;
-        NowPlayingHero.Visibility = isNow ? Visibility.Visible : Visibility.Collapsed;
-        if (isNow)
-        {
-            DetailSection.Visibility = Visibility.Visible;
-            DetailSectionTitle.Text = "Up next";
-        }
 
         UpdateLibraryControls();
         _currentLibraryRows = [];
@@ -739,7 +843,6 @@ public sealed partial class LibraryWindow : Window
 
         ContentHeading.Text = _tab switch
         {
-            "queue" => "Queue",
             "search" => "Search",
             "artist" => "Artists",
             "playlist" => "Playlists",
@@ -749,7 +852,6 @@ public sealed partial class LibraryWindow : Window
         };
         ContentDescription.Text = _tab switch
         {
-            "queue" => "Manage what's coming up next.",
             "search" => string.IsNullOrWhiteSpace(_lastQuery)
                 ? "Find music across your library and providers."
                 : $"Results for “{_lastQuery}”",
@@ -788,15 +890,6 @@ public sealed partial class LibraryWindow : Window
 
                 rows = detailChildren.Select((i, index) => ListRow.From(i,
                     position: parent.Type == MaMediaType.Artist ? null : index + 1)).ToList();
-            }
-            else if (_tab is "queue" or "now")
-            {
-                rows = await LoadQueueRowsAsync();
-                empty = "The queue is empty.";
-                if (_tab == "queue" && rows.Count > 0)
-                {
-                    ContentDescription.Text = $"{rows.Count} {(rows.Count == 1 ? "track" : "tracks")} in the queue";
-                }
             }
             else if (isHome)
             {
@@ -949,17 +1042,11 @@ public sealed partial class LibraryWindow : Window
                         "search" => string.IsNullOrWhiteSpace(_lastQuery)
                             ? "Enter an artist, album or track above to begin."
                             : "Try a different search term.",
-                        "queue" or "now" => "Add something to your selected player's queue to get started.",
                         "home" => "Add music to your Music Assistant library to see it here.",
                         _ => "Items you add to your Music Assistant library will appear here.",
                     },
                 };
                 ShowEmptyState(_openedItem is null ? empty : "Nothing here yet", detail);
-            }
-
-            if (isNow)
-            {
-                _ = EnsurePaletteAsync();
             }
 
             if (!backgroundRefresh)
@@ -1404,32 +1491,31 @@ public sealed partial class LibraryWindow : Window
             return;
 
         var pending = _pendingPlayback is not null && SelectedTarget?.QueueId == _pendingTargetId;
-        FooterPlayPauseSpinner.IsActive = QueuePlayPauseSpinner.IsActive = pending;
-        FooterPlayPauseSpinner.Visibility = QueuePlayPauseSpinner.Visibility =
+        FooterPlayPauseSpinner.IsActive = pending;
+        FooterPlayPauseSpinner.Visibility =
             pending ? Visibility.Visible : Visibility.Collapsed;
-        FooterPlayPauseTrack.Visibility = QueuePlayPauseTrack.Visibility =
+        FooterPlayPauseTrack.Visibility =
             pending ? Visibility.Visible : Visibility.Collapsed;
-        FooterPlayPauseIcon.Visibility = QueuePlayPauseIcon.Visibility =
+        FooterPlayPauseIcon.Visibility =
             pending ? Visibility.Collapsed : Visibility.Visible;
 
         // Disabling a WinUI Button fades its entire content, making its spinner barely visible.
         // Keep the pending surface at full opacity and prevent repeated clicks via hit-testing
         // (StartPlaybackAsync also guards against duplicate keyboard/automation commands).
-        FooterPlayPauseButton.IsEnabled = QueuePlayPauseButton.IsEnabled = _canPlayPause || pending;
-        FooterPlayPauseButton.IsHitTestVisible = QueuePlayPauseButton.IsHitTestVisible = !pending;
+        FooterPlayPauseButton.IsEnabled = _canPlayPause || pending;
+        FooterPlayPauseButton.IsHitTestVisible = !pending;
         var background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
             pending ? "AuroraAccentSoft" : "AuroraAccentGradient"];
         var accent = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraAccent"];
-        FooterPlayPauseButton.Background = QueuePlayPauseButton.Background = background;
-        FooterPlayPauseButton.BorderBrush = QueuePlayPauseButton.BorderBrush = accent;
-        FooterPlayPauseButton.BorderThickness = QueuePlayPauseButton.BorderThickness =
+        FooterPlayPauseButton.Background = background;
+        FooterPlayPauseButton.BorderBrush = accent;
+        FooterPlayPauseButton.BorderThickness =
             new Thickness(pending ? 1.5 : 0);
         FooterState.Foreground = NowPlayingState.Foreground =
             (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
                 pending ? "AuroraAccent" : "AuroraGood"];
         var label = pending ? _pendingPlayback!.Label : "Play or pause";
         AutomationProperties.SetName(FooterPlayPauseButton, label);
-        AutomationProperties.SetName(QueuePlayPauseButton, label);
         var target = SelectedTarget?.Name ?? "No player selected";
         var state = _latestPlayback.HasTrack
             ? (_latestPlayback.IsPlaying ? "Playing" : "Paused")
@@ -1537,21 +1623,20 @@ public sealed partial class LibraryWindow : Window
 
         var icon = summary.IsPlaying ? "\uE769" : "\uE768";
         FooterPlayPauseIcon.Glyph = icon;
-        QueuePlayPauseIcon.Glyph = icon;
 
         if (SelectedTarget is { IsThisPc: true } && _host.Status.Connection == ConnectionState.Connected)
         {
             var transport = TransportLogic.Describe(_host.Status.Session);
             _canPlayPause = transport.CanPlayPause;
-            FooterPreviousButton.IsEnabled = QueuePreviousButton.IsEnabled = transport.CanPrevious;
-            FooterNextButton.IsEnabled = QueueNextButton.IsEnabled = transport.CanNext;
+            FooterPreviousButton.IsEnabled = transport.CanPrevious;
+            FooterNextButton.IsEnabled = transport.CanNext;
         }
         else
         {
             var enabled = SelectedTarget is not null;
             _canPlayPause = enabled;
-            FooterPreviousButton.IsEnabled = QueuePreviousButton.IsEnabled = enabled;
-            FooterNextButton.IsEnabled = QueueNextButton.IsEnabled = enabled;
+            FooterPreviousButton.IsEnabled = enabled;
+            FooterNextButton.IsEnabled = enabled;
         }
 
         UpdatePlaybackFeedbackUi();
@@ -1816,13 +1901,13 @@ public sealed partial class LibraryWindow : Window
     {
         _paletteSourceKey = key;
         _paletteSource = source;
-        if (_tab == "now" && _openedItem is null)
+        if (_dock == "now")
         {
             _ = EnsurePaletteAsync();
         }
     }
 
-    /// <summary>Tints the Now Playing hero with a dark tone of the artwork's colour (only while that page is open).</summary>
+    /// <summary>Tints the Now Playing panel with a dark tone of the artwork's colour (only while it is open).</summary>
     private async Task EnsurePaletteAsync()
     {
         var key = _paletteSourceKey;
@@ -1855,12 +1940,13 @@ public sealed partial class LibraryWindow : Window
 
         if (color is not { } picked || picked == Rgb.Fallback)
         {
-            NowPlayingHero.Background = (Brush)Application.Current.Resources["AuroraHeroGradient"];
+            _tintedBrush = null;
+            ApplyDockBackground();
             return;
         }
 
         var top = picked.ToBackdrop();
-        NowPlayingHero.Background = new LinearGradientBrush
+        _tintedBrush = new LinearGradientBrush
         {
             StartPoint = new global::Windows.Foundation.Point(0, 0),
             EndPoint = new global::Windows.Foundation.Point(1, 1),
@@ -1870,6 +1956,7 @@ public sealed partial class LibraryWindow : Window
                 new GradientStop { Color = global::Windows.UI.Color.FromArgb(255, 11, 16, 32), Offset = 1 },
             },
         };
+        ApplyDockBackground();
     }
 
     private async Task LoadLocalArtworkAsync(ArtworkImage artwork, int request)
