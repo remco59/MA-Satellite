@@ -3,10 +3,10 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using MaSatellite.Core.Protocol;
 using MaSatellite.Core.Session;
-using MaSatellite.Host.Audio;
+using MaSatellite.Host.Library;
 using MaSatellite.Host.Orchestration;
 using MaSatellite.Host.Presentation;
-using MaSatellite.Host.Settings;
+using MaSatellite.MaApi;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -19,35 +19,31 @@ using WinRT.Interop;
 
 namespace MaSatellite.App.Views;
 
-/// <summary>The tray flyout: artwork, track info, transport, seek bar, volume and output device.</summary>
+/// <summary>The tray flyout: a compact now playing view and queue, with transport, seek bar and volume.</summary>
 internal sealed partial class MiniPlayerWindow : Window
 {
-    private const int BaseWidth = 400;
-    private const int BaseHeight = 478;
-    private const string SystemDefaultLabel = "System default";
+    private const int BaseWidth = 340;
+    private const int BaseHeight = 382;
 
     private readonly SatelliteHost _host;
-    private readonly SettingsStore _settings;
-    private readonly IAudioDeviceCatalog _catalog;
-    private readonly Action _openSettings;
-    private readonly Action _openLibrary;
+    private readonly Func<LibraryController?> _library;
     private readonly Func<Rectangle?> _trayRect;
     private readonly DispatcherQueueTimer _progressTimer;
     private readonly DispatcherQueueTimer _seekDebounce;
-    private IReadOnlyList<AudioDeviceInfo> _devices = [];
     private bool _updating;
     private int _artworkVersion = -1;
     private long _hiddenAtTicks;
     private long _pendingSeekMs;
     private PlaybackFeedback? _pendingPlayback;
+    private bool _showingQueue;
+    private PlayTarget? _queueTarget;
+    private string? _queueTrackKey;
+    private int _queueLoadId;
 
-    public MiniPlayerWindow(SatelliteHost host, SettingsStore settings, IAudioDeviceCatalog catalog, Action openSettings, Action openLibrary, Func<Rectangle?> trayRect)
+    public MiniPlayerWindow(SatelliteHost host, Func<LibraryController?> library, Func<Rectangle?> trayRect)
     {
         _host = host;
-        _settings = settings;
-        _catalog = catalog;
-        _openSettings = openSettings;
-        _openLibrary = openLibrary;
+        _library = library;
         _trayRect = trayRect;
         InitializeComponent();
         Title = "ma-satellite";
@@ -127,7 +123,6 @@ internal sealed partial class MiniPlayerWindow : Window
 
     public void ShowFlyout(bool activate = true)
     {
-        LoadDevices();
         Refresh();
         Position();
         // Showing a hover preview must not interrupt the application currently in focus.
@@ -191,30 +186,6 @@ internal sealed partial class MiniPlayerWindow : Window
         AppWindow.MoveAndResize(new RectInt32(x, y, width, height));
     }
 
-    private void LoadDevices()
-    {
-        try
-        {
-            _devices = _catalog.GetOutputDevices();
-        }
-        catch (Exception)
-        {
-            _devices = [];
-        }
-
-        _updating = true;
-        DeviceBox.Items.Clear();
-        DeviceBox.Items.Add(SystemDefaultLabel);
-        foreach (var d in _devices)
-        {
-            DeviceBox.Items.Add(d.Name);
-        }
-
-        var index = _settings.Current.OutputDeviceId is { } id ? _devices.ToList().FindIndex(d => d.Id == id) + 1 : 0;
-        DeviceBox.SelectedIndex = Math.Max(index, 0);
-        _updating = false;
-    }
-
     /// <summary>Called on the UI thread whenever the status changes (and every 500 ms while shown).</summary>
     public void Refresh()
     {
@@ -235,14 +206,6 @@ internal sealed partial class MiniPlayerWindow : Window
             SetMetadataText(TitleText, string.IsNullOrEmpty(md.Title) ? "Nothing playing" : md.Title);
             SetMetadataText(ArtistText, md.Artist);
             SetMetadataText(AlbumText, md.Album);
-            SetMetadataText(StatusText, _pendingPlayback?.Label ?? (status.Connection switch
-            {
-                ConnectionState.Connected => $"{(view.IsPlaying ? "Playing on" : "Connected to")} {status.ServerName}" + (string.IsNullOrEmpty(session.Group.GroupName) ? string.Empty : $" · {session.Group.GroupName}"),
-                ConnectionState.Listening => status.Detail ?? "Waiting for Music Assistant",
-                ConnectionState.Connecting => status.Detail ?? "Connecting…",
-                _ => "Stopped",
-            }));
-
             PlayPauseIcon.Glyph = view.IsPlaying ? "" : "";
             var pending = _pendingPlayback is not null;
             PlayPauseSpinner.IsActive = pending;
@@ -256,8 +219,6 @@ internal sealed partial class MiniPlayerWindow : Window
                 pending ? "AuroraAccentSoft" : "AuroraAccentGradient"];
             PlayPauseButton.BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraAccent"];
             PlayPauseButton.BorderThickness = new Thickness(pending ? 1.5 : 0);
-            StatusText.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                pending ? "AuroraAccent" : "AuroraGood"];
             AutomationProperties.SetName(PlayPauseButton, pending ? _pendingPlayback!.Label : "Play or pause");
             PrevButton.IsEnabled = view.CanPrevious;
             NextButton.IsEnabled = view.CanNext;
@@ -283,6 +244,101 @@ internal sealed partial class MiniPlayerWindow : Window
         finally
         {
             _updating = false;
+        }
+
+        // The queue follows the playing track: reload it when the track changes while the queue is on screen.
+        if (_showingQueue && _queueTrackKey != TrackKey(md))
+        {
+            _ = LoadQueueAsync();
+        }
+    }
+
+    private static string TrackKey(MetadataState md) => $"{md.Title}\u0001{md.Artist}\u0001{md.Album}";
+
+    private void OnShowNowPlaying(object sender, RoutedEventArgs e) => SetView(queue: false);
+
+    private void OnShowQueue(object sender, RoutedEventArgs e) => SetView(queue: true);
+
+    private void SetView(bool queue)
+    {
+        _showingQueue = queue;
+        NowTab.IsChecked = !queue;
+        QueueTab.IsChecked = queue;
+        NowView.Visibility = queue ? Visibility.Collapsed : Visibility.Visible;
+        QueueView.Visibility = queue ? Visibility.Visible : Visibility.Collapsed;
+        if (queue)
+        {
+            _ = LoadQueueAsync();
+        }
+    }
+
+    /// <summary>Shows the Music Assistant queue of this PC's player, with the current track highlighted.</summary>
+    private async Task LoadQueueAsync()
+    {
+        var loadId = ++_queueLoadId;
+        _queueTrackKey = TrackKey(_host.Status.Session.Metadata);
+        try
+        {
+            if (_library() is not { } library)
+            {
+                ShowQueueRows([], "Connect to Music Assistant to see the queue.");
+                return;
+            }
+
+            _queueTarget ??= (await library.GetTargetsAsync()).FirstOrDefault(t => t.IsThisPc);
+            if (_queueTarget is null)
+            {
+                ShowQueueRows([], "The queue is not available yet.");
+                return;
+            }
+
+            var view = await library.GetQueueAsync(_queueTarget);
+            if (loadId != _queueLoadId)
+            {
+                return;
+            }
+
+            var current = view.Queue?.CurrentIndex;
+            ShowQueueRows(
+                view.Items.Select(q => new ListRow(q.Name, q.Subtitle ?? string.Empty, q.ImageUrl, null, q, isCurrent: q.Index == current)).ToList(),
+                "The queue is empty.");
+        }
+        catch (Exception ex) when (ex is MaException or HttpRequestException or TaskCanceledException)
+        {
+            if (loadId == _queueLoadId)
+            {
+                _queueTarget = null;
+                ShowQueueRows([], "Couldn't load the queue.");
+            }
+        }
+    }
+
+    private void ShowQueueRows(List<ListRow> rows, string emptyText)
+    {
+        QueueList.ItemsSource = rows;
+        QueueEmptyText.Text = emptyText;
+        QueueEmptyText.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        var playing = rows.FirstOrDefault(r => r.IsCurrent);
+        if (playing is not null)
+        {
+            QueueList.ScrollIntoView(playing, ScrollIntoViewAlignment.Leading);
+        }
+    }
+
+    private async void OnQueueItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is not ListRow { QueueItem: { } item } || _queueTarget is null || _library() is not { } library)
+        {
+            return;
+        }
+
+        try
+        {
+            await library.PlayQueueIndexAsync(_queueTarget, item.Index);
+        }
+        catch (Exception ex) when (ex is MaException or HttpRequestException or TaskCanceledException)
+        {
+            // The queue reloads on the next track change; a failed jump needs no extra UI.
         }
     }
 
@@ -362,7 +418,6 @@ internal sealed partial class MiniPlayerWindow : Window
         {
             _pendingPlayback = null;
             Refresh();
-            SetMetadataText(StatusText, "Couldn't send playback command.");
         }
     }
 
@@ -405,32 +460,6 @@ internal sealed partial class MiniPlayerWindow : Window
     }
 
     private void OnMute(object sender, RoutedEventArgs e) => _host.Volume.SetMuted(!_host.Volume.Muted);
-
-    private void OnDeviceChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_updating || DeviceBox.SelectedIndex < 0)
-        {
-            return;
-        }
-
-        string? id = DeviceBox.SelectedIndex > 0 && DeviceBox.SelectedIndex - 1 < _devices.Count ? _devices[DeviceBox.SelectedIndex - 1].Id : null;
-        if (id != _settings.Current.OutputDeviceId)
-        {
-            _settings.Save(_settings.Current with { OutputDeviceId = id });
-        }
-    }
-
-    private void OnOpenLibrary(object sender, RoutedEventArgs e)
-    {
-        HideFlyout();
-        _openLibrary();
-    }
-
-    private void OnOpenSettings(object sender, RoutedEventArgs e)
-    {
-        HideFlyout();
-        _openSettings();
-    }
 
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hwnd);
