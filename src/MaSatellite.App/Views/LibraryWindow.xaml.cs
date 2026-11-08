@@ -5,11 +5,16 @@ using MaSatellite.Host.Orchestration;
 using MaSatellite.Host.Presentation;
 using MaSatellite.MaApi;
 using MaSatellite.MaApi.Models;
+using Microsoft.UI;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using VirtualKey = Windows.System.VirtualKey;
 using Windows.Graphics;
 using Windows.Storage.Streams;
 
@@ -22,7 +27,20 @@ public sealed partial class LibraryWindow : Window
     private readonly SatelliteHost _host;
     private readonly Action _openSettings;
     private readonly DispatcherQueueTimer _queueRefresh;
-    private readonly Stack<MaItem> _history = new();
+    private readonly NavigationHistory<NavState> _nav = new(new NavState("home"));
+    private PlayTarget? _selectedTarget;
+    private bool _sidebarCollapsed;
+    private bool _narrowWindow;
+    private bool _stackFeatured;
+    private DispatcherQueueTimer? _sidebarTween;
+    private string _filterText = string.Empty;
+    private string _searchKind = "all";
+    private bool _configuringFilter;
+    private int _paletteRequestId;
+    private string? _paletteKey;
+    private string? _paletteSourceKey;
+    private Func<Task<byte[]?>>? _paletteSource;
+    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(8) };
     private IReadOnlyList<PlayTarget> _targets = [];
     private MaItem? _openedItem;
     private string _tab = "home";
@@ -36,7 +54,6 @@ public sealed partial class LibraryWindow : Window
     private IReadOnlyList<ListRow> _currentLibraryRows = [];
     private string _lastQuery = string.Empty;
     private int _loadId;
-    private bool _loadingTargets;
     private bool _closed;
     private int _playbackRefreshRequest;
     private int _artworkRequestId;
@@ -66,14 +83,18 @@ public sealed partial class LibraryWindow : Window
         _host = host;
         _openSettings = openSettings;
         InitializeComponent();
-        // Share the library's existing clickable album card template across Home shelves.
+        // Every shelf uses the shared card template; the "Recently played" row uses the compact size.
+        var cardTemplate = (DataTemplate)LibraryRoot.Resources["CardTemplate"];
         foreach (var shelf in HomeShelfControls)
         {
-            shelf.ItemTemplate = AlbumGrid.ItemTemplate;
+            shelf.ItemTemplate = cardTemplate;
         }
-        AuroraWindowChrome.Apply(this);
-        Title = "ma-satellite library";
-        AppWindow.Resize(new SizeInt32(1180, 790));
+
+        HomeRecentPlaylistsShelf.ItemTemplate = (DataTemplate)LibraryRoot.Resources["CompactCardTemplate"];
+        AuroraWindowChrome.Apply(this, TitleBarRegion);
+        Title = "MA-Satellite";
+        AppWindow.Resize(new SizeInt32(1360, 860));
+        Motion.Pulse(SkeletonRow);
 
         _queueRefresh = DispatcherQueue.CreateTimer();
         _queueRefresh.Interval = TimeSpan.FromMilliseconds(600);
@@ -134,6 +155,7 @@ public sealed partial class LibraryWindow : Window
             _footerProgressTimer.Stop();
             _footerSeekDebounce.Stop();
             _footerVolumeDebounce.Stop();
+            _sidebarTween?.Stop();
             _host.Volume.Changed -= OnFooterSystemVolumeChanged;
             ++_artworkRequestId;
             _controller.Service.ServerEvent -= OnServerEvent;
@@ -141,7 +163,7 @@ public sealed partial class LibraryWindow : Window
         Activated += OnFirstActivated;
     }
 
-    private PlayTarget? SelectedTarget => TargetBox.SelectedItem is ComboBoxItem { Tag: PlayTarget t } ? t : null;
+    private PlayTarget? SelectedTarget => _selectedTarget;
 
     private void OnFirstActivated(object sender, WindowActivatedEventArgs e)
     {
@@ -157,87 +179,73 @@ public sealed partial class LibraryWindow : Window
 
     private async Task LoadTargetsAsync()
     {
-        _loadingTargets = true;
         try
         {
             _targets = await _controller.GetTargetsAsync();
-            var previous = SelectedTarget?.QueueId;
-            TargetBox.Items.Clear();
-            foreach (var t in _targets)
-            {
-                TargetBox.Items.Add(new ComboBoxItem { Content = t.Name, Tag = t });
-            }
-
-            var index = previous is null ? 0 : Math.Max(_targets.ToList().FindIndex(t => t.QueueId == previous), 0);
-            if (_targets.Count > 0)
-            {
-                TargetBox.SelectedIndex = index;
-            }
-
-            RefreshTransferTargets();
+            var previous = _selectedTarget?.QueueId;
+            _selectedTarget = _targets.FirstOrDefault(t => t.QueueId == previous) ?? _targets.FirstOrDefault();
+            UpdateTargetUi();
             SidebarStatus.Text = _targets.Count > 0 ? $"{_targets.Count} player(s) available" : "No players available";
+            SidebarDot.Fill = (Brush)Application.Current.Resources[_targets.Count > 0 ? "AuroraGood" : "AuroraMuted"];
         }
         catch (MaException ex)
         {
+            SidebarDot.Fill = (Brush)Application.Current.Resources["AuroraMuted"];
             ShowError(ex);
         }
-        finally
-        {
-            _loadingTargets = false;
-        }
     }
 
-    private void RefreshTransferTargets()
+    private void UpdateTargetUi()
     {
-        TransferBox.Items.Clear();
-        foreach (var t in _targets.Where(t => t.QueueId != SelectedTarget?.QueueId))
-        {
-            TransferBox.Items.Add(new ComboBoxItem { Content = t.Name, Tag = t });
-        }
+        TargetLabel.Text = _selectedTarget?.Name ?? "No player";
+        // Shuffle needs a queue we can reorder; Sendspin playback on this PC does not expose one.
+        var canShuffle = _selectedTarget is { IsThisPc: false };
+        FeaturedOne.ShuffleAvailable = canShuffle;
+        FeaturedTwo.ShuffleAvailable = canShuffle;
     }
 
-    private async void OnNavigate(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button { Tag: string tab })
-        {
-            await NavigateAsync(tab);
-        }
-    }
+    private void OnTargetButtonClick(object sender, RoutedEventArgs e) => ShowTargetFlyout((FrameworkElement)sender);
 
-    // All navigation comes through one path so focus, selection and detail history stay in sync.
-    private async Task NavigateAsync(string tab, bool forceReload = false)
+    private void ShowTargetFlyout(FrameworkElement anchor)
     {
-        if (!forceReload && tab == _tab && _openedItem is null)
+        var flyout = new MenuFlyout();
+        if (_targets.Count == 0)
         {
-            return;
+            flyout.Items.Add(new MenuFlyoutItem { Text = "No players available", IsEnabled = false });
         }
 
-        _tab = tab;
-        _openedItem = null;
-        _history.Clear();
-        await LoadTabAsync();
+        foreach (var target in _targets)
+        {
+            var item = new RadioMenuFlyoutItem
+            {
+                Text = target.Name,
+                GroupName = "playback-targets",
+                IsChecked = target.QueueId == _selectedTarget?.QueueId,
+            };
+            item.Click += async (_, _) => await ChooseTargetAsync(target);
+            flyout.Items.Add(item);
+        }
+
+        flyout.Items.Add(new MenuFlyoutSeparator());
+        flyout.Items.Add(MenuItem("Refresh players", LoadTargetsAsync));
+        flyout.ShowAt(anchor);
     }
 
-    private async void OnSearchSubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
+    private async Task ChooseTargetAsync(PlayTarget target)
     {
-        _lastQuery = args.QueryText?.Trim() ?? string.Empty;
-        await NavigateAsync("search", forceReload: true);
-    }
-
-    private async void OnTargetChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (_loadingTargets)
+        if (target.QueueId == _selectedTarget?.QueueId)
         {
             return;
         }
 
+        _selectedTarget = target;
+        UpdateTargetUi();
         _footerSeekDebounce.Stop();
         _footerVolumeDebounce.Stop();
         _canPlayPause = false;
         ClearPendingPlayback();
         _remoteMuted = false;
         ResetFooterControls();
-        RefreshTransferTargets();
         await RefreshFooterVolumeAsync();
         if (_tab is "queue" or "now")
         {
@@ -249,19 +257,212 @@ public sealed partial class LibraryWindow : Window
         }
     }
 
+    private async void OnNavigate(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string tab })
+        {
+            await NavigateAsync(tab);
+        }
+    }
+
+    // All navigation comes through one path so focus, selection and back/forward history stay in sync.
+    private async Task NavigateAsync(string tab, bool forceReload = false) =>
+        await GoToAsync(new NavState(tab, null, QueryFor(tab)), forceReload);
+
+    /// <summary>The query is part of history only on the search page.</summary>
+    private string QueryFor(string tab) => tab == "search" ? _lastQuery : string.Empty;
+
+    private async Task GoToAsync(NavState next, bool forceReload = false)
+    {
+        if (!_nav.Navigate(next))
+        {
+            if (!forceReload)
+            {
+                return;
+            }
+
+            _nav.Replace(next);
+        }
+
+        ApplyState(next);
+        await LoadTabAsync();
+    }
+
+    private void ApplyState(NavState state)
+    {
+        _tab = state.Tab;
+        _openedItem = state.Item;
+        if (state.Tab == "search")
+        {
+            // Other pages leave the remembered query alone so the sidebar's Search item can restore it.
+            _lastQuery = state.Query;
+        }
+
+        if (state.Tab == "search" && state.Item is null && SearchBox.Text != state.Query)
+        {
+            SearchBox.Text = state.Query;
+        }
+
+        // Filters belong to one page; a new page starts unfiltered.
+        _filterText = string.Empty;
+        _searchKind = "all";
+        _configuringFilter = true;
+        try
+        {
+            FilterBox.Text = string.Empty;
+        }
+        finally
+        {
+            _configuringFilter = false;
+        }
+
+        foreach (var chip in SearchChipButtons)
+        {
+            chip.IsChecked = (string)chip.Tag == "all";
+        }
+    }
+
+    private IEnumerable<ToggleButton> SearchChipButtons => [ChipAll, ChipAlbums, ChipArtists, ChipTracks, ChipPlaylists];
+
+    private async void OnBack(object sender, RoutedEventArgs e) => await GoBackAsync();
+
+    private async void OnForward(object sender, RoutedEventArgs e) => await GoForwardAsync();
+
+    private async Task GoBackAsync()
+    {
+        if (!_nav.CanGoBack)
+        {
+            return;
+        }
+
+        ApplyState(_nav.GoBack());
+        await LoadTabAsync();
+    }
+
+    private async Task GoForwardAsync()
+    {
+        if (!_nav.CanGoForward)
+        {
+            return;
+        }
+
+        ApplyState(_nav.GoForward());
+        await LoadTabAsync();
+    }
+
+    private async void OnBackAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        await GoBackAsync();
+    }
+
+    private async void OnForwardAccelerator(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        await GoForwardAsync();
+    }
+
+    private void OnFocusSearch(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        args.Handled = true;
+        SearchBox.Focus(FocusState.Keyboard);
+        SearchBox.SelectAll();
+    }
+
+    private void OnSearchFocus(object sender, RoutedEventArgs e) =>
+        SearchPill.BorderBrush = (Brush)Application.Current.Resources["AuroraAccent"];
+
+    private void OnSearchBlur(object sender, RoutedEventArgs e) =>
+        SearchPill.BorderBrush = (Brush)Application.Current.Resources["AuroraBorder"];
+
+    private async void OnSearchKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key != VirtualKey.Enter)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        var query = SearchBox.Text.Trim();
+        await GoToAsync(new NavState("search", null, query), forceReload: true);
+    }
+
+    private async void OnShelfShowAll(object? sender, string tab) => await NavigateAsync(tab);
+
+    private void OnToggleSidebar(object sender, RoutedEventArgs e)
+    {
+        _sidebarCollapsed = !_sidebarCollapsed;
+        ApplySidebar();
+    }
+
+    /// <summary>Collapses to an icon rail (by choice, or automatically in narrow windows) and expands again.</summary>
+    private void ApplySidebar()
+    {
+        var collapsed = _sidebarCollapsed || _narrowWindow;
+        var target = collapsed ? 72.0 : 232.0;
+        void SetLabels(bool visible)
+        {
+            foreach (var label in Motion.Descendants(Sidebar).Where(el => el.Tag is "label"))
+            {
+                label.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+        _sidebarTween?.Stop();
+        if (collapsed)
+        {
+            SetLabels(false);
+        }
+
+        _sidebarTween = Motion.Tween(DispatcherQueue, SidebarColumn.Width.Value, target, 180,
+            width => SidebarColumn.Width = new GridLength(width),
+            done: () => { if (!collapsed) SetLabels(true); });
+    }
+
     /// <summary>Keep browsing and transport usable when the desktop window is resized.</summary>
     private void OnLibrarySizeChanged(object sender, SizeChangedEventArgs e)
     {
         var width = e.NewSize.Width;
-        SidebarColumn.Width = new GridLength(width < 760 ? 152 : width < 1030 ? 184 : 208);
-        TargetColumn.Width = new GridLength(width < 760 ? 152 : width < 1030 ? 198 : 244);
-        MainContent.Padding = width < 880 ? new Thickness(14, 14, 14, 10) : new Thickness(24, 18, 24, 12);
+        var narrow = width < 980;
+        if (narrow != _narrowWindow)
+        {
+            _narrowWindow = narrow;
+            ApplySidebar();
+        }
 
-        // Essential playback controls always stay in view. The full volume controls
-        // are also available in the tray player at narrow widths.
-        FooterVolumeGroup.Visibility = width < 1040 ? Visibility.Collapsed : Visibility.Visible;
+        MainContent.Padding = width < 880 ? new Thickness(16, 0, 16, 0) : new Thickness(28, 0, 28, 0);
+        SearchHint.Visibility = width < 760 ? Visibility.Collapsed : Visibility.Visible;
+        TargetLabel.MaxWidth = width < 1100 ? 120 : 200;
+
+        // Essential playback controls always stay in view; the rest drops away in narrow windows.
+        FooterVolumeSlider.Visibility = width < 1100 ? Visibility.Collapsed : Visibility.Visible;
+        FooterExpandButton.Visibility = width < 900 ? Visibility.Collapsed : Visibility.Visible;
         FooterShuffleButton.Visibility = width < 820 ? Visibility.Collapsed : Visibility.Visible;
         FooterRepeatButton.Visibility = width < 820 ? Visibility.Collapsed : Visibility.Visible;
+
+        var stack = width < 1060;
+        if (stack != _stackFeatured)
+        {
+            _stackFeatured = stack;
+            LayoutFeatured();
+        }
+    }
+
+    /// <summary>Two featured cards sit side by side; in narrow windows (or with only one card) they use the full width.</summary>
+    private void LayoutFeatured()
+    {
+        var both = FeaturedOne.Visibility == Visibility.Visible && FeaturedTwo.Visibility == Visibility.Visible;
+        FeaturedGrid.RowDefinitions.Clear();
+        FeaturedGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        FeaturedGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var stacked = _stackFeatured && both;
+        FeaturedGrid.RowSpacing = stacked ? 20 : 0;
+        Grid.SetRow(FeaturedOne, 0);
+        Grid.SetColumn(FeaturedOne, 0);
+        Grid.SetColumnSpan(FeaturedOne, both && !_stackFeatured ? 1 : 2);
+        Grid.SetRow(FeaturedTwo, stacked ? 1 : 0);
+        Grid.SetColumn(FeaturedTwo, stacked ? 0 : (FeaturedOne.Visibility == Visibility.Visible ? 1 : 0));
+        Grid.SetColumnSpan(FeaturedTwo, stacked || FeaturedOne.Visibility != Visibility.Visible ? 2 : 1);
     }
 
     private async void OnRetry(object sender, RoutedEventArgs e)
@@ -282,14 +483,14 @@ public sealed partial class LibraryWindow : Window
     {
         var selected = (Style)Application.Current.Resources["AuroraNavSelectedButtonStyle"];
         var regular = (Style)Application.Current.Resources["AuroraNavButtonStyle"];
-        foreach (var button in new[] { NavHome, NavLibrary, NavAlbum, NavArtist, NavTrack, NavPlaylist, NavNow, NavQueue, NavSearch })
+        foreach (var button in new[] { NavHome, NavSearch, NavPlaylist, NavAlbum, NavArtist, NavTrack, NavNow, NavQueue })
         {
-            // The Library parent remains active while browsing Albums, Artists, or Tracks.
-            var active = button == NavLibrary
-                ? _tab is "album" or "artist" or "track"
-                : (string?)button.Tag == _tab;
+            var active = (string?)button.Tag == _tab;
             button.Style = active ? selected : regular;
         }
+
+        BackButton.IsEnabled = _nav.CanGoBack;
+        ForwardButton.IsEnabled = _nav.CanGoForward;
     }
 
     private bool IsLibraryRoot => _openedItem is null && _tab is "album" or "artist" or "track" or "playlist";
@@ -341,10 +542,14 @@ public sealed partial class LibraryWindow : Window
             }
         }
 
-        var selectedStyle = (Style)Application.Current.Resources["AuroraPrimaryButtonStyle"];
-        var defaultStyle = (Style)Application.Current.Resources["AuroraButtonStyle"];
-        LibraryGridButton.Style = IsGridView ? selectedStyle : defaultStyle;
-        LibraryListButton.Style = IsGridView ? defaultStyle : selectedStyle;
+        MarkViewButton(LibraryGridButton, IsGridView);
+        MarkViewButton(LibraryListButton, !IsGridView);
+    }
+
+    private static void MarkViewButton(Button button, bool on)
+    {
+        button.Background = on ? (Brush)Application.Current.Resources["AuroraSelected"] : new SolidColorBrush(Colors.Transparent);
+        button.Foreground = (Brush)Application.Current.Resources[on ? "AuroraText" : "AuroraMuted"];
     }
 
     private void SetLibraryView(bool grid)
@@ -356,10 +561,76 @@ public sealed partial class LibraryWindow : Window
 
         _libraryGridViews[_tab] = grid;
         UpdateLibraryControls();
-        AlbumGrid.Visibility = grid ? Visibility.Visible : Visibility.Collapsed;
-        List.Visibility = grid ? Visibility.Collapsed : Visibility.Visible;
-        AlbumGrid.ItemsSource = grid ? _currentLibraryRows : null;
-        List.ItemsSource = grid ? null : _currentLibraryRows;
+        RefreshRows();
+    }
+
+    /// <summary>Rows after the in-page filters (library text filter, search result type).</summary>
+    private IReadOnlyList<ListRow> VisibleRows()
+    {
+        IEnumerable<ListRow> rows = _currentLibraryRows;
+        if (_tab == "search" && _openedItem is null && _searchKind != "all")
+        {
+            rows = rows.Where(r => r.Item?.Type.ToString() == _searchKind);
+        }
+
+        if (_filterText.Length > 0 && IsLibraryRoot)
+        {
+            rows = rows.Where(r => r.Title.Contains(_filterText, StringComparison.CurrentCultureIgnoreCase)
+                || r.Subtitle.Contains(_filterText, StringComparison.CurrentCultureIgnoreCase));
+        }
+
+        return rows.ToList();
+    }
+
+    /// <summary>Re-applies view mode and filters to the already loaded rows without another server call.</summary>
+    private void RefreshRows()
+    {
+        if (_tab == "home" && _openedItem is null)
+        {
+            return;
+        }
+
+        var useGrid = IsGridView;
+        var rows = VisibleRows();
+        AlbumGrid.ItemsSource = useGrid ? rows : null;
+        List.ItemsSource = useGrid ? null : rows;
+        AlbumGrid.Visibility = useGrid ? Visibility.Visible : Visibility.Collapsed;
+        List.Visibility = useGrid ? Visibility.Collapsed : Visibility.Visible;
+        if (_currentLibraryRows.Count > 0 && rows.Count == 0)
+        {
+            ShowEmptyState("No matches", "Try a different filter.");
+        }
+        else if (_currentLibraryRows.Count > 0)
+        {
+            EmptyState.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void OnFilterChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_configuringFilter)
+        {
+            return;
+        }
+
+        _filterText = FilterBox.Text.Trim();
+        RefreshRows();
+    }
+
+    private void OnChipClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleButton { Tag: string kind } clicked)
+        {
+            return;
+        }
+
+        _searchKind = kind;
+        foreach (var chip in SearchChipButtons)
+        {
+            chip.IsChecked = chip == clicked;
+        }
+
+        RefreshRows();
     }
 
     private void OnLibraryGridView(object sender, RoutedEventArgs e) => SetLibraryView(true);
@@ -395,28 +666,11 @@ public sealed partial class LibraryWindow : Window
 
     private IEnumerable<Shelf> HomeShelfControls =>
     [
-        HomeTimeShelf, HomePlaylistsShelf, HomeRecentShelf, HomeNewPlaylistsShelf,
-        HomeTopTracksShelf, HomeSimilarShelf, HomeAlbumShelf,
+        HomeRecentPlaylistsShelf, HomeMadeForYouShelf, HomeRotationShelf, HomeNewPlaylistsShelf, HomeRecentShelf,
     ];
 
-    /// <summary>Personal greeting based on the clock and the signed-in Windows user's first name.</summary>
-    private static string HomeGreetingText(DateTime now)
-    {
-        var greeting = now.Hour switch
-        {
-            >= 5 and < 12 => "Good morning",
-            >= 12 and < 18 => "Good afternoon",
-            >= 18 and < 23 => "Good evening",
-            _ => "Good night",
-        };
-        var name = Environment.UserName;
-        return !string.IsNullOrWhiteSpace(name) && name.All(char.IsLetter)
-            ? $"{greeting}, {char.ToUpperInvariant(name[0])}{name[1..].ToLowerInvariant()}"
-            : greeting;
-    }
-
-    // No AI-generated music, arbitrary genres or fake statistics: only the user's own playlists.
-    private static List<ListRow> TimeOfDayPicks(IReadOnlyList<MaItem> playlists, int hour)
+    // Only the user's own playlists: matched by name, never generated or invented.
+    private static List<MaItem> TimeOfDayPicks(IReadOnlyList<MaItem> playlists, int hour)
     {
         var keywords = hour switch
         {
@@ -429,16 +683,8 @@ public sealed partial class LibraryWindow : Window
             .Where(p => p.IsPlayable && !string.IsNullOrWhiteSpace(p.Uri)
                 && keywords.Any(k => p.Name.Contains(k, StringComparison.OrdinalIgnoreCase)))
             .DistinctBy(p => p.Uri, StringComparer.OrdinalIgnoreCase)
-            .Take(16).Select(p => ListRow.From(p)).ToList();
+            .Take(16).ToList();
     }
-
-    private static string TimeOfDayTitle(int hour) => hour switch
-    {
-        >= 5 and < 12 => "Your morning playlists",
-        >= 12 and < 18 => "For your afternoon",
-        >= 18 and < 22 => "Your evening playlists",
-        _ => "After dark",
-    };
 
     private async Task LoadTabAsync(bool backgroundRefresh = false)
     {
@@ -462,18 +708,25 @@ public sealed partial class LibraryWindow : Window
             LoadingState.Visibility = Visibility.Visible;
             Busy.IsActive = true;
         }
+
         UpdateNavigationState();
-        ContextBar.Visibility = _openedItem is null ? Visibility.Collapsed : Visibility.Visible;
-        // Playback controls live in the detail hero, leaving the back bar uncluttered.
-        ContextActions.Visibility = Visibility.Collapsed;
+        var detailOpen = _openedItem is not null;
+        var isHome = _tab == "home" && !detailOpen;
+        var isNow = _tab == "now" && !detailOpen;
         DetailHero.Visibility = Visibility.Collapsed;
         DetailSection.Visibility = Visibility.Collapsed;
-        ContentHeading.Visibility = _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
-        ContentDescription.Visibility = _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
-        QueueBar.Visibility = (_tab is "queue" or "now") && _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
-        NowPlayingHero.Visibility = _tab == "now" && _openedItem is null ? Visibility.Visible : Visibility.Collapsed;
-        var isHome = _tab == "home" && _openedItem is null;
-        var useGrid = IsGridView;
+        // Home has its own greeting, Now Playing and detail pages their own hero: no extra page title there.
+        var showHeading = !detailOpen && !isHome && !isNow;
+        ContentHeading.Visibility = ContentDescription.Visibility = showHeading ? Visibility.Visible : Visibility.Collapsed;
+        QueueBar.Visibility = (_tab is "queue" or "now") && !detailOpen ? Visibility.Visible : Visibility.Collapsed;
+        SearchChips.Visibility = _tab == "search" && !detailOpen ? Visibility.Visible : Visibility.Collapsed;
+        NowPlayingHero.Visibility = isNow ? Visibility.Visible : Visibility.Collapsed;
+        if (isNow)
+        {
+            DetailSection.Visibility = Visibility.Visible;
+            DetailSectionTitle.Text = "Up next";
+        }
+
         UpdateLibraryControls();
         _currentLibraryRows = [];
         if (!backgroundRefresh)
@@ -482,42 +735,36 @@ public sealed partial class LibraryWindow : Window
             AlbumGrid.Visibility = Visibility.Collapsed;
             List.Visibility = Visibility.Collapsed;
         }
-        ContentHeading.Text = _openedItem?.Name ?? (_tab switch
+
+        ContentHeading.Text = _tab switch
         {
-            "now" => "Now playing",
-            "home" => "Welcome back",
-            "queue" => "Your queue",
-            "search" => "Discover music",
+            "queue" => "Queue",
+            "search" => "Search",
             "artist" => "Artists",
-            "playlist" => "Your playlists",
-            "track" => "Your tracks",
-            _ => "Your library",
-        });
-        ContentDescription.Text = _openedItem is not null ? "Explore and play your selection." : _tab switch
+            "playlist" => "Playlists",
+            "track" => "Tracks",
+            _ => "Albums",
+        };
+        ContentDescription.Text = _tab switch
         {
-            "now" => "Your current Music Assistant playback and what's up next.",
-            "home" => "Your listening, your playlists, and new music to explore.",
             "queue" => "Manage what's coming up next.",
-            "search" => "Find music across your library and providers.",
-            _ => "Everything you love, beautifully organised.",
+            "search" => string.IsNullOrWhiteSpace(_lastQuery)
+                ? "Find music across your library and providers."
+                : $"Results for “{_lastQuery}”",
+            _ => string.Empty,
         };
         try
         {
-            List<ListRow> rows;
+            List<ListRow> rows = [];
             MaItem? detailItem = null;
             IReadOnlyList<MaItem> detailChildren = [];
-            List<ListRow> recentRows = [];
-            List<ListRow> timeRows = [];
-            List<ListRow> playlistRows = [];
-            List<ListRow> topTracks = [];
-            List<ListRow> similarRows = [];
-            List<ListRow> newPlaylistRows = [];
+            HomeLayout? home = null;
+            List<ListRow> jumpBackRows = [];
             var playlistsRanked = false;
-            MaItem? similarSeed = null;
+            var sortFallback = false;
             string empty = "Nothing here yet.";
             if (_openedItem is { } parent)
             {
-                ContextTitle.Text = $"{parent.Type} details";
                 var client = await _controller.Service.GetClientAsync();
                 // Fetch richer metadata and child rows concurrently to avoid serial page loads.
                 // A track has its own detail view but no child list.
@@ -543,26 +790,27 @@ public sealed partial class LibraryWindow : Window
             {
                 rows = await LoadQueueRowsAsync();
                 empty = "The queue is empty.";
+                if (_tab == "queue" && rows.Count > 0)
+                {
+                    ContentDescription.Text = $"{rows.Count} {(rows.Count == 1 ? "track" : "tracks")} in the queue";
+                }
             }
-            else if (_tab == "home")
+            else if (isHome)
             {
                 var client = await _controller.Service.GetClientAsync();
-                rows = (await client.GetLibraryAsync(MaMediaType.Album, limit: 60))
-                    .Select(i => ListRow.From(i)).ToList();
                 IReadOnlyList<MaItem> recentItems = [];
-                IReadOnlyList<MaItem> playlistItems = [];
                 try
                 {
-                    recentItems = (await client.GetRecentlyPlayedAsync(80))
-                        .Where(i => i.Type is MaMediaType.Album or MaMediaType.Track).ToList();
-                    recentRows = recentItems.DistinctBy(i => i.Uri, StringComparer.OrdinalIgnoreCase)
-                        .Take(20).Select(i => ListRow.From(i)).ToList();
+                    recentItems = await client.GetRecentlyPlayedAsync(80, ["playlist", "album", "track"]);
                 }
                 catch (MaException)
                 {
-                    // Older servers may not provide listening history; never invent it.
+                    // Older servers may not report playlists in their history; fall back to albums and tracks.
+                    try { recentItems = await client.GetRecentlyPlayedAsync(80); }
+                    catch (MaException) { /* No listening history on this server; never invent it. */ }
                 }
 
+                IReadOnlyList<MaItem> playlistItems;
                 try
                 {
                     playlistItems = await client.GetLibraryAsync(MaMediaType.Playlist, limit: 40,
@@ -572,65 +820,38 @@ public sealed partial class LibraryWindow : Window
                 catch (MaException)
                 {
                     // If play-count ordering is unavailable, show real playlists without a ranking claim.
-                    try { playlistItems = await client.GetLibraryAsync(MaMediaType.Playlist, limit: 40); }
-                    catch (MaException) { /* Keep the rest of Home usable. */ }
+                    playlistItems = await client.GetLibraryAsync(MaMediaType.Playlist, limit: 40);
                 }
 
+                IReadOnlyList<MaItem> newestItems = [];
                 try
                 {
-                    newPlaylistRows = (await client.GetLibraryAsync(MaMediaType.Playlist, limit: 20,
-                        sortField: "timestamp_added", sortDirection: "desc"))
-                        .Where(i => i.IsPlayable).Select(i => ListRow.From(i)).ToList();
+                    newestItems = (await client.GetLibraryAsync(MaMediaType.Playlist, limit: 20,
+                        sortField: "timestamp_added", sortDirection: "desc")).Where(i => i.IsPlayable).ToList();
                 }
                 catch (MaException)
                 {
                     // Sort by date added is server-dependent; hide the shelf if unsupported.
                 }
 
-                try
-                {
-                    topTracks = (await client.GetLibraryAsync(MaMediaType.Track, limit: 20,
-                        sortField: "play_count", sortDirection: "desc"))
-                        .Where(t => t.IsPlayable).Select(t => ListRow.From(t)).ToList();
-                }
-                catch (MaException)
-                {
-                    // Only advertise "On repeat" when the server can actually rank play counts.
-                }
-
-                playlistRows = playlistItems.Where(i => i.IsPlayable)
-                    .DistinctBy(i => i.Uri, StringComparer.OrdinalIgnoreCase)
-                    .Take(20).Select(i => ListRow.From(i)).ToList();
-                timeRows = TimeOfDayPicks(playlistItems, DateTime.Now.Hour);
-
-                if (recentItems.Count > 0)
-                {
-                    try
-                    {
-                        var artists = await client.GetLibraryAsync(MaMediaType.Artist, limit: 150);
-                        similarSeed = artists.FirstOrDefault(a => recentItems.Any(r =>
-                            r.Subtitle?.Split(',').Any(n =>
-                                string.Equals(n.Trim(), a.Name, StringComparison.OrdinalIgnoreCase)) == true));
-                        if (similarSeed is not null)
-                        {
-                            similarRows = (await client.GetSimilarArtistsAsync(similarSeed))
-                                .Where(a => a.Type == MaMediaType.Artist && a.Uri != similarSeed.Uri)
-                                .DistinctBy(a => a.Uri, StringComparer.OrdinalIgnoreCase)
-                                .Take(16).Select(a => ListRow.From(a)).ToList();
-                        }
-                    }
-                    catch (MaException)
-                    {
-                        // Similar-artist discovery is provider-dependent; hide the shelf if unsupported.
-                    }
-                }
-                empty = "No music yet. Add albums or playlists to Music Assistant to get started.";
+                var recentPlaylists = recentItems.Where(i => i.Type == MaMediaType.Playlist)
+                    .DistinctBy(i => i.Uri, StringComparer.OrdinalIgnoreCase).Take(20).ToList();
+                home = HomeComposer.Compose(playlistItems, playlistsRanked,
+                    TimeOfDayPicks(playlistItems, DateTime.Now.Hour), newestItems, recentPlaylists);
+                jumpBackRows = recentItems.Where(i => i.Type is MaMediaType.Album or MaMediaType.Track)
+                    .DistinctBy(i => i.Uri, StringComparer.OrdinalIgnoreCase).Take(16)
+                    .Select(i => ListRow.From(i)).ToList();
+                empty = "No music yet. Add playlists or albums to Music Assistant to get started.";
             }
             else if (_tab == "search")
             {
                 var client = await _controller.Service.GetClientAsync();
                 var results = await client.SearchAsync(_lastQuery);
                 rows = results.Albums.Concat(results.Artists).Concat(results.Tracks).Concat(results.Playlists).Select(i => ListRow.From(i, showType: true)).ToList();
+                ChipAlbums.Content = $"Albums ({results.Albums.Count})";
+                ChipArtists.Content = $"Artists ({results.Artists.Count})";
+                ChipTracks.Content = $"Tracks ({results.Tracks.Count})";
+                ChipPlaylists.Content = $"Playlists ({results.Playlists.Count})";
                 empty = string.IsNullOrEmpty(_lastQuery) ? "Type a search above." : "No results.";
             }
             else
@@ -648,9 +869,17 @@ public sealed partial class LibraryWindow : Window
                 {
                     items = await client.GetLibraryAsync(type, limit: 300);
                     ContentDescription.Text = "This sort isn't supported by your Music Assistant server. Showing default order.";
+                    sortFallback = true;
                 }
+
                 rows = items.Select(i => ListRow.From(i)).ToList();
                 empty = "Your library has no items of this kind.";
+                if (!sortFallback)
+                {
+                    var noun = _tab switch { "artist" => "artist", "playlist" => "playlist", "track" => "track", _ => "album" };
+                    var count = rows.Count >= 300 ? "300+" : rows.Count.ToString();
+                    ContentDescription.Text = $"{count} {noun}{(rows.Count == 1 ? "" : "s")}";
+                }
             }
 
             if (id != _loadId)
@@ -663,45 +892,31 @@ public sealed partial class LibraryWindow : Window
                 RenderDetail(detailItem, detailChildren);
             }
 
-            // Quick access: your most played playlists first, falling back to recent listening.
-            var quickRows = isHome
-                ? (playlistRows.Count > 0 ? playlistRows : recentRows).Take(8).ToList()
-                : [];
-            var quickUris = quickRows.Select(r => r.Item?.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            // Shelves below never immediately repeat what quick access already shows.
-            // Hide the shelf rather than repeating quick-access items when too few remain.
-            List<ListRow> playlistShelf = isHome ? playlistRows.Where(r => !quickUris.Contains(r.Item?.Uri)).ToList() : [];
-            if (playlistShelf.Count < 3)
+            var homeEmpty = true;
+            if (isHome && home is not null)
             {
-                playlistShelf = [];
+                homeEmpty = RenderHome(home, jumpBackRows, playlistsRanked);
+            }
+            else
+            {
+                ClearHome();
             }
 
-            var newPlaylistShelf = isHome
-                ? newPlaylistRows
-                    .DistinctBy(r => r.Item?.Uri, StringComparer.OrdinalIgnoreCase)
-                    .Where(r => !playlistRows.Any(p => string.Equals(p.Item?.Uri, r.Item?.Uri, StringComparison.OrdinalIgnoreCase)))
-                    .ToList()
-                : [];
-            HomeGreeting.Text = HomeGreetingText(DateTime.Now);
-            HomeQuickGrid.ItemsSource = isHome ? quickRows : null;
-            HomeQuickGrid.Visibility = quickRows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-            SetShelf(HomeTimeShelf, isHome ? timeRows : [], TimeOfDayTitle(DateTime.Now.Hour));
-            SetShelf(HomePlaylistsShelf, playlistShelf,
-                playlistsRanked ? "Your most played playlists" : "Playlists from your library");
-            SetShelf(HomeRecentShelf, isHome ? recentRows.Take(16).ToList() : []);
-            SetShelf(HomeNewPlaylistsShelf, newPlaylistShelf);
-            SetShelf(HomeTopTracksShelf, isHome ? topTracks : []);
-            SetShelf(HomeSimilarShelf, isHome ? similarRows : [],
-                similarSeed is null ? "Artists you may like" : $"Because you listen to {similarSeed.Name}");
-            SetShelf(HomeAlbumShelf, isHome ? rows.Take(30).ToList() : []);
             _currentLibraryRows = rows;
-            AlbumGrid.ItemsSource = useGrid ? rows : null;
-            List.ItemsSource = (isHome || useGrid) ? null : rows;
             HomeShelves.Visibility = isHome ? Visibility.Visible : Visibility.Collapsed;
-            AlbumGrid.Visibility = useGrid ? Visibility.Visible : Visibility.Collapsed;
-            List.Visibility = (isHome || useGrid) ? Visibility.Collapsed : Visibility.Visible;
-            if ((isHome ? rows.Count + recentRows.Count + playlistRows.Count + topTracks.Count == 0 : rows.Count == 0)
-                && _openedItem?.Type != MaMediaType.Track)
+            if (isHome)
+            {
+                AlbumGrid.ItemsSource = null;
+                List.ItemsSource = null;
+                AlbumGrid.Visibility = Visibility.Collapsed;
+                List.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                RefreshRows();
+            }
+
+            if ((isHome ? homeEmpty : rows.Count == 0) && _openedItem?.Type != MaMediaType.Track)
             {
                 var detail = _openedItem?.Type switch
                 {
@@ -720,18 +935,24 @@ public sealed partial class LibraryWindow : Window
                 };
                 ShowEmptyState(_openedItem is null ? empty : "Nothing here yet", detail);
             }
+
+            if (isNow)
+            {
+                _ = EnsurePaletteAsync();
+            }
+
+            if (!backgroundRefresh)
+            {
+                Motion.FadeIn(Body, 220);
+            }
+
             await RefreshPlaybackSummaryAsync();
         }
         catch (MaException ex) when (id == _loadId)
         {
             List.ItemsSource = null;
             AlbumGrid.ItemsSource = null;
-            HomeQuickGrid.ItemsSource = null;
-            foreach (var shelf in HomeShelfControls)
-            {
-                SetShelf(shelf, []);
-            }
-
+            ClearHome();
             ShowEmptyState("Couldn't load your music", "Check the Music Assistant connection and try again.", retry: true);
             ShowError(ex);
         }
@@ -743,6 +964,96 @@ public sealed partial class LibraryWindow : Window
                 LoadingState.Visibility = Visibility.Collapsed;
             }
         }
+    }
+
+    /// <summary>Fills Home from the composed layout. Returns true when there is nothing to show.</summary>
+    private bool RenderHome(HomeLayout layout, List<ListRow> jumpBackRows, bool playlistsRanked)
+    {
+        var hour = DateTime.Now.Hour;
+        HomeGreeting.Text = Greeting.For(DateTime.Now, Environment.UserName);
+        BindFeatured(FeaturedOne, layout.FirstFeatured, hour);
+        BindFeatured(FeaturedTwo, layout.SecondFeatured, hour);
+        FeaturedGrid.Visibility = layout.Featured.Any() ? Visibility.Visible : Visibility.Collapsed;
+        LayoutFeatured();
+
+        static List<ListRow> Rows(IEnumerable<MaItem> items) => items.Select(i => ListRow.From(i)).ToList();
+        SetShelf(HomeRecentPlaylistsShelf, Rows(layout.Recent));
+        SetShelf(HomeMadeForYouShelf, Rows(layout.MadeForYou), "Made for you",
+            $"Your own playlists that fit this {Greeting.PartOfDay(hour)}.");
+        SetShelf(HomeRotationShelf, Rows(layout.Rotation),
+            playlistsRanked ? "Your most played playlists" : "Your playlists",
+            playlistsRanked ? "Ranked by what you actually play." : string.Empty);
+        SetShelf(HomeNewPlaylistsShelf, Rows(layout.Added));
+        SetShelf(HomeRecentShelf, jumpBackRows);
+        return !layout.Featured.Any() && layout.Recent.Count + layout.MadeForYou.Count + layout.Rotation.Count
+            + layout.Added.Count + jumpBackRows.Count == 0;
+    }
+
+    private void ClearHome()
+    {
+        FeaturedGrid.Visibility = Visibility.Collapsed;
+        FeaturedOne.Visibility = FeaturedTwo.Visibility = Visibility.Collapsed;
+        foreach (var shelf in HomeShelfControls)
+        {
+            SetShelf(shelf, []);
+        }
+    }
+
+    private static void BindFeatured(FeaturedCard card, FeaturedPick? pick, int hour)
+    {
+        card.Visibility = pick is null ? Visibility.Collapsed : Visibility.Visible;
+        if (pick is null)
+        {
+            return;
+        }
+
+        var eyebrow = pick.Kind switch
+        {
+            FeaturedKind.ForThisMoment => $"For your {Greeting.PartOfDay(hour)}",
+            FeaturedKind.YourRotation => "Your rotation",
+            FeaturedKind.RecentlyAdded => "Recently added",
+            _ => "From your playlists",
+        };
+        var description = !string.IsNullOrWhiteSpace(pick.Item.Overview)
+            ? pick.Item.Overview
+            : string.IsNullOrWhiteSpace(pick.Item.Subtitle) ? null : $"By {pick.Item.Subtitle}";
+        card.Bind(ListRow.From(pick.Item), eyebrow, description);
+    }
+
+    private async void OnFeaturedOpen(object? sender, ListRow row)
+    {
+        if (row.Item is { } item)
+        {
+            await GoToAsync(new NavState(_tab, item, QueryFor(_tab)));
+        }
+    }
+
+    private async void OnFeaturedPlay(object? sender, ListRow row)
+    {
+        if (row.Item is { } item)
+        {
+            await PlayAsync(item, MaQueueOption.Replace);
+        }
+    }
+
+    private async void OnFeaturedShuffle(object? sender, ListRow row)
+    {
+        if (row.Item is not { } item)
+        {
+            return;
+        }
+
+        if (SelectedTarget is not { IsThisPc: false } target)
+        {
+            ShowInfo("Shuffle isn't available when playing on this PC.");
+            return;
+        }
+
+        await StartPlaybackAsync(target, async () =>
+        {
+            await _controller.PlayAsync(item, target, MaQueueOption.Replace);
+            await _controller.SetShuffleAsync(target, true);
+        }, $"Shuffling {item.Name}…", waitForTrackChange: true);
     }
 
     private void RenderDetail(MaItem item, IReadOnlyList<MaItem> children)
@@ -821,11 +1132,16 @@ public sealed partial class LibraryWindow : Window
                 : $"{time.Seconds} sec";
     }
 
-    private static void SetShelf(Shelf shelf, List<ListRow> rows, string? title = null)
+    private static void SetShelf(Shelf shelf, List<ListRow> rows, string? title = null, string? subtitle = null)
     {
         if (title is not null)
         {
             shelf.Title = title;
+        }
+
+        if (subtitle is not null)
+        {
+            shelf.Subtitle = subtitle;
         }
 
         shelf.ItemsSource = rows.Count > 0 ? rows : null;
@@ -867,13 +1183,7 @@ public sealed partial class LibraryWindow : Window
         // and the row menu still offer immediate playback without navigating.
         if (item.Type is MaMediaType.Album or MaMediaType.Artist or MaMediaType.Playlist or MaMediaType.Track)
         {
-            if (_openedItem is not null)
-            {
-                _history.Push(_openedItem);
-            }
-
-            _openedItem = item;
-            await LoadTabAsync();
+            await GoToAsync(new NavState(_tab, item, QueryFor(_tab)));
         }
         else
         {
@@ -882,23 +1192,17 @@ public sealed partial class LibraryWindow : Window
         }
     }
 
-    private async void OnBack(object sender, RoutedEventArgs e)
+    private async void OnCardPlay(object? sender, RowAction action)
     {
-        _openedItem = _history.Count > 0 ? _history.Pop() : null;
-        await LoadTabAsync();
-    }
-
-    private async void OnCardPlay(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button { Tag: ListRow { Item: { IsPlayable: true } item } })
+        if (action.Row.Item is { IsPlayable: true } item)
         {
             await PlayAsync(item, MaQueueOption.Replace);
         }
     }
 
-    private void OnRowMenu(object sender, RoutedEventArgs e)
+    private void OnRowMenu(object? sender, RowAction action)
     {
-        if (sender is not Button { Tag: ListRow { Item: { } item } })
+        if (action.Row.Item is not { } item)
         {
             return;
         }
@@ -907,7 +1211,7 @@ public sealed partial class LibraryWindow : Window
         flyout.Items.Add(MenuItem("Play now", () => PlayAsync(item, MaQueueOption.Replace)));
         flyout.Items.Add(MenuItem("Play next", () => PlayAsync(item, MaQueueOption.Next)));
         flyout.Items.Add(MenuItem("Add to queue", () => PlayAsync(item, MaQueueOption.Add)));
-        flyout.ShowAt((FrameworkElement)sender);
+        flyout.ShowAt(action.Anchor);
     }
 
     private static MenuFlyoutItem MenuItem(string text, Func<Task> action)
@@ -1002,17 +1306,34 @@ public sealed partial class LibraryWindow : Window
         }
     }
 
-    private async void OnTransfer(object sender, RoutedEventArgs e)
+    private void OnTransferClick(object sender, RoutedEventArgs e)
     {
-        if (SelectedTarget is not { } from || TransferBox.SelectedItem is not ComboBoxItem { Tag: PlayTarget to })
+        var flyout = new MenuFlyout();
+        var others = _targets.Where(t => t.QueueId != SelectedTarget?.QueueId).ToList();
+        if (others.Count == 0)
         {
-            ShowInfo("Choose the player to move the queue to.");
+            flyout.Items.Add(new MenuFlyoutItem { Text = "No other players available", IsEnabled = false });
+        }
+
+        foreach (var to in others)
+        {
+            flyout.Items.Add(MenuItem(to.Name, () => TransferToAsync(to)));
+        }
+
+        flyout.ShowAt((FrameworkElement)sender);
+    }
+
+    private async Task TransferToAsync(PlayTarget to)
+    {
+        if (SelectedTarget is not { } from)
+        {
+            ShowInfo("Choose the player to move the queue from first.");
             return;
         }
 
         await RunAsync(() => _controller.TransferAsync(from, to));
         ShowInfo($"Moved the queue from {from.Name} to {to.Name}.");
-        TargetBox.SelectedItem = TargetBox.Items.Cast<ComboBoxItem>().FirstOrDefault(i => (i.Tag as PlayTarget)?.QueueId == to.QueueId) ?? TargetBox.SelectedItem;
+        await ChooseTargetAsync(to);
     }
 
     private async Task StartPlaybackAsync(PlayTarget target, Func<Task> action, string label,
@@ -1274,9 +1595,10 @@ public sealed partial class LibraryWindow : Window
     private void UpdateFooterModes()
     {
         FooterShuffleIcon.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-            _remoteShuffle ? "AuroraGood" : "AuroraMuted"];
+            _remoteShuffle ? "AuroraAccent" : "AuroraMuted"];
         FooterRepeatIcon.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-            _remoteRepeat == "off" ? "AuroraMuted" : "AuroraGood"];
+            _remoteRepeat == "off" ? "AuroraMuted" : "AuroraAccent"];
+        FooterRepeatIcon.Glyph = _remoteRepeat == "one" ? "\uE8ED" : "\uE8EE";
         ToolTipService.SetToolTip(FooterRepeatButton, $"Repeat: {_remoteRepeat}");
         ToolTipService.SetToolTip(FooterShuffleButton, _remoteShuffle ? "Shuffle on" : "Shuffle off");
     }
@@ -1457,7 +1779,75 @@ public sealed partial class LibraryWindow : Window
                 : new ListRow(summary.Title, summary.Artist, summary.ArtworkUrl).Image;
             FooterArtwork.Source = image;
             NowPlayingArtwork.Source = image;
+            if (image is not null)
+            {
+                Motion.FadeIn(FooterArtwork);
+                Motion.FadeIn(NowPlayingArtwork);
+            }
+
+            var url = summary.ArtworkUrl;
+            SetPaletteSource(key, string.IsNullOrWhiteSpace(url) ? null : async () => await Http.GetByteArrayAsync(url));
         }
+    }
+
+    private void SetPaletteSource(string key, Func<Task<byte[]?>>? source)
+    {
+        _paletteSourceKey = key;
+        _paletteSource = source;
+        if (_tab == "now" && _openedItem is null)
+        {
+            _ = EnsurePaletteAsync();
+        }
+    }
+
+    /// <summary>Tints the Now Playing hero with a dark tone of the artwork's colour (only while that page is open).</summary>
+    private async Task EnsurePaletteAsync()
+    {
+        var key = _paletteSourceKey;
+        var source = _paletteSource;
+        if (key is null || key == _paletteKey)
+        {
+            return;
+        }
+
+        _paletteKey = key;
+        var request = ++_paletteRequestId;
+        Rgb? color = null;
+        try
+        {
+            var bytes = source is null ? null : await source();
+            if (bytes is { Length: > 0 })
+            {
+                color = await ArtworkPalette.PickAsync(bytes);
+            }
+        }
+        catch (Exception)
+        {
+            // Artwork may be unreachable or undecodable: keep the default Aurora gradient.
+        }
+
+        if (_closed || request != _paletteRequestId)
+        {
+            return;
+        }
+
+        if (color is not { } picked || picked == Rgb.Fallback)
+        {
+            NowPlayingHero.Background = (Brush)Application.Current.Resources["AuroraHeroGradient"];
+            return;
+        }
+
+        var top = picked.ToBackdrop();
+        NowPlayingHero.Background = new LinearGradientBrush
+        {
+            StartPoint = new global::Windows.Foundation.Point(0, 0),
+            EndPoint = new global::Windows.Foundation.Point(1, 1),
+            GradientStops =
+            {
+                new GradientStop { Color = global::Windows.UI.Color.FromArgb(255, top.R, top.G, top.B), Offset = 0 },
+                new GradientStop { Color = global::Windows.UI.Color.FromArgb(255, 11, 16, 32), Offset = 1 },
+            },
+        };
     }
 
     private async Task LoadLocalArtworkAsync(ArtworkImage artwork, int request)
@@ -1474,6 +1864,10 @@ public sealed partial class LibraryWindow : Window
             {
                 FooterArtwork.Source = image;
                 NowPlayingArtwork.Source = image;
+                Motion.FadeIn(FooterArtwork);
+                Motion.FadeIn(NowPlayingArtwork);
+                var data = artwork.Data;
+                SetPaletteSource($"sendspin:{request}", () => Task.FromResult<byte[]?>(data));
             }
         }
         catch (Exception)
@@ -1489,7 +1883,7 @@ public sealed partial class LibraryWindow : Window
     private void OnServerEvent(MaEvent e)
     {
         // ServerEvent is raised by the Music Assistant WebSocket thread.
-        // Never access TargetBox.SelectedItem (or any WinUI control) until we're on the UI thread.
+        // Never access a WinUI control until we're on the UI thread.
         // Elapsed-time ticks do not change the queue list.
         if (e.Event == "player_updated")
         {

@@ -21,7 +21,7 @@
         <Border Background="{StaticResource AuroraAccentGradient}" CornerRadius="5" Width="19" Height="19">
           <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE8D6;" FontSize="11" Foreground="#10192B" HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
-        <TextBlock Text="ma·satellite" FontWeight="Bold" Foreground="{StaticResource AuroraText}" FontSize="14" VerticalAlignment="Center"/>
+        <TextBlock Text="MA-Satellite" FontWeight="Bold" Foreground="{StaticResource AuroraText}" FontSize="14" VerticalAlignment="Center"/>
       </StackPanel>
       <TextBlock Grid.Column="1" Text="NOW PLAYING" Foreground="{StaticResource AuroraMuted}" FontSize="10" CharacterSpacing="100" VerticalAlignment="Center"/>
     </Grid>

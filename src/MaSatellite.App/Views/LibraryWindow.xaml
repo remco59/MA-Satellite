@@ -5,415 +5,415 @@
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
   xmlns:local="using:MaSatellite.App.Views">
   <Grid x:Name="LibraryRoot" Background="{StaticResource AuroraBackground}" RequestedTheme="Dark" SizeChanged="OnLibrarySizeChanged">
-    <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="108"/></Grid.RowDefinitions>
-    <Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="208"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-    <!-- Persistent navigation. Every button selects a real library view. -->
-    <Border Grid.Column="0" Grid.RowSpan="2" Background="{StaticResource AuroraSidebarGradient}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,0,1,0">
-      <Grid Padding="17,27,17,18">
-        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-        <StackPanel Orientation="Horizontal" Spacing="10" Margin="7,0,0,35">
-          <Border Width="38" Height="38" CornerRadius="11" Background="{StaticResource AuroraAccentGradient}">
-            <FontIcon Glyph="&#xE8D6;" Foreground="#111A30" FontSize="21" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-          </Border>
-          <StackPanel VerticalAlignment="Center" Spacing="2">
-            <TextBlock Text="ma·satellite" FontSize="16" FontWeight="Bold" Foreground="{StaticResource AuroraText}"/>
-            <TextBlock Text="Music, connected." Foreground="{StaticResource AuroraMuted}" FontSize="10"/>
-          </StackPanel>
+    <Grid.Resources>
+      <!-- One card template for every grid and shelf, so albums, artists, tracks and playlists look the same. -->
+      <DataTemplate x:Key="CardTemplate" x:DataType="local:ListRow">
+        <local:MediaCard Row="{x:Bind}" PlayRequested="OnCardPlay" MenuRequested="OnRowMenu"/>
+      </DataTemplate>
+      <DataTemplate x:Key="CompactCardTemplate" x:DataType="local:ListRow">
+        <local:MediaCard Row="{x:Bind}" ArtSize="140" PlayRequested="OnCardPlay" MenuRequested="OnRowMenu"/>
+      </DataTemplate>
+      <DataTemplate x:Key="RowTemplate" x:DataType="local:ListRow">
+        <local:MediaRow Row="{x:Bind}" PlayRequested="OnCardPlay" MenuRequested="OnRowMenu"/>
+      </DataTemplate>
+    </Grid.Resources>
+    <Grid.KeyboardAccelerators>
+      <KeyboardAccelerator Key="K" Modifiers="Control" Invoked="OnFocusSearch"/>
+      <KeyboardAccelerator Key="Left" Modifiers="Menu" Invoked="OnBackAccelerator"/>
+      <KeyboardAccelerator Key="Right" Modifiers="Menu" Invoked="OnForwardAccelerator"/>
+    </Grid.KeyboardAccelerators>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="40"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition x:Name="SidebarColumn" Width="232"/><ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+
+    <!-- Title area: the window drag region, with the app name like a native title bar. -->
+    <Grid x:Name="TitleBarRegion" Grid.ColumnSpan="2" Background="Transparent">
+      <StackPanel Orientation="Horizontal" Spacing="9" Margin="16,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False">
+        <Border Width="18" Height="18" CornerRadius="5" Background="{StaticResource AuroraAccentGradient}">
+          <FontIcon Glyph="&#xE8D6;" FontSize="11" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+        <TextBlock Text="MA-Satellite" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AuroraText}"/>
+      </StackPanel>
+    </Grid>
+
+    <!-- Sidebar: every item opens a real view. Labels are tagged so the collapsed state can hide them. -->
+    <Border x:Name="Sidebar" Grid.Row="1" Background="{StaticResource AuroraSidebar}"
+            BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,0,1,0">
+      <Grid Padding="12,4,12,12" RowSpacing="8">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <StackPanel Spacing="14">
+          <Button x:Name="SidebarToggle" Click="OnToggleSidebar" Style="{StaticResource AuroraNavButtonStyle}"
+                  ToolTipService.ToolTip="Collapse or expand the sidebar" AutomationProperties.Name="Collapse or expand the sidebar">
+            <Grid ColumnSpacing="14">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <FontIcon Glyph="&#xE700;" FontSize="16"/>
+              <TextBlock Grid.Column="1" Tag="label" Text="Menu" VerticalAlignment="Center"/>
+            </Grid>
+          </Button>
+          <Grid ColumnSpacing="12" Margin="4,0,0,6">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <Border Width="40" Height="40" CornerRadius="12" Background="{StaticResource AuroraAccentGradient}">
+              <FontIcon Glyph="&#xE8D6;" Foreground="White" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <StackPanel Grid.Column="1" Tag="label" VerticalAlignment="Center" Spacing="2">
+              <TextBlock Text="MA-Satellite" FontSize="17" FontWeight="Bold" Foreground="{StaticResource AuroraText}"/>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Ellipse x:Name="SidebarDot" Width="7" Height="7" Fill="{StaticResource AuroraMuted}" VerticalAlignment="Center"/>
+                <TextBlock x:Name="BrandStatus" Text="Music Assistant" FontSize="11" Foreground="{StaticResource AuroraMuted}"/>
+              </StackPanel>
+            </StackPanel>
+          </Grid>
         </StackPanel>
-        <!-- The sidebar is the single source of page navigation. Library subviews stay together. -->
-        <StackPanel Grid.Row="1" Spacing="5">
-          <TextBlock Text="YOUR MUSIC" Margin="12,0,0,8" Style="{StaticResource AuroraSectionLabelStyle}"/>
-          <Button x:Name="NavHome" Tag="home" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
-                  AutomationProperties.Name="Home">
-            <StackPanel Orientation="Horizontal" Spacing="15">
-              <FontIcon Glyph="&#xE80F;" FontSize="16"/><TextBlock Text="Home" VerticalAlignment="Center"/>
-            </StackPanel>
-          </Button>
-          <Button x:Name="NavSearch" Tag="search" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
-                  AutomationProperties.Name="Search">
-            <StackPanel Orientation="Horizontal" Spacing="15">
-              <FontIcon Glyph="&#xE721;" FontSize="16"/><TextBlock Text="Search" VerticalAlignment="Center"/>
-            </StackPanel>
-          </Button>
-          <Button x:Name="NavLibrary" Tag="album" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
-                  AutomationProperties.Name="Library">
-            <StackPanel Orientation="Horizontal" Spacing="15">
-              <FontIcon Glyph="&#xE8F1;" FontSize="16"/><TextBlock Text="Library" VerticalAlignment="Center"/>
-            </StackPanel>
-          </Button>
-          <StackPanel Margin="35,0,0,7" Spacing="2" AutomationProperties.Name="Library views">
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="2">
+            <TextBlock Tag="label" Text="DISCOVER" Margin="14,6,0,6" Style="{StaticResource AuroraSectionLabelStyle}"/>
+            <Button x:Name="NavHome" Tag="home" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                    ToolTipService.ToolTip="Home" AutomationProperties.Name="Home">
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE80F;" FontSize="17"/><TextBlock Grid.Column="1" Tag="label" Text="Home" VerticalAlignment="Center"/>
+              </Grid>
+            </Button>
+            <Button x:Name="NavSearch" Tag="search" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                    ToolTipService.ToolTip="Search" AutomationProperties.Name="Search">
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE721;" FontSize="17"/><TextBlock Grid.Column="1" Tag="label" Text="Search" VerticalAlignment="Center"/>
+              </Grid>
+            </Button>
+
+            <TextBlock Tag="label" Text="YOUR COLLECTION" Margin="14,18,0,6" Style="{StaticResource AuroraSectionLabelStyle}"/>
+            <Button x:Name="NavPlaylist" Tag="playlist" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                    ToolTipService.ToolTip="Playlists" AutomationProperties.Name="Playlists">
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE90B;" FontSize="17"/><TextBlock Grid.Column="1" Tag="label" Text="Playlists" VerticalAlignment="Center"/>
+              </Grid>
+            </Button>
             <Button x:Name="NavAlbum" Tag="album" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
-                    AutomationProperties.Name="Albums" Padding="12,7">
-              <TextBlock Text="Albums"/>
+                    ToolTipService.ToolTip="Albums" AutomationProperties.Name="Albums">
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE93C;" FontSize="17"/><TextBlock Grid.Column="1" Tag="label" Text="Albums" VerticalAlignment="Center"/>
+              </Grid>
             </Button>
             <Button x:Name="NavArtist" Tag="artist" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
-                    AutomationProperties.Name="Artists" Padding="12,7">
-              <TextBlock Text="Artists"/>
+                    ToolTipService.ToolTip="Artists" AutomationProperties.Name="Artists">
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE77B;" FontSize="17"/><TextBlock Grid.Column="1" Tag="label" Text="Artists" VerticalAlignment="Center"/>
+              </Grid>
             </Button>
             <Button x:Name="NavTrack" Tag="track" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
-                    AutomationProperties.Name="Tracks" Padding="12,7">
-              <TextBlock Text="Tracks"/>
+                    ToolTipService.ToolTip="Tracks" AutomationProperties.Name="Tracks">
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE8D6;" FontSize="17"/><TextBlock Grid.Column="1" Tag="label" Text="Tracks" VerticalAlignment="Center"/>
+              </Grid>
+            </Button>
+
+            <TextBlock Tag="label" Text="PLAYBACK" Margin="14,18,0,6" Style="{StaticResource AuroraSectionLabelStyle}"/>
+            <Button x:Name="NavNow" Tag="now" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                    ToolTipService.ToolTip="Now playing" AutomationProperties.Name="Now playing">
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE767;" FontSize="17"/><TextBlock Grid.Column="1" Tag="label" Text="Now playing" VerticalAlignment="Center"/>
+              </Grid>
+            </Button>
+            <Button x:Name="NavQueue" Tag="queue" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                    ToolTipService.ToolTip="Queue" AutomationProperties.Name="Queue">
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE8FD;" FontSize="17"/><TextBlock Grid.Column="1" Tag="label" Text="Queue" VerticalAlignment="Center"/>
+              </Grid>
             </Button>
           </StackPanel>
-          <Button x:Name="NavPlaylist" Tag="playlist" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
-                  AutomationProperties.Name="Playlists">
-            <StackPanel Orientation="Horizontal" Spacing="15">
-              <FontIcon Glyph="&#xE8F1;" FontSize="16"/><TextBlock Text="Playlists" VerticalAlignment="Center"/>
-            </StackPanel>
-          </Button>
-          <Border Height="1" Background="{StaticResource AuroraBorder}" Margin="6,10,6,10"/>
-          <Button x:Name="NavNow" Tag="now" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
-                  AutomationProperties.Name="Now playing">
-            <StackPanel Orientation="Horizontal" Spacing="15">
-              <FontIcon Glyph="&#xE768;" FontSize="16"/><TextBlock Text="Now playing" VerticalAlignment="Center"/>
-            </StackPanel>
-          </Button>
-          <Button x:Name="NavQueue" Tag="queue" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
-                  AutomationProperties.Name="Queue">
-            <StackPanel Orientation="Horizontal" Spacing="15">
-              <FontIcon Glyph="&#xE8FD;" FontSize="16"/><TextBlock Text="Queue" VerticalAlignment="Center"/>
-            </StackPanel>
-          </Button>
-        </StackPanel>
-        <StackPanel Grid.Row="3" Spacing="15">
-          <Border Background="{StaticResource AuroraSurfaceRaised}" CornerRadius="14" Padding="13" BorderThickness="1" BorderBrush="{StaticResource AuroraBorder}">
-            <StackPanel Spacing="6">
-              <StackPanel Orientation="Horizontal" Spacing="7">
-                <FontIcon Glyph="&#xE73E;" FontSize="12" Foreground="{StaticResource AuroraGood}"/>
-                <TextBlock Text="Music Assistant" Foreground="{StaticResource AuroraText}" FontSize="12" FontWeight="SemiBold"/>
-              </StackPanel>
-              <TextBlock x:Name="SidebarStatus" Text="Connecting to your library…" AutomationProperties.LiveSetting="Polite" Foreground="{StaticResource AuroraMuted}" FontSize="11" TextTrimming="CharacterEllipsis"/>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Spacing="8">
+          <Border Tag="label" Background="{StaticResource AuroraCardSoft}" CornerRadius="12" Padding="12,10"
+                  BorderThickness="1" BorderBrush="{StaticResource AuroraBorder}">
+            <StackPanel Spacing="3">
+              <TextBlock Text="Music Assistant" Foreground="{StaticResource AuroraText}" FontSize="12" FontWeight="SemiBold"/>
+              <TextBlock x:Name="SidebarStatus" Text="Connecting to your library…" AutomationProperties.LiveSetting="Polite"
+                         Foreground="{StaticResource AuroraMuted}" FontSize="11" TextTrimming="CharacterEllipsis"/>
             </StackPanel>
           </Border>
-          <Button Click="OnOpenSettings" Style="{StaticResource AuroraNavButtonStyle}" AutomationProperties.Name="Open settings">
-            <StackPanel Orientation="Horizontal" Spacing="15">
-              <FontIcon Glyph="&#xE713;" FontSize="16"/><TextBlock Text="Settings" VerticalAlignment="Center"/>
-            </StackPanel>
+          <Button Click="OnOpenSettings" Style="{StaticResource AuroraNavButtonStyle}"
+                  ToolTipService.ToolTip="Settings" AutomationProperties.Name="Open settings">
+            <Grid ColumnSpacing="14">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <FontIcon Glyph="&#xE713;" FontSize="17"/><TextBlock Grid.Column="1" Tag="label" Text="Settings" VerticalAlignment="Center"/>
+            </Grid>
           </Button>
         </StackPanel>
       </Grid>
     </Border>
 
     <!-- Main content -->
-    <Grid x:Name="MainContent" Grid.Column="1" Padding="24,18,24,12" RowSpacing="13">
+    <Grid x:Name="MainContent" Grid.Row="1" Grid.Column="1" Padding="28,0,28,0">
       <Grid.RowDefinitions>
-        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/>
-        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
+        <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/>
       </Grid.RowDefinitions>
-      <Grid ColumnSpacing="16">
-        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition x:Name="TargetColumn" Width="244"/></Grid.ColumnDefinitions>
-        <AutoSuggestBox x:Name="SearchBox" PlaceholderText="Search Music Assistant…" QueryIcon="Find"
-                        QuerySubmitted="OnSearchSubmitted" MaxWidth="620" HorizontalAlignment="Stretch"
-                        AutomationProperties.Name="Search music"/>
-        <ComboBox x:Name="TargetBox" Grid.Column="1" HorizontalAlignment="Stretch"
-                  PlaceholderText="Play on…" SelectionChanged="OnTargetChanged"
-                  AutomationProperties.Name="Playback target"/>
+
+      <!-- Top bar: history, search, output device. Nothing else. -->
+      <Grid Grid.Row="0" ColumnSpacing="12" Margin="0,6,0,14">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Button x:Name="BackButton" Click="OnBack" IsEnabled="False" Style="{StaticResource AuroraIconButtonStyle}"
+                  Background="{StaticResource AuroraInput}" ToolTipService.ToolTip="Back (Alt+Left)" AutomationProperties.Name="Back">
+            <FontIcon Glyph="&#xE76B;" FontSize="14"/>
+          </Button>
+          <Button x:Name="ForwardButton" Click="OnForward" IsEnabled="False" Style="{StaticResource AuroraIconButtonStyle}"
+                  Background="{StaticResource AuroraInput}" ToolTipService.ToolTip="Forward (Alt+Right)" AutomationProperties.Name="Forward">
+            <FontIcon Glyph="&#xE76C;" FontSize="14"/>
+          </Button>
+        </StackPanel>
+        <Border x:Name="SearchPill" Grid.Column="1" Height="44" CornerRadius="22" MaxWidth="640" HorizontalAlignment="Stretch"
+                Background="{StaticResource AuroraInput}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1">
+          <Grid Padding="16,0,10,0" ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <FontIcon Glyph="&#xE721;" FontSize="15" Foreground="{StaticResource AuroraMuted}" VerticalAlignment="Center"/>
+            <TextBox x:Name="SearchBox" Grid.Column="1" PlaceholderText="Search your music, artists, albums or playlists…"
+                     Background="Transparent" BorderThickness="0" VerticalAlignment="Center" Padding="0,10"
+                     KeyDown="OnSearchKeyDown" GotFocus="OnSearchFocus" LostFocus="OnSearchBlur"
+                     AutomationProperties.Name="Search music">
+              <TextBox.Resources>
+                <SolidColorBrush x:Key="TextControlBackground" Color="Transparent"/>
+                <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent"/>
+                <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent"/>
+                <SolidColorBrush x:Key="TextControlBorderBrush" Color="Transparent"/>
+                <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent"/>
+                <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent"/>
+                <Thickness x:Key="TextControlBorderThemeThicknessFocused">0</Thickness>
+              </TextBox.Resources>
+            </TextBox>
+            <Border x:Name="SearchHint" Grid.Column="2" Padding="8,3" CornerRadius="6" VerticalAlignment="Center"
+                    Background="{StaticResource AuroraCard}">
+              <TextBlock Text="Ctrl K" FontSize="11" Foreground="{StaticResource AuroraMuted}"/>
+            </Border>
+          </Grid>
+        </Border>
+        <Button x:Name="TargetButton" Grid.Column="2" Click="OnTargetButtonClick" Style="{StaticResource AuroraPillButtonStyle}"
+                ToolTipService.ToolTip="Choose where music plays" AutomationProperties.Name="Playback target">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <FontIcon Glyph="&#xE7F4;" FontSize="15"/>
+            <TextBlock x:Name="TargetLabel" Text="Choose a player" MaxWidth="200" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+            <FontIcon Glyph="&#xE70D;" FontSize="10" Foreground="{StaticResource AuroraMuted}"/>
+          </StackPanel>
+        </Button>
       </Grid>
-      <StackPanel Grid.Row="1" Spacing="5" Margin="0,6,0,1">
-        <TextBlock x:Name="ContentHeading" Text="Your library" Style="{StaticResource AuroraTitleStyle}"/>
-        <TextBlock x:Name="ContentDescription" Text="Everything you love, beautifully organised." Style="{StaticResource AuroraSubtitleStyle}"/>
-      </StackPanel>
-      <InfoBar x:Name="Message" Grid.Row="2" IsOpen="False" IsClosable="True">
+
+      <InfoBar x:Name="Message" Grid.Row="1" IsOpen="False" IsClosable="True" Margin="0,0,0,10">
         <InfoBar.ActionButton>
           <Button x:Name="SetupButton" Content="Open settings" Click="OnOpenSettings" Visibility="Collapsed"/>
         </InfoBar.ActionButton>
       </InfoBar>
-      <!-- Library-only controls: views and sorting are independent for each media section. -->
-      <Grid x:Name="LibraryToolbar" Grid.Row="3" ColumnSpacing="10" Visibility="Collapsed">
-        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <ComboBox x:Name="LibrarySortBox" Width="226" PlaceholderText="Sort library"
-                  SelectionChanged="OnLibrarySortChanged" AutomationProperties.Name="Sort library"/>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="7">
-          <Button x:Name="LibraryListButton" Click="OnLibraryListView" Style="{StaticResource AuroraButtonStyle}"
-                  ToolTipService.ToolTip="List view" AutomationProperties.Name="List view">
-            <FontIcon Glyph="&#xE8FD;" FontSize="15"/>
+
+      <!-- Page header: title and only the controls the current page actually needs. -->
+      <StackPanel x:Name="PageHeader" Grid.Row="2" Spacing="12" Margin="0,0,0,8">
+        <StackPanel Spacing="4">
+          <TextBlock x:Name="ContentHeading" Text="Albums" Style="{StaticResource AuroraTitleStyle}"/>
+          <TextBlock x:Name="ContentDescription" Style="{StaticResource AuroraSubtitleStyle}"/>
+        </StackPanel>
+        <!-- Library: filter, sort and list/grid. -->
+        <Grid x:Name="LibraryToolbar" ColumnSpacing="10" Visibility="Collapsed">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <TextBox x:Name="FilterBox" Width="240" PlaceholderText="Filter this view" TextChanged="OnFilterChanged"
+                   AutomationProperties.Name="Filter this view"/>
+          <ComboBox x:Name="LibrarySortBox" Grid.Column="1" Width="200" PlaceholderText="Sort"
+                    SelectionChanged="OnLibrarySortChanged" AutomationProperties.Name="Sort library"/>
+          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4">
+            <Button x:Name="LibraryListButton" Click="OnLibraryListView" Style="{StaticResource AuroraIconButtonStyle}"
+                    ToolTipService.ToolTip="List view" AutomationProperties.Name="List view">
+              <FontIcon Glyph="&#xE8FD;" FontSize="15"/>
+            </Button>
+            <Button x:Name="LibraryGridButton" Click="OnLibraryGridView" Style="{StaticResource AuroraIconButtonStyle}"
+                    ToolTipService.ToolTip="Grid view" AutomationProperties.Name="Grid view">
+              <FontIcon Glyph="&#xE80A;" FontSize="15"/>
+            </Button>
+          </StackPanel>
+        </Grid>
+        <!-- Search: result-type filter. -->
+        <StackPanel x:Name="SearchChips" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
+          <ToggleButton x:Name="ChipAll" Tag="all" Content="All" IsChecked="True" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
+          <ToggleButton x:Name="ChipAlbums" Tag="Album" Content="Albums" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
+          <ToggleButton x:Name="ChipArtists" Tag="Artist" Content="Artists" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
+          <ToggleButton x:Name="ChipTracks" Tag="Track" Content="Tracks" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
+          <ToggleButton x:Name="ChipPlaylists" Tag="Playlist" Content="Playlists" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
+        </StackPanel>
+        <!-- Queue: moving the queue to another player. -->
+        <StackPanel x:Name="QueueBar" Orientation="Horizontal" Visibility="Collapsed">
+          <Button x:Name="TransferButton" Click="OnTransferClick" Style="{StaticResource AuroraButtonStyle}"
+                  ToolTipService.ToolTip="Move this queue to another player" AutomationProperties.Name="Transfer queue">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <FontIcon Glyph="&#xE8AB;" FontSize="14"/><TextBlock Text="Transfer queue"/>
+            </StackPanel>
           </Button>
-          <Button x:Name="LibraryGridButton" Click="OnLibraryGridView" Style="{StaticResource AuroraButtonStyle}"
-                  ToolTipService.ToolTip="Grid view" AutomationProperties.Name="Grid view">
-            <FontIcon Glyph="&#xE80A;" FontSize="15"/>
-          </Button>
         </StackPanel>
-      </Grid>
-      <Grid x:Name="ContextBar" Grid.Row="3" ColumnSpacing="8" Visibility="Collapsed">
-        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <Button x:Name="BackButton" Click="OnBack" ToolTipService.ToolTip="Back" AutomationProperties.Name="Back to library" Style="{StaticResource AuroraButtonStyle}">
-          <FontIcon Glyph="&#xE72B;"/>
-        </Button>
-        <TextBlock x:Name="ContextTitle" Grid.Column="1" VerticalAlignment="Center"
-                   FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource AuroraText}" TextTrimming="CharacterEllipsis"/>
-        <StackPanel x:Name="ContextActions" Grid.Column="2" Orientation="Horizontal" Spacing="8">
-          <Button Content="Play" Style="{StaticResource AuroraPrimaryButtonStyle}" Click="OnContextPlay"/>
-          <Button Content="Play next" Style="{StaticResource AuroraButtonStyle}" Click="OnContextPlayNext"/>
-          <Button Content="Add to queue" Style="{StaticResource AuroraButtonStyle}" Click="OnContextAdd"/>
-        </StackPanel>
-      </Grid>
-      <Grid x:Name="QueueBar" Grid.Row="3" ColumnSpacing="8" Visibility="Collapsed">
-        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <Button x:Name="QueuePreviousButton" Click="OnQueuePrevious" Style="{StaticResource AuroraButtonStyle}" ToolTipService.ToolTip="Previous"><FontIcon Glyph="&#xE892;"/></Button>
-          <Button x:Name="QueuePlayPauseButton" Click="OnQueuePlayPause" Style="{StaticResource AuroraPrimaryButtonStyle}"
-                  ToolTipService.ToolTip="Play or pause" AutomationProperties.Name="Play or pause">
-            <Grid Width="28" Height="28">
-              <Ellipse x:Name="QueuePlayPauseTrack" Visibility="Collapsed" Width="26" Height="26"
-                       Stroke="#7899CB" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-              <FontIcon x:Name="QueuePlayPauseIcon" Glyph="&#xE768;" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-              <ProgressRing x:Name="QueuePlayPauseSpinner" IsActive="False" Visibility="Collapsed"
-                            Foreground="#F5FBFF" Width="28" Height="28"/>
-            </Grid>
-          </Button>
-          <Button x:Name="QueueNextButton" Click="OnQueueNext" Style="{StaticResource AuroraButtonStyle}" ToolTipService.ToolTip="Next"><FontIcon Glyph="&#xE893;"/></Button>
-        </StackPanel>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-          <ComboBox x:Name="TransferBox" Width="200" PlaceholderText="Transfer to…" AutomationProperties.Name="Transfer destination"/>
-          <Button Content="Transfer queue" Style="{StaticResource AuroraButtonStyle}" Click="OnTransfer"/>
-        </StackPanel>
-      </Grid>
-      <Grid Grid.Row="4" RowSpacing="16">
+      </StackPanel>
+
+      <Grid x:Name="Body" Grid.Row="3" RowSpacing="16">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-        <!-- Detail hero shares the current Aurora palette with Home and Now Playing. -->
+
+        <!-- Detail hero: album, artist, playlist or track. -->
         <Border x:Name="DetailHero" Grid.Row="0" Visibility="Collapsed" Background="{StaticResource AuroraHeroGradient}"
-                BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" CornerRadius="18" Padding="20">
-          <Grid ColumnSpacing="23">
+                CornerRadius="20" Padding="24">
+          <Grid ColumnSpacing="26">
             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <Border Width="164" Height="164" CornerRadius="13" Background="{StaticResource AuroraCard}" VerticalAlignment="Top">
+            <Border Width="176" Height="176" CornerRadius="14" Background="{StaticResource AuroraCard}" VerticalAlignment="Top">
               <Grid>
                 <FontIcon Glyph="&#xE8D6;" FontSize="40" Foreground="{StaticResource AuroraMuted}" Opacity="0.5"/>
                 <Image x:Name="DetailArtwork" Stretch="UniformToFill"/>
               </Grid>
             </Border>
             <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
-              <TextBlock x:Name="DetailKind" Style="{StaticResource AuroraSectionLabelStyle}" Text="PLAYLIST"/>
-              <TextBlock x:Name="DetailTitle" FontSize="28" FontWeight="Bold" Foreground="{StaticResource AuroraText}"
+              <TextBlock x:Name="DetailKind" Style="{StaticResource AuroraSectionLabelStyle}" Foreground="#D4CCFF" Text="PLAYLIST"/>
+              <TextBlock x:Name="DetailTitle" FontSize="32" FontWeight="Bold" Foreground="White"
                          TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2"/>
-              <TextBlock x:Name="DetailByline" FontSize="13" Foreground="{StaticResource AuroraMuted}"
+              <TextBlock x:Name="DetailByline" FontSize="14" Foreground="#D9DEF2"
                          TextTrimming="CharacterEllipsis" MaxLines="1" Visibility="Collapsed"/>
-              <TextBlock x:Name="DetailStats" FontSize="12" Foreground="{StaticResource AuroraText}"
-                         TextWrapping="Wrap" Visibility="Collapsed"/>
-              <TextBlock x:Name="DetailGenres" FontSize="12" Foreground="{StaticResource AuroraMuted}"
-                         TextWrapping="Wrap" MaxLines="2" Visibility="Collapsed"/>
-              <TextBlock x:Name="DetailOverview" FontSize="12" Foreground="{StaticResource AuroraMuted}"
-                         TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="3" Visibility="Collapsed"/>
-              <StackPanel x:Name="DetailActions" Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
-                <Button Click="OnContextPlay" Style="{StaticResource AuroraPrimaryButtonStyle}" AutomationProperties.Name="Play selection">
-                  <StackPanel Orientation="Horizontal" Spacing="7">
+              <TextBlock x:Name="DetailStats" FontSize="12" Foreground="White" TextWrapping="Wrap" Visibility="Collapsed"/>
+              <TextBlock x:Name="DetailGenres" FontSize="12" Foreground="#D9DEF2" TextWrapping="Wrap" MaxLines="2" Visibility="Collapsed"/>
+              <TextBlock x:Name="DetailOverview" FontSize="12" Foreground="#D9DEF2" TextWrapping="Wrap"
+                         TextTrimming="CharacterEllipsis" MaxLines="3" Visibility="Collapsed"/>
+              <StackPanel x:Name="DetailActions" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                <Button Click="OnContextPlay" Style="{StaticResource AuroraPrimaryButtonStyle}" CornerRadius="20" MinHeight="40"
+                        AutomationProperties.Name="Play selection">
+                  <StackPanel Orientation="Horizontal" Spacing="8">
                     <FontIcon Glyph="&#xE768;" FontSize="13"/><TextBlock Text="Play" VerticalAlignment="Center"/>
                   </StackPanel>
                 </Button>
-                <Button Content="Play next" Click="OnContextPlayNext" Style="{StaticResource AuroraButtonStyle}"/>
-                <Button Content="Add to queue" Click="OnContextAdd" Style="{StaticResource AuroraButtonStyle}"/>
+                <Button Click="OnContextPlayNext" Style="{StaticResource AuroraButtonStyle}" Background="#26FFFFFF" CornerRadius="20"
+                        MinHeight="40" Content="Play next"/>
+                <Button Click="OnContextAdd" Style="{StaticResource AuroraButtonStyle}" Background="#26FFFFFF" CornerRadius="20"
+                        MinHeight="40" Content="Add to queue"/>
               </StackPanel>
             </StackPanel>
           </Grid>
         </Border>
         <StackPanel x:Name="DetailSection" Grid.Row="1" Spacing="4" Visibility="Collapsed">
-          <TextBlock x:Name="DetailSectionTitle" FontSize="19" FontWeight="SemiBold"
+          <TextBlock x:Name="DetailSectionTitle" FontSize="20" FontWeight="SemiBold"
                      Foreground="{StaticResource AuroraText}" Text="Tracks"/>
         </StackPanel>
-        <Border x:Name="NowPlayingHero" Visibility="Collapsed" Background="{StaticResource AuroraHeroGradient}"
-                BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" CornerRadius="19" Padding="22">
-          <Grid ColumnSpacing="25">
+
+        <!-- Now playing: large artwork on a colour taken from the artwork. -->
+        <Border x:Name="NowPlayingHero" Grid.Row="0" Visibility="Collapsed" Background="{StaticResource AuroraHeroGradient}"
+                CornerRadius="24" Padding="32">
+          <Grid ColumnSpacing="36">
             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <Border Width="152" Height="152" Background="{StaticResource AuroraCard}" CornerRadius="14">
+            <Border x:Name="NowPlayingArtworkFrame" Width="260" Height="260" Background="{StaticResource AuroraCard}" CornerRadius="16">
               <Grid>
-                <FontIcon Glyph="&#xE8D6;" FontSize="42" Foreground="{StaticResource AuroraMuted}" Opacity="0.5"/>
+                <FontIcon Glyph="&#xE8D6;" FontSize="56" Foreground="{StaticResource AuroraMuted}" Opacity="0.5"/>
                 <Image x:Name="NowPlayingArtwork" Stretch="UniformToFill"/>
               </Grid>
             </Border>
-            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="9">
-              <TextBlock Text="CURRENT TRACK" Style="{StaticResource AuroraSectionLabelStyle}"/>
-              <TextBlock x:Name="NowPlayingTitle" Text="Nothing playing" FontSize="24" FontWeight="Bold"
-                         TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2" Foreground="{StaticResource AuroraText}"/>
-              <TextBlock x:Name="NowPlayingArtist" Text="Select a player to begin" FontSize="14"
-                         TextTrimming="CharacterEllipsis" MaxLines="1" Foreground="{StaticResource AuroraMuted}"/>
-              <TextBlock x:Name="NowPlayingState" Text="Idle" AutomationProperties.LiveSetting="Polite" Foreground="{StaticResource AuroraGood}" FontSize="12" TextTrimming="CharacterEllipsis"/>
-              <TextBlock Text="Up next in your Music Assistant queue" Foreground="{StaticResource AuroraMuted}" FontSize="12"/>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="10">
+              <TextBlock Text="NOW PLAYING" Style="{StaticResource AuroraSectionLabelStyle}" Foreground="#D4CCFF"/>
+              <TextBlock x:Name="NowPlayingTitle" Text="Nothing playing" FontSize="34" FontWeight="Bold"
+                         TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2" Foreground="White"/>
+              <TextBlock x:Name="NowPlayingArtist" Text="Choose a player" FontSize="17"
+                         TextTrimming="CharacterEllipsis" MaxLines="1" Foreground="#D9DEF2"/>
+              <TextBlock x:Name="NowPlayingState" Text="Idle" AutomationProperties.LiveSetting="Polite"
+                         Foreground="{StaticResource AuroraGood}" FontSize="12" TextTrimming="CharacterEllipsis"/>
+              <StackPanel Orientation="Horizontal" Spacing="14" Margin="0,12,0,0">
+                <Button x:Name="QueuePreviousButton" Click="OnQueuePrevious" Style="{StaticResource AuroraIconButtonStyle}"
+                        Foreground="White" ToolTipService.ToolTip="Previous" AutomationProperties.Name="Previous">
+                  <FontIcon Glyph="&#xE892;" FontSize="18"/>
+                </Button>
+                <Button x:Name="QueuePlayPauseButton" Click="OnQueuePlayPause" Style="{StaticResource AuroraPlayButtonStyle}"
+                        ToolTipService.ToolTip="Play or pause" AutomationProperties.Name="Play or pause">
+                  <Grid Width="28" Height="28">
+                    <Ellipse x:Name="QueuePlayPauseTrack" Visibility="Collapsed" Width="26" Height="26"
+                             Stroke="#B3A8FF" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <FontIcon x:Name="QueuePlayPauseIcon" Glyph="&#xE768;" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <ProgressRing x:Name="QueuePlayPauseSpinner" IsActive="False" Visibility="Collapsed"
+                                  Foreground="White" Width="28" Height="28"/>
+                  </Grid>
+                </Button>
+                <Button x:Name="QueueNextButton" Click="OnQueueNext" Style="{StaticResource AuroraIconButtonStyle}"
+                        Foreground="White" ToolTipService.ToolTip="Next" AutomationProperties.Name="Next">
+                  <FontIcon Glyph="&#xE893;" FontSize="18"/>
+                </Button>
+              </StackPanel>
             </StackPanel>
           </Grid>
         </Border>
 
-        <!-- Home: a personal, playlist-first landing page. Real library and listening data only. -->
-        <ScrollViewer x:Name="HomeShelves" Grid.Row="2" Visibility="Collapsed"
+        <!-- Home: greeting and real library data only. -->
+        <ScrollViewer x:Name="HomeShelves" Grid.Row="2" Visibility="Collapsed" Margin="-12,0,-12,0"
                       HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-          <StackPanel Spacing="26" Padding="0,0,0,18">
-            <StackPanel Spacing="14">
-              <TextBlock x:Name="HomeGreeting" Text="Welcome back" Foreground="{StaticResource AuroraText}" FontSize="28" FontWeight="Bold"/>
-              <GridView x:Name="HomeQuickGrid" IsItemClickEnabled="True" SelectionMode="None" ItemClick="OnItemClick"
-                        ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.HorizontalScrollMode="Disabled"
-                        AutomationProperties.Name="Quick access">
-                <GridView.ItemTemplate>
-                  <DataTemplate x:DataType="local:ListRow">
-                    <Grid Width="270" Height="60" ColumnSpacing="12" Background="{StaticResource AuroraCardSoft}" CornerRadius="10"
-                          AutomationProperties.Name="{x:Bind Title}">
-                      <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="60"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
-                      </Grid.ColumnDefinitions>
-                      <Border CornerRadius="10,0,0,10" Background="{StaticResource AuroraHeroGradient}">
-                        <Grid>
-                          <FontIcon Glyph="&#xE8D6;" Foreground="{StaticResource AuroraMuted}" Opacity="0.5" Visibility="{x:Bind PlaceholderVisibility}"/>
-                          <Image Source="{x:Bind Image}" Stretch="UniformToFill"/>
-                        </Grid>
-                      </Border>
-                      <TextBlock Grid.Column="1" Text="{x:Bind Title}" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold"
-                                 Foreground="{StaticResource AuroraText}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2"
-                                 ToolTipService.ToolTip="{x:Bind Title}"/>
-                      <Button Grid.Column="2" Tag="{x:Bind}" Click="OnCardPlay" Visibility="{x:Bind MenuVisibility}"
-                              Style="{StaticResource AuroraPrimaryButtonStyle}" Width="34" Height="34" MinHeight="34" Padding="0"
-                              CornerRadius="17" Margin="0,0,12,0" ToolTipService.ToolTip="Play now" AutomationProperties.Name="Play now">
-                        <FontIcon Glyph="&#xE768;" FontSize="14"/>
-                      </Button>
-                    </Grid>
-                  </DataTemplate>
-                </GridView.ItemTemplate>
-              </GridView>
+          <StackPanel Spacing="28" Padding="12,0,12,24">
+            <StackPanel Spacing="4">
+              <TextBlock x:Name="HomeGreeting" Text="Good day" Style="{StaticResource AuroraTitleStyle}" FontSize="34"/>
+              <TextBlock Text="What shall we play today?" Style="{StaticResource AuroraSubtitleStyle}" FontSize="15"/>
             </StackPanel>
-            <local:Shelf x:Name="HomeTimeShelf" Visibility="Collapsed" ItemClick="OnItemClick" Subtitle="Playlists that fit the moment."/>
-            <local:Shelf x:Name="HomePlaylistsShelf" Visibility="Collapsed" ItemClick="OnItemClick"/>
+            <Grid x:Name="FeaturedGrid" ColumnSpacing="20" RowSpacing="20" Visibility="Collapsed">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <local:FeaturedCard x:Name="FeaturedOne" Visibility="Collapsed" OpenRequested="OnFeaturedOpen"
+                                  PlayRequested="OnFeaturedPlay" ShuffleRequested="OnFeaturedShuffle"/>
+              <local:FeaturedCard x:Name="FeaturedTwo" Grid.Column="1" Visibility="Collapsed" OpenRequested="OnFeaturedOpen"
+                                  PlayRequested="OnFeaturedPlay" ShuffleRequested="OnFeaturedShuffle"/>
+            </Grid>
+            <local:Shelf x:Name="HomeRecentPlaylistsShelf" Visibility="Collapsed" ItemClick="OnItemClick"
+                         Title="Recently played" RowHeight="228"/>
+            <local:Shelf x:Name="HomeMadeForYouShelf" Visibility="Collapsed" ItemClick="OnItemClick"
+                         Title="Made for you"/>
+            <local:Shelf x:Name="HomeRotationShelf" Visibility="Collapsed" ItemClick="OnItemClick" ShowAll="OnShelfShowAll"
+                         ShowAllTarget="playlist"/>
+            <local:Shelf x:Name="HomeNewPlaylistsShelf" Visibility="Collapsed" ItemClick="OnItemClick" ShowAll="OnShelfShowAll"
+                         ShowAllTarget="playlist" Title="Recently added" Subtitle="Fresh additions to your playlists."/>
             <local:Shelf x:Name="HomeRecentShelf" Visibility="Collapsed" ItemClick="OnItemClick"
                          Title="Jump back in" Subtitle="Albums and tracks you listened to recently."/>
-            <local:Shelf x:Name="HomeNewPlaylistsShelf" Visibility="Collapsed" ItemClick="OnItemClick"
-                         Title="Recently added playlists" Subtitle="Fresh additions to your collection."/>
-            <local:Shelf x:Name="HomeTopTracksShelf" Visibility="Collapsed" ItemClick="OnItemClick"
-                         Title="On repeat" Subtitle="The tracks you play most."/>
-            <local:Shelf x:Name="HomeSimilarShelf" Visibility="Collapsed" ItemClick="OnItemClick"
-                         Title="Artists you may like" Subtitle="Discover artists connected to what you listen to."/>
-            <local:Shelf x:Name="HomeAlbumShelf" Visibility="Collapsed" ItemClick="OnItemClick"
-                         Title="From your library" Subtitle="Albums you've added to Music Assistant."/>
           </StackPanel>
         </ScrollViewer>
 
-        <!-- Shared virtualized grid cards for albums, artists, tracks and playlists. -->
-        <GridView x:Name="AlbumGrid" Grid.Row="2" IsItemClickEnabled="True" SelectionMode="None"
-                  ItemClick="OnItemClick" Visibility="Collapsed"
-                  HorizontalContentAlignment="Stretch" AutomationProperties.Name="Library grid">
-          <GridView.ItemTemplate>
-            <DataTemplate x:DataType="local:ListRow">
-              <!-- Four full-size covers fit at the default desktop width; GridView wraps naturally on resize. -->
-              <Border Width="208" Padding="10" CornerRadius="15" Background="Transparent"
-                      Margin="4" AutomationProperties.Name="{x:Bind Title}">
-                <StackPanel Spacing="6">
-                  <Grid Width="188" Height="188">
-                    <Border CornerRadius="12" Background="{StaticResource AuroraHeroGradient}">
-                      <Grid>
-                        <FontIcon Glyph="&#xE8D6;" Foreground="{StaticResource AuroraMuted}" FontSize="36"
-                                  Opacity="0.5" Visibility="{x:Bind PlaceholderVisibility}"/>
-                        <Image Source="{x:Bind Image}" Stretch="UniformToFill"/>
-                      </Grid>
-                    </Border>
-                    <Button Tag="{x:Bind}" Click="OnRowMenu" Visibility="{x:Bind MenuVisibility}"
-                            Style="{StaticResource AuroraButtonStyle}" HorizontalAlignment="Right" VerticalAlignment="Top"
-                            Margin="0,7,7,0" Width="35" Height="35" Padding="7"
-                            ToolTipService.ToolTip="More playback options" AutomationProperties.Name="More playback options">
-                      <FontIcon Glyph="&#xE712;" FontSize="14"/>
-                    </Button>
-                    <Button Tag="{x:Bind}" Click="OnCardPlay" Visibility="{x:Bind MenuVisibility}"
-                            Style="{StaticResource AuroraPrimaryButtonStyle}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                            Margin="0,0,8,8" Width="42" Height="42" Padding="8"
-                            ToolTipService.ToolTip="Play now" AutomationProperties.Name="Play album or track">
-                      <FontIcon Glyph="&#xE768;" FontSize="20"/>
-                    </Button>
-                  </Grid>
-                  <TextBlock Text="{x:Bind Title}" FontSize="13" FontWeight="SemiBold"
-                             Foreground="{StaticResource AuroraText}" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"
-                             MaxLines="2" MinHeight="34" ToolTipService.ToolTip="{x:Bind Title}"/>
-                  <TextBlock Text="{x:Bind Subtitle}" Style="{StaticResource AuroraSubtitleStyle}" FontSize="11"
-                             MaxLines="1" ToolTipService.ToolTip="{x:Bind Subtitle}"/>
-                </StackPanel>
-              </Border>
-            </DataTemplate>
-          </GridView.ItemTemplate>
-        </GridView>
+        <!-- Library, playlists, artists: a virtualised grid of cards. -->
+        <GridView x:Name="AlbumGrid" Grid.Row="2" IsItemClickEnabled="True" SelectionMode="None" Margin="-12,0,-12,0"
+                  ItemClick="OnItemClick" Visibility="Collapsed" ItemTemplate="{StaticResource CardTemplate}"
+                  ItemContainerStyle="{StaticResource AuroraGridItemStyle}" HorizontalContentAlignment="Stretch"
+                  Padding="0,0,0,16" AutomationProperties.Name="Library grid"/>
 
         <ListView x:Name="List" Grid.Row="2" IsItemClickEnabled="True" SelectionMode="None" ItemClick="OnItemClick"
-                  AutomationProperties.Name="Library and queue items">
-          <ListView.ItemTemplate>
-            <DataTemplate x:DataType="local:ListRow">
-              <Grid Padding="9,7" ColumnSpacing="13" MinHeight="66">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
-                  <ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{x:Bind PositionLabel}" Visibility="{x:Bind PositionVisibility}"
-                           Width="25" TextAlignment="Right" VerticalAlignment="Center"
-                           Foreground="{StaticResource AuroraMuted}" FontSize="12"/>
-                <Border Grid.Column="1" Width="54" Height="54" CornerRadius="10" Background="{StaticResource AuroraCard}">
-                  <Grid>
-                    <FontIcon Glyph="&#xE8D6;" Opacity="0.5" Visibility="{x:Bind PlaceholderVisibility}" Foreground="{StaticResource AuroraMuted}"/>
-                    <Image Source="{x:Bind Image}" Stretch="UniformToFill"/>
-                  </Grid>
-                </Border>
-                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="4">
-                  <TextBlock Text="{x:Bind Title}" TextTrimming="CharacterEllipsis" MaxLines="1"
-                             Foreground="{StaticResource AuroraText}" FontWeight="{x:Bind Weight}" ToolTipService.ToolTip="{x:Bind Title}"/>
-                  <TextBlock Text="{x:Bind Subtitle}" Style="{StaticResource AuroraSubtitleStyle}" MaxLines="1"/>
-                </StackPanel>
-                <TextBlock Grid.Column="3" Text="{x:Bind DurationLabel}" Visibility="{x:Bind DurationVisibility}"
-                           Foreground="{StaticResource AuroraMuted}" FontSize="12" VerticalAlignment="Center"
-                           Margin="0,0,10,0"/>
-                <Button Grid.Column="4" Tag="{x:Bind}" Click="OnRowMenu" Visibility="{x:Bind MenuVisibility}"
-                        ToolTipService.ToolTip="Play options" VerticalAlignment="Center"
-                        Style="{StaticResource AuroraButtonStyle}" Padding="10">
-                  <FontIcon Glyph="&#xE712;" FontSize="14"/>
-                </Button>
-              </Grid>
-            </DataTemplate>
-          </ListView.ItemTemplate>
-        </ListView>
-        <!-- Distinct loading/empty/error surfaces keep the page understandable at all DPI settings. -->
+                  ItemTemplate="{StaticResource RowTemplate}" ItemContainerStyle="{StaticResource AuroraListItemStyle}"
+                  Margin="-10,0,-10,0" Padding="0,0,0,16" AutomationProperties.Name="Library and queue items"/>
+
+        <!-- Loading, empty and error surfaces. -->
         <StackPanel x:Name="LoadingState" Grid.Row="2" Visibility="Collapsed" Spacing="22"
-                    HorizontalAlignment="Stretch" VerticalAlignment="Top" Padding="8,16,8,0"
+                    HorizontalAlignment="Stretch" VerticalAlignment="Top" Padding="0,8,0,0"
                     AutomationProperties.LiveSetting="Polite">
           <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-            <ProgressRing x:Name="Busy" IsActive="False" Width="26" Height="26"
+            <ProgressRing x:Name="Busy" IsActive="False" Width="24" Height="24"
                           Foreground="{StaticResource AuroraAccent}" AutomationProperties.Name="Loading music"/>
-            <StackPanel Spacing="3" VerticalAlignment="Center">
-              <TextBlock x:Name="LoadingLabel" Text="Loading your music…" FontSize="15" FontWeight="SemiBold"
-                         Foreground="{StaticResource AuroraText}"/>
-              <TextBlock Text="Getting everything ready from Music Assistant" FontSize="12"
-                         Foreground="{StaticResource AuroraMuted}"/>
-            </StackPanel>
+            <TextBlock x:Name="LoadingLabel" Text="Loading your music…" FontSize="15" FontWeight="SemiBold"
+                       Foreground="{StaticResource AuroraText}" VerticalAlignment="Center"/>
           </StackPanel>
-          <!-- Stable placeholders avoid a blank page while MA fetches its library. -->
-          <StackPanel Orientation="Horizontal" Spacing="14" Opacity="0.7">
-            <Border Width="148" Height="185" CornerRadius="14" Background="{StaticResource AuroraCardSoft}"
-                    BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1">
-              <StackPanel Spacing="10" Padding="10">
-                <Border Height="120" CornerRadius="9" Background="{StaticResource AuroraAccentSoft}"/>
-                <Border Height="9" Width="100" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraBorder}"/>
-                <Border Height="7" Width="64" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraBorder}"/>
-              </StackPanel>
-            </Border>
-            <Border Width="148" Height="185" CornerRadius="14" Background="{StaticResource AuroraCardSoft}"
-                    BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1">
-              <StackPanel Spacing="10" Padding="10">
-                <Border Height="120" CornerRadius="9" Background="{StaticResource AuroraAccentSoft}"/>
-                <Border Height="9" Width="94" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraBorder}"/>
-                <Border Height="7" Width="78" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraBorder}"/>
-              </StackPanel>
-            </Border>
-            <Border Width="148" Height="185" CornerRadius="14" Background="{StaticResource AuroraCardSoft}"
-                    BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1">
-              <StackPanel Spacing="10" Padding="10">
-                <Border Height="120" CornerRadius="9" Background="{StaticResource AuroraAccentSoft}"/>
-                <Border Height="9" Width="112" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraBorder}"/>
-                <Border Height="7" Width="58" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraBorder}"/>
-              </StackPanel>
-            </Border>
+          <StackPanel x:Name="SkeletonRow" Orientation="Horizontal" Spacing="16">
+            <StackPanel Spacing="10" Width="164"><Border Height="164" CornerRadius="10" Background="{StaticResource AuroraCardSoft}"/><Border Height="10" Width="120" HorizontalAlignment="Left" CornerRadius="5" Background="{StaticResource AuroraCardSoft}"/><Border Height="8" Width="80" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraCardSoft}"/></StackPanel>
+            <StackPanel Spacing="10" Width="164"><Border Height="164" CornerRadius="10" Background="{StaticResource AuroraCardSoft}"/><Border Height="10" Width="100" HorizontalAlignment="Left" CornerRadius="5" Background="{StaticResource AuroraCardSoft}"/><Border Height="8" Width="90" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraCardSoft}"/></StackPanel>
+            <StackPanel Spacing="10" Width="164"><Border Height="164" CornerRadius="10" Background="{StaticResource AuroraCardSoft}"/><Border Height="10" Width="130" HorizontalAlignment="Left" CornerRadius="5" Background="{StaticResource AuroraCardSoft}"/><Border Height="8" Width="70" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraCardSoft}"/></StackPanel>
+            <StackPanel Spacing="10" Width="164"><Border Height="164" CornerRadius="10" Background="{StaticResource AuroraCardSoft}"/><Border Height="10" Width="110" HorizontalAlignment="Left" CornerRadius="5" Background="{StaticResource AuroraCardSoft}"/><Border Height="8" Width="84" HorizontalAlignment="Left" CornerRadius="4" Background="{StaticResource AuroraCardSoft}"/></StackPanel>
           </StackPanel>
-          <ProgressBar IsIndeterminate="True" Height="3" Foreground="{StaticResource AuroraAccent}"
-                       Background="{StaticResource AuroraCardSoft}" HorizontalAlignment="Stretch"
-                       AutomationProperties.Name="Loading progress"/>
         </StackPanel>
         <Border x:Name="EmptyState" Grid.Row="2" Visibility="Collapsed" HorizontalAlignment="Center"
-                VerticalAlignment="Center" MaxWidth="410" Padding="30,24" CornerRadius="18"
-                Background="{StaticResource AuroraSurfaceRaised}" BorderBrush="{StaticResource AuroraBorder}"
-                BorderThickness="1">
+                VerticalAlignment="Center" MaxWidth="420" Padding="32,26" CornerRadius="20"
+                Background="{StaticResource AuroraCardSoft}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1">
           <StackPanel Spacing="11" HorizontalAlignment="Center">
-            <FontIcon Glyph="&#xE8D6;" FontSize="29" Foreground="{StaticResource AuroraAccent}"
-                      HorizontalAlignment="Center"/>
+            <FontIcon Glyph="&#xE8D6;" FontSize="30" Foreground="{StaticResource AuroraAccent}" HorizontalAlignment="Center"/>
             <TextBlock x:Name="EmptyText" Text="Nothing here yet" FontSize="17" FontWeight="SemiBold"
                        Foreground="{StaticResource AuroraText}" TextAlignment="Center" TextWrapping="Wrap"/>
             <TextBlock x:Name="EmptyDetail" Text="Your music will appear here." Style="{StaticResource AuroraStatusTextStyle}"
-                       MaxWidth="310" TextAlignment="Center"/>
+                       MaxWidth="320" TextAlignment="Center"/>
             <Button x:Name="RetryButton" Content="Try again" Visibility="Collapsed" Click="OnRetry"
                     HorizontalAlignment="Center" Margin="0,6,0,0"
                     Style="{StaticResource AuroraPrimaryButtonStyle}" AutomationProperties.Name="Retry loading music"/>
@@ -421,88 +421,103 @@
         </Border>
       </Grid>
     </Grid>
-    <!-- Persistent transport: local Sendspin state or the selected remote Music Assistant queue. -->
-    <Border Grid.Column="1" Grid.Row="1" Background="{StaticResource AuroraSidebar}"
-            BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,1,0,0" Padding="15,6">
-      <Grid RowSpacing="3">
-        <Grid.RowDefinitions><RowDefinition Height="30"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-        <Grid ColumnSpacing="8">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="35"/><ColumnDefinition Width="*"/><ColumnDefinition Width="35"/>
-          </Grid.ColumnDefinitions>
-          <TextBlock x:Name="FooterElapsed" Text="0:00" FontSize="10" Foreground="{StaticResource AuroraMuted}"
-                     VerticalAlignment="Center"/>
-          <Slider x:Name="FooterSeekSlider" Grid.Column="1" Minimum="0" Maximum="1" IsEnabled="False"
-                  IsThumbToolTipEnabled="False" ValueChanged="OnFooterSeekChanged"
-                  AutomationProperties.Name="Track position" VerticalAlignment="Center"/>
-          <TextBlock x:Name="FooterDuration" Grid.Column="2" Text="—" FontSize="10" TextAlignment="Right"
-                     Foreground="{StaticResource AuroraMuted}" VerticalAlignment="Center"/>
-        </Grid>
-        <Grid Grid.Row="1" ColumnSpacing="12">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
-          </Grid.ColumnDefinitions>
-          <Button Grid.Column="0" Tag="now" Click="OnNavigate" Style="{StaticResource AuroraButtonStyle}"
-                  Padding="0" CornerRadius="10" ToolTipService.ToolTip="Open now playing"
-                  AutomationProperties.Name="Open now playing">
-            <Border Width="50" Height="50" CornerRadius="9" Background="{StaticResource AuroraHeroGradient}">
+
+    <!-- Playback bar: track, transport and progress, output options. Always visible, full width. -->
+    <Border x:Name="PlayerBar" Grid.Row="2" Grid.ColumnSpan="2" Background="{StaticResource AuroraPlayerBar}"
+            BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,1,0,0">
+      <Grid Padding="20,10" ColumnSpacing="20" MinHeight="92">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" MinWidth="150"/><ColumnDefinition Width="2*" MaxWidth="640"/><ColumnDefinition Width="*" MinWidth="120"/>
+        </Grid.ColumnDefinitions>
+
+        <Grid Grid.Column="0" ColumnSpacing="14">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <Button Tag="now" Click="OnNavigate" Style="{StaticResource AuroraButtonStyle}" Padding="0" CornerRadius="10"
+                  BorderThickness="0" Background="Transparent" VerticalAlignment="Center"
+                  ToolTipService.ToolTip="Open now playing" AutomationProperties.Name="Open now playing">
+            <Border Width="60" Height="60" CornerRadius="10" Background="{StaticResource AuroraHeroGradient}">
               <Grid>
-                <FontIcon Glyph="&#xE8D6;" Foreground="{StaticResource AuroraMuted}"/>
+                <FontIcon Glyph="&#xE8D6;" Foreground="{StaticResource AuroraMuted}" Opacity="0.6"/>
                 <Image x:Name="FooterArtwork" Stretch="UniformToFill"/>
               </Grid>
             </Border>
           </Button>
           <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
-            <TextBlock x:Name="FooterTitle" Text="Nothing playing" Foreground="{StaticResource AuroraText}" FontSize="12"
+            <TextBlock x:Name="FooterTitle" Text="Nothing playing" Foreground="{StaticResource AuroraText}" FontSize="14"
                        FontWeight="SemiBold" TextTrimming="CharacterEllipsis" MaxLines="1"/>
-            <TextBlock x:Name="FooterArtist" Text="Choose a player" Style="{StaticResource AuroraSubtitleStyle}" FontSize="11" MaxLines="1"/>
-            <TextBlock x:Name="FooterState" Text="Idle" AutomationProperties.LiveSetting="Polite" Foreground="{StaticResource AuroraGood}" FontSize="10"
-                       TextTrimming="CharacterEllipsis" MaxLines="1"/>
+            <TextBlock x:Name="FooterArtist" Text="Choose a player" Style="{StaticResource AuroraSubtitleStyle}" FontSize="12" MaxLines="1"/>
+            <TextBlock x:Name="FooterState" Text="Idle" AutomationProperties.LiveSetting="Polite" Foreground="{StaticResource AuroraGood}"
+                       FontSize="10" TextTrimming="CharacterEllipsis" MaxLines="1"/>
           </StackPanel>
-          <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="3">
-            <Button x:Name="FooterShuffleButton" Click="OnFooterShuffle" ToolTipService.ToolTip="Shuffle"
-                    AutomationProperties.Name="Toggle shuffle" Style="{StaticResource AuroraButtonStyle}" Padding="7" IsEnabled="False">
-              <FontIcon x:Name="FooterShuffleIcon" Glyph="&#xE8B1;" FontSize="14"/>
+        </Grid>
+
+        <Grid Grid.Column="1" RowSpacing="4" VerticalAlignment="Center">
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+            <Button x:Name="FooterShuffleButton" Click="OnFooterShuffle" ToolTipService.ToolTip="Shuffle" IsEnabled="False"
+                    AutomationProperties.Name="Toggle shuffle" Style="{StaticResource AuroraIconButtonStyle}">
+              <FontIcon x:Name="FooterShuffleIcon" Glyph="&#xE8B1;" FontSize="15"/>
             </Button>
             <Button x:Name="FooterPreviousButton" Click="OnQueuePrevious" ToolTipService.ToolTip="Previous"
-                    AutomationProperties.Name="Previous" Style="{StaticResource AuroraButtonStyle}" Padding="8">
-              <FontIcon Glyph="&#xE892;"/>
+                    AutomationProperties.Name="Previous" Style="{StaticResource AuroraIconButtonStyle}" Foreground="{StaticResource AuroraText}">
+              <FontIcon Glyph="&#xE892;" FontSize="16"/>
             </Button>
             <Button x:Name="FooterPlayPauseButton" Click="OnQueuePlayPause" ToolTipService.ToolTip="Play or pause"
-                    AutomationProperties.Name="Play or pause" Style="{StaticResource AuroraPrimaryButtonStyle}" Padding="11">
+                    AutomationProperties.Name="Play or pause" Style="{StaticResource AuroraPlayButtonStyle}">
               <Grid Width="28" Height="28">
                 <Ellipse x:Name="FooterPlayPauseTrack" Visibility="Collapsed" Width="26" Height="26"
-                         Stroke="#7899CB" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                <FontIcon x:Name="FooterPlayPauseIcon" Glyph="&#xE768;" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                         Stroke="#B3A8FF" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <FontIcon x:Name="FooterPlayPauseIcon" Glyph="&#xE768;" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 <ProgressRing x:Name="FooterPlayPauseSpinner" IsActive="False" Visibility="Collapsed"
-                              Foreground="#F5FBFF" Width="28" Height="28"/>
+                              Foreground="White" Width="28" Height="28"/>
               </Grid>
             </Button>
             <Button x:Name="FooterNextButton" Click="OnQueueNext" ToolTipService.ToolTip="Next"
-                    AutomationProperties.Name="Next" Style="{StaticResource AuroraButtonStyle}" Padding="8">
-              <FontIcon Glyph="&#xE893;"/>
+                    AutomationProperties.Name="Next" Style="{StaticResource AuroraIconButtonStyle}" Foreground="{StaticResource AuroraText}">
+              <FontIcon Glyph="&#xE893;" FontSize="16"/>
             </Button>
-            <Button x:Name="FooterRepeatButton" Click="OnFooterRepeat" ToolTipService.ToolTip="Repeat"
-                    AutomationProperties.Name="Cycle repeat mode" Style="{StaticResource AuroraButtonStyle}" Padding="7" IsEnabled="False">
-              <FontIcon x:Name="FooterRepeatIcon" Glyph="&#xE8EE;" FontSize="14"/>
+            <Button x:Name="FooterRepeatButton" Click="OnFooterRepeat" ToolTipService.ToolTip="Repeat" IsEnabled="False"
+                    AutomationProperties.Name="Cycle repeat mode" Style="{StaticResource AuroraIconButtonStyle}">
+              <FontIcon x:Name="FooterRepeatIcon" Glyph="&#xE8EE;" FontSize="15"/>
             </Button>
           </StackPanel>
-          <StackPanel x:Name="FooterVolumeGroup" Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
+          <Grid Grid.Row="1" ColumnSpacing="10">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="42"/><ColumnDefinition Width="*"/><ColumnDefinition Width="42"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="FooterElapsed" Text="0:00" FontSize="11" Foreground="{StaticResource AuroraMuted}"
+                       VerticalAlignment="Center" TextAlignment="Right"/>
+            <Slider x:Name="FooterSeekSlider" Grid.Column="1" Minimum="0" Maximum="1" IsEnabled="False"
+                    IsThumbToolTipEnabled="False" ValueChanged="OnFooterSeekChanged"
+                    AutomationProperties.Name="Track position" VerticalAlignment="Center"/>
+            <TextBlock x:Name="FooterDuration" Grid.Column="2" Text="—" FontSize="11"
+                       Foreground="{StaticResource AuroraMuted}" VerticalAlignment="Center"/>
+          </Grid>
+        </Grid>
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="4">
+          <Button x:Name="FooterDeviceButton" Click="OnTargetButtonClick" Style="{StaticResource AuroraIconButtonStyle}"
+                  ToolTipService.ToolTip="Output device" AutomationProperties.Name="Choose output device">
+            <FontIcon Glyph="&#xE7F4;" FontSize="16"/>
+          </Button>
+          <StackPanel x:Name="FooterVolumeGroup" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
             <Button x:Name="FooterMuteButton" Click="OnFooterMute" ToolTipService.ToolTip="Mute or unmute"
-                    AutomationProperties.Name="Mute or unmute" Style="{StaticResource AuroraButtonStyle}" Padding="7">
-              <FontIcon x:Name="FooterMuteIcon" Glyph="&#xE767;" FontSize="15"/>
+                    AutomationProperties.Name="Mute or unmute" Style="{StaticResource AuroraIconButtonStyle}">
+              <FontIcon x:Name="FooterMuteIcon" Glyph="&#xE767;" FontSize="16"/>
             </Button>
-            <Slider x:Name="FooterVolumeSlider" Width="83" Minimum="0" Maximum="100" IsEnabled="False"
+            <Slider x:Name="FooterVolumeSlider" Width="104" Minimum="0" Maximum="100" IsEnabled="False"
                     ValueChanged="OnFooterVolumeChanged" AutomationProperties.Name="Player volume"
                     VerticalAlignment="Center"/>
           </StackPanel>
-          <Button Grid.Column="4" Tag="queue" Click="OnNavigate" Style="{StaticResource AuroraButtonStyle}"
-                  VerticalAlignment="Center" Padding="9" ToolTipService.ToolTip="Open queue"
-                  AutomationProperties.Name="Open queue">
+          <Button Tag="queue" Click="OnNavigate" Style="{StaticResource AuroraIconButtonStyle}"
+                  ToolTipService.ToolTip="Open queue" AutomationProperties.Name="Open queue">
             <FontIcon Glyph="&#xE8FD;" FontSize="16"/>
           </Button>
-        </Grid>
+          <Button x:Name="FooterExpandButton" Tag="now" Click="OnNavigate" Style="{StaticResource AuroraIconButtonStyle}"
+                  ToolTipService.ToolTip="Open now playing" AutomationProperties.Name="Expand now playing">
+            <FontIcon Glyph="&#xE740;" FontSize="15"/>
+          </Button>
+        </StackPanel>
       </Grid>
     </Border>
   </Grid>

@@ -10,10 +10,10 @@
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <StackPanel Spacing="5">
           <TextBlock Text="Settings" Style="{StaticResource AuroraTitleStyle}"/>
-          <TextBlock Text="Make ma·satellite sound and behave the way you want." Style="{StaticResource AuroraSubtitleStyle}"/>
+          <TextBlock Text="Make MA-Satellite sound and behave the way you want." Style="{StaticResource AuroraSubtitleStyle}"/>
         </StackPanel>
         <Border Grid.Column="1" Padding="12,6" CornerRadius="14" Background="{StaticResource AuroraCard}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" VerticalAlignment="Center">
-          <TextBlock Text="MA · SATELLITE" FontSize="11" CharacterSpacing="90" FontWeight="SemiBold" Foreground="{StaticResource AuroraAccent}"/>
+          <TextBlock Text="MA-SATELLITE" FontSize="11" CharacterSpacing="90" FontWeight="SemiBold" Foreground="{StaticResource AuroraAccent}"/>
         </Border>
       </Grid>
     </Border>

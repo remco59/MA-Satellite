@@ -22,6 +22,37 @@ public sealed partial class Shelf : UserControl
 
     public event ItemClickEventHandler? ItemClick;
 
+    /// <summary>Raised with <see cref="ShowAllTarget"/> when the "Show all" link is used.</summary>
+    public event EventHandler<string>? ShowAll;
+
+    /// <summary>Navigation tab the "Show all" link opens. Empty hides the link.</summary>
+    public string ShowAllTarget
+    {
+        get => _showAllTarget;
+        set
+        {
+            _showAllTarget = value;
+            ShowAllButton.Visibility = string.IsNullOrEmpty(value) ? Visibility.Collapsed : Visibility.Visible;
+        }
+    }
+
+    private string _showAllTarget = string.Empty;
+
+    /// <summary>Height of the card row; compact cards need less than standard ones.</summary>
+    public double RowHeight
+    {
+        get => Items.Height;
+        set => Items.Height = value;
+    }
+
+    private void OnShowAll(object sender, RoutedEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_showAllTarget))
+        {
+            ShowAll?.Invoke(this, _showAllTarget);
+        }
+    }
+
     public string Title
     {
         get => TitleText.Text;

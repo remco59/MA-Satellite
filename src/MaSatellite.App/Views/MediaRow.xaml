@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+  x:Class="MaSatellite.App.Views.MediaRow"
+  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- One line of a track/queue/search list: position, artwork, title and artist, duration, actions. -->
+  <Grid x:Name="Root" Padding="10,6" ColumnSpacing="14" MinHeight="64" CornerRadius="12" Background="Transparent"
+        PointerEntered="OnPointerEntered" PointerExited="OnPointerExited"
+        GotFocus="OnGotFocus" LostFocus="OnLostFocus" RightTapped="OnRightTapped">
+    <Grid.BackgroundTransition>
+      <BrushTransition Duration="0:0:0.15"/>
+    </Grid.BackgroundTransition>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/>
+      <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
+    </Grid.ColumnDefinitions>
+    <Grid Grid.Column="0" Width="26" VerticalAlignment="Center">
+      <TextBlock x:Name="PositionText" TextAlignment="Right" Foreground="{StaticResource AuroraMuted}" FontSize="12"/>
+      <FontIcon x:Name="NowIcon" Glyph="&#xE767;" FontSize="14" Foreground="{StaticResource AuroraAccent}"
+                HorizontalAlignment="Right" Visibility="Collapsed"/>
+    </Grid>
+    <Grid Grid.Column="1" Width="48" Height="48">
+      <Rectangle RadiusX="8" RadiusY="8" Fill="{StaticResource AuroraCard}"/>
+      <FontIcon x:Name="Placeholder" Glyph="&#xE8D6;" FontSize="18" Foreground="{StaticResource AuroraMuted}" Opacity="0.5"/>
+      <Rectangle x:Name="ArtRect" RadiusX="8" RadiusY="8"/>
+      <Button x:Name="PlayButton" Click="OnPlayClick" Style="{StaticResource AuroraIconButtonStyle}"
+              Background="#B30B1020" Foreground="White" Width="48" Height="48" MinHeight="48" CornerRadius="8" Opacity="0"
+              ToolTipService.ToolTip="Play now" AutomationProperties.Name="Play now">
+        <Button.OpacityTransition><ScalarTransition Duration="0:0:0.15"/></Button.OpacityTransition>
+        <FontIcon Glyph="&#xE768;" FontSize="16"/>
+      </Button>
+    </Grid>
+    <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="3">
+      <TextBlock x:Name="TitleText" TextTrimming="CharacterEllipsis" MaxLines="1" Foreground="{StaticResource AuroraText}" FontSize="14"/>
+      <TextBlock x:Name="SubtitleText" Style="{StaticResource AuroraSubtitleStyle}" MaxLines="1"/>
+    </StackPanel>
+    <TextBlock x:Name="DurationText" Grid.Column="3" Foreground="{StaticResource AuroraMuted}" FontSize="12"
+               VerticalAlignment="Center" Margin="0,0,6,0"/>
+    <Button x:Name="MenuButton" Grid.Column="4" Click="OnMenuClick" Style="{StaticResource AuroraIconButtonStyle}" Opacity="0"
+            VerticalAlignment="Center" ToolTipService.ToolTip="More options" AutomationProperties.Name="More options">
+      <Button.OpacityTransition><ScalarTransition Duration="0:0:0.15"/></Button.OpacityTransition>
+      <FontIcon Glyph="&#xE712;" FontSize="14"/>
+    </Button>
+  </Grid>
+</UserControl>
