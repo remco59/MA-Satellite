@@ -35,7 +35,7 @@
   var state = null;          // last NowPlaying payload from the API
   var fallback = null;       // last livelyCurrentTrack payload
   var lastArtUrl = null;
-  var diag = '';             // why the last connection attempt failed, shown while disconnected
+  var diag = ' (v3)';           // why the last connection attempt failed, shown while disconnected
 
   function formatTime(ms) {
     var total = Math.max(0, Math.floor(ms / 1000));
