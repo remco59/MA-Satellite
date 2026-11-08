@@ -19,10 +19,10 @@
         <ColumnDefinition Width="Auto"/>
       </Grid.ColumnDefinitions>
       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-        <Border Background="{StaticResource AuroraAccentGradient}" CornerRadius="5" Width="19" Height="19">
-          <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE8D6;" FontSize="11" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        <Border Background="{StaticResource AuroraAccentGradient}" CornerRadius="{StaticResource AuroraRadiusS}" Width="19" Height="19">
+          <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE8D6;" FontSize="12" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
-        <TextBlock Text="MA-Satellite" FontWeight="Bold" Foreground="{StaticResource AuroraText}" FontSize="14" VerticalAlignment="Center"/>
+        <TextBlock Text="MA-Satellite" FontWeight="SemiBold" Foreground="{StaticResource AuroraText}" FontSize="14" VerticalAlignment="Center"/>
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
         <ToggleButton x:Name="NowTab" Content="Now playing" IsChecked="True" Click="OnShowNowPlaying"
@@ -35,32 +35,32 @@
     </Grid>
 
     <!-- Now playing view. Long SoundCloud descriptions are always constrained to a single line. -->
-    <Border x:Name="NowView" Grid.Row="1" Background="{StaticResource AuroraCardSoft}" BorderBrush="{StaticResource AuroraBorder}"
-            BorderThickness="1" Padding="10" CornerRadius="15">
+    <Border x:Name="NowView" Grid.Row="1" Background="{StaticResource AuroraSurface}" BorderBrush="{StaticResource AuroraBorder}"
+            BorderThickness="1" Padding="10" CornerRadius="{StaticResource AuroraRadiusM}">
       <Grid ColumnSpacing="12">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        <Border Width="102" Height="102" CornerRadius="12" Background="{StaticResource AuroraHeroGradient}">
+        <Border Width="102" Height="102" CornerRadius="{StaticResource AuroraRadiusM}" Background="{StaticResource AuroraHeroGradient}">
           <Grid>
-            <FontIcon Glyph="&#xE8D6;" FontSize="30" Foreground="{StaticResource AuroraMuted}" Opacity="0.6"/>
+            <FontIcon Glyph="&#xE8D6;" FontSize="32" Foreground="{StaticResource AuroraMuted}" Opacity="0.6"/>
             <Image x:Name="ArtworkImage" Stretch="UniformToFill"/>
           </Grid>
         </Border>
         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
-          <TextBlock x:Name="TitleText" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource AuroraText}"
+          <TextBlock x:Name="TitleText" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource AuroraText}"
                      TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2"/>
-          <TextBlock x:Name="ArtistText" FontSize="13" Foreground="{StaticResource AuroraMuted}" TextTrimming="CharacterEllipsis" MaxLines="1"/>
-          <TextBlock x:Name="AlbumText" FontSize="11" Foreground="{StaticResource AuroraMuted}" Opacity="0.8"
+          <TextBlock x:Name="ArtistText" FontSize="12" Foreground="{StaticResource AuroraMuted}" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+          <TextBlock x:Name="AlbumText" FontSize="12" Foreground="{StaticResource AuroraMuted}" Opacity="0.8"
                      TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" MaxLines="1"/>
         </StackPanel>
       </Grid>
     </Border>
 
     <!-- Queue view: same slot as the now playing card, so the window never changes size. -->
-    <Border x:Name="QueueView" Grid.Row="1" Visibility="Collapsed" Background="{StaticResource AuroraCardSoft}"
-            BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" CornerRadius="15">
+    <Border x:Name="QueueView" Grid.Row="1" Visibility="Collapsed" Background="{StaticResource AuroraSurface}"
+            BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" CornerRadius="{StaticResource AuroraRadiusM}">
       <Grid>
         <ListView x:Name="QueueList" ItemContainerStyle="{StaticResource AuroraListItemStyle}" SelectionMode="None"
                   IsItemClickEnabled="True" ItemClick="OnQueueItemClick" Padding="4"
@@ -73,12 +73,12 @@
                   <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center">
-                  <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="{Binding Weight}" Foreground="{StaticResource AuroraText}"
+                  <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="{Binding Weight}" Foreground="{StaticResource AuroraText}"
                              TextTrimming="CharacterEllipsis" MaxLines="1"/>
-                  <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="{StaticResource AuroraMuted}"
+                  <TextBlock Text="{Binding Subtitle}" FontSize="12" Foreground="{StaticResource AuroraMuted}"
                              TextTrimming="CharacterEllipsis" MaxLines="1"/>
                 </StackPanel>
-                <TextBlock Grid.Column="1" Text="{Binding DurationLabel}" FontSize="11" Foreground="{StaticResource AuroraMuted}"
+                <TextBlock Grid.Column="1" Text="{Binding DurationLabel}" FontSize="12" Foreground="{StaticResource AuroraMuted}"
                            VerticalAlignment="Center"/>
               </Grid>
             </DataTemplate>
@@ -96,8 +96,8 @@
       <Slider x:Name="SeekSlider" Minimum="0" Maximum="1" IsThumbToolTipEnabled="False" ValueChanged="OnSeekChanged"
               AutomationProperties.Name="Track position"/>
       <Grid Grid.Row="1">
-        <TextBlock x:Name="ElapsedText" Text="0:00" Foreground="{StaticResource AuroraMuted}" FontSize="11"/>
-        <TextBlock x:Name="TotalText" Text="0:00" Foreground="{StaticResource AuroraMuted}" FontSize="11" HorizontalAlignment="Right"/>
+        <TextBlock x:Name="ElapsedText" Text="0:00" Foreground="{StaticResource AuroraMuted}" FontSize="12"/>
+        <TextBlock x:Name="TotalText" Text="0:00" Foreground="{StaticResource AuroraMuted}" FontSize="12" HorizontalAlignment="Right"/>
       </Grid>
     </Grid>
 
@@ -111,7 +111,7 @@
               ToolTipService.ToolTip="Play or pause" AutomationProperties.Name="Play or pause">
         <Grid Width="28" Height="28">
           <Ellipse x:Name="PlayPauseTrack" Visibility="Collapsed" Width="26" Height="26"
-                   Stroke="#C4B5FD" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                   Stroke="{StaticResource AuroraAccentLight}" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
           <FontIcon x:Name="PlayPauseIcon" Glyph="&#xE768;" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
           <ProgressRing x:Name="PlayPauseSpinner" IsActive="False" Visibility="Collapsed"
                         Foreground="White" Width="28" Height="28"/>
