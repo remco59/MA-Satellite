@@ -114,6 +114,43 @@ public sealed class LibraryController
         await client.SetPlayerMutedAsync(target.QueueId, muted, ct).ConfigureAwait(false);
     }
 
+    /// <summary>Moves a queue item by <paramref name="positionShift"/> places (negative = up).</summary>
+    public async Task MoveQueueItemAsync(PlayTarget target, string queueItemId, int positionShift, CancellationToken ct = default)
+    {
+        var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
+        await client.MoveQueueItemAsync(target.QueueId, queueItemId, positionShift, ct).ConfigureAwait(false);
+    }
+
+    public async Task RemoveQueueItemAsync(PlayTarget target, string queueItemId, CancellationToken ct = default)
+    {
+        var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
+        await client.DeleteQueueItemAsync(target.QueueId, queueItemId, ct).ConfigureAwait(false);
+    }
+
+    public async Task ClearQueueAsync(PlayTarget target, CancellationToken ct = default)
+    {
+        var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
+        await client.ClearQueueAsync(target.QueueId, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Playlists from the library; the server rejects the add when a playlist is not editable.</summary>
+    public async Task<IReadOnlyList<MaItem>> GetPlaylistsAsync(CancellationToken ct = default)
+    {
+        var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
+        return await client.GetLibraryAsync(MaMediaType.Playlist, limit: 200, sortField: "name", ct: ct).ConfigureAwait(false);
+    }
+
+    public async Task AddToPlaylistAsync(MaItem playlist, string trackUri, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(trackUri))
+        {
+            throw new MaException("This track has no address to add to a playlist.");
+        }
+
+        var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
+        await client.AddToPlaylistAsync(playlist.ItemId, [trackUri], ct).ConfigureAwait(false);
+    }
+
     public async Task PlayQueueIndexAsync(PlayTarget target, int index, CancellationToken ct = default)
     {
         var client = await _service.GetClientAsync(ct).ConfigureAwait(false);

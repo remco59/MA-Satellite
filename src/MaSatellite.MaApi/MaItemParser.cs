@@ -124,11 +124,15 @@ public static class MaItemParser
     {
         string? subtitle = null;
         string? uri = null;
+        string? artist = null;
+        string? album = null;
         if (e.TryGetProperty("media_item", out var media) && media.ValueKind == JsonValueKind.Object)
         {
             var item = ParseItem(media, baseUrl, imageSize);
             subtitle = item.Description;
             uri = item.Uri;
+            artist = item.Subtitle;
+            album = item.AlbumName;
         }
 
         var imageUrl = ImageUrlFrom(e, "image", baseUrl, imageSize);
@@ -144,7 +148,124 @@ public static class MaItemParser
             e.TryGetProperty("duration", out var d) && d.ValueKind == JsonValueKind.Number ? d.GetInt32() : null,
             e.TryGetProperty("index", out var i) && i.ValueKind == JsonValueKind.Number ? i.GetInt32() : 0,
             imageUrl,
-            uri);
+            uri,
+            artist,
+            album);
+    }
+
+    /// <summary>
+    /// Parses a full item (from <c>music/item_by_uri</c>) into <see cref="MaItemDetails"/>. Provider payloads differ
+    /// a lot, so every field is read defensively and left null when absent.
+    /// </summary>
+    public static MaItemDetails ParseDetails(JsonElement e, string baseUrl)
+    {
+        var item = ParseItem(e, baseUrl, imageSize: 512);
+        var externalIds = ReadExternalIds(e);
+
+        var artists = new List<MaArtistRef>();
+        if (e.TryGetProperty("artists", out var arr) && arr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var a in arr.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.Object))
+            {
+                var name = Str(a, "name");
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    continue;
+                }
+
+                var ids = ReadExternalIds(a);
+                artists.Add(new MaArtistRef(name, Str(a, "item_id"), Str(a, "provider"), Str(a, "uri"),
+                    Str(a, "mbid") ?? Str(a, "musicbrainz_id") ?? ids.GetValueOrDefault("musicbrainz_artistid")));
+            }
+        }
+
+        string? albumName = null, albumUri = null, albumId = null, albumProvider = null, albumMbid = null;
+        if (e.TryGetProperty("album", out var album) && album.ValueKind == JsonValueKind.Object)
+        {
+            albumName = Str(album, "name");
+            albumUri = Str(album, "uri");
+            albumId = Str(album, "item_id");
+            albumProvider = Str(album, "provider");
+            albumMbid = Str(album, "mbid") ?? ReadExternalIds(album).GetValueOrDefault("musicbrainz_albumid");
+        }
+
+        string? plain = null, synced = null, label = null, copyright = null, release = null, description = item.Overview;
+        var links = new List<MaLink>();
+        if (e.TryGetProperty("metadata", out var meta) && meta.ValueKind == JsonValueKind.Object)
+        {
+            plain = Str(meta, "lyrics");
+            synced = Str(meta, "lrc_lyrics");
+            label = Str(meta, "label");
+            copyright = Str(meta, "copyright");
+            release = Str(meta, "release_date");
+            if (meta.TryGetProperty("links", out var l) && l.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var link in l.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.Object))
+                {
+                    if (Str(link, "url") is { Length: > 0 } url)
+                    {
+                        links.Add(new MaLink(Str(link, "type") ?? "website", url));
+                    }
+                }
+            }
+        }
+
+        return new MaItemDetails(
+            item,
+            artists,
+            albumName,
+            albumUri,
+            albumId,
+            albumProvider,
+            string.IsNullOrWhiteSpace(plain) ? null : plain,
+            string.IsNullOrWhiteSpace(synced) ? null : synced,
+            Str(e, "mbid") ?? Str(e, "musicbrainz_id") ?? externalIds.GetValueOrDefault(item.Type switch
+            {
+                MaMediaType.Track => "musicbrainz_recordingid",
+                MaMediaType.Artist => "musicbrainz_artistid",
+                MaMediaType.Album => "musicbrainz_albumid",
+                _ => "musicbrainz_id",
+            }),
+            albumMbid,
+            externalIds.GetValueOrDefault("isrc"),
+            label,
+            copyright,
+            release,
+            item.Genres ?? [],
+            description,
+            links);
+    }
+
+    /// <summary><c>external_ids</c> is a list of <c>[type, value]</c> pairs (or <c>{type, value}</c> objects) depending on the server version.</summary>
+    private static Dictionary<string, string> ReadExternalIds(JsonElement e)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (!e.TryGetProperty("external_ids", out var ids) || ids.ValueKind != JsonValueKind.Array)
+        {
+            return result;
+        }
+
+        foreach (var entry in ids.EnumerateArray())
+        {
+            string? type = null, value = null;
+            if (entry.ValueKind == JsonValueKind.Array && entry.GetArrayLength() >= 2)
+            {
+                type = entry[0].ValueKind == JsonValueKind.String ? entry[0].GetString() : null;
+                value = entry[1].ValueKind == JsonValueKind.String ? entry[1].GetString() : null;
+            }
+            else if (entry.ValueKind == JsonValueKind.Object)
+            {
+                type = Str(entry, "type");
+                value = Str(entry, "value");
+            }
+
+            if (!string.IsNullOrEmpty(type) && !string.IsNullOrEmpty(value))
+            {
+                result.TryAdd(type, value);
+            }
+        }
+
+        return result;
     }
 
     /// <summary>Resolves an image reference to a URL the app can load, via the server's image proxy when needed.</summary>
