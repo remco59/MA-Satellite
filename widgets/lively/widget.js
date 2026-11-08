@@ -35,6 +35,7 @@
   var state = null;          // last NowPlaying payload from the API
   var fallback = null;       // last livelyCurrentTrack payload
   var lastArtUrl = null;
+  var diag = '';             // why the last connection attempt failed, shown while disconnected
 
   function formatTime(ms) {
     var total = Math.max(0, Math.floor(ms / 1000));
@@ -142,16 +143,19 @@
     try {
       ws = new WebSocket('ws://' + settings.host + ':' + settings.port + '/api/events');
     } catch (e) {
+      diag = ' (' + e.name + ': ' + e.message + ')';
+      render();
       scheduleRetry();
       return;
     }
     socket = ws;
-    ws.onopen = function () { connected = true; retryMs = 1000; render(); };
+    ws.onopen = function () { connected = true; diag = ''; retryMs = 1000; render(); };
     ws.onmessage = onMessage;
-    ws.onclose = function () {
+    ws.onclose = function (e) {
       if (socket !== ws) { return; }
       connected = false;
       state = null;
+      diag = ' (WebSocket closed, code ' + (e && e.code) + ', page origin ' + location.origin + ')';
       render();
       scheduleRetry();
     };
