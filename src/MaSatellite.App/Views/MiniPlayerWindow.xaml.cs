@@ -47,6 +47,7 @@ internal sealed partial class MiniPlayerWindow : Window
         _trayRect = trayRect;
         InitializeComponent();
         Title = "ma-satellite";
+        AuroraWindowChrome.SetIcon(this);
 
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {
