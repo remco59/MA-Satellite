@@ -19,7 +19,7 @@
       </Grid.ColumnDefinitions>
       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
         <Border Background="{StaticResource AuroraAccentGradient}" CornerRadius="5" Width="19" Height="19">
-          <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE8D6;" FontSize="11" Foreground="#10192B" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          <FontIcon FontFamily="Segoe MDL2 Assets" Glyph="&#xE8D6;" FontSize="11" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
         <TextBlock Text="MA-Satellite" FontWeight="Bold" Foreground="{StaticResource AuroraText}" FontSize="14" VerticalAlignment="Center"/>
       </StackPanel>
@@ -57,25 +57,26 @@
         <TextBlock x:Name="TotalText" Text="0:00" Foreground="{StaticResource AuroraMuted}" FontSize="11" HorizontalAlignment="Right"/>
       </Grid>
     </Grid>
-    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
-      <Button x:Name="PrevButton" Click="OnPrevious" Width="44" Height="44" Style="{StaticResource AuroraButtonStyle}"
-              Padding="0" ToolTipService.ToolTip="Previous track" AutomationProperties.Name="Previous track">
-        <FontIcon Glyph="&#xE892;" FontSize="18"/>
+    <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+      <Button x:Name="PrevButton" Click="OnPrevious" Style="{StaticResource AuroraIconButtonStyle}"
+              Foreground="{StaticResource AuroraText}" ToolTipService.ToolTip="Previous track"
+              AutomationProperties.Name="Previous track">
+        <FontIcon Glyph="&#xE892;" FontSize="16"/>
       </Button>
-      <Button x:Name="PlayPauseButton" Click="OnPlayPause" Width="64" Height="48" Padding="0"
-              Style="{StaticResource AuroraPrimaryButtonStyle}" ToolTipService.ToolTip="Play or pause"
-              AutomationProperties.Name="Play or pause">
-        <Grid Width="30" Height="30">
-          <Ellipse x:Name="PlayPauseTrack" Visibility="Collapsed" Width="28" Height="28"
-                   Stroke="#7899CB" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-          <FontIcon x:Name="PlayPauseIcon" Glyph="&#xE768;" FontSize="23" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      <Button x:Name="PlayPauseButton" Click="OnPlayPause" Style="{StaticResource AuroraPlayButtonStyle}"
+              ToolTipService.ToolTip="Play or pause" AutomationProperties.Name="Play or pause">
+        <Grid Width="28" Height="28">
+          <Ellipse x:Name="PlayPauseTrack" Visibility="Collapsed" Width="26" Height="26"
+                   Stroke="#B3A8FF" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          <FontIcon x:Name="PlayPauseIcon" Glyph="&#xE768;" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
           <ProgressRing x:Name="PlayPauseSpinner" IsActive="False" Visibility="Collapsed"
-                        Foreground="#F5FBFF" Width="30" Height="30"/>
+                        Foreground="White" Width="28" Height="28"/>
         </Grid>
       </Button>
-      <Button x:Name="NextButton" Click="OnNext" Width="44" Height="44" Style="{StaticResource AuroraButtonStyle}"
-              Padding="0" ToolTipService.ToolTip="Next track" AutomationProperties.Name="Next track">
-        <FontIcon Glyph="&#xE893;" FontSize="18"/>
+      <Button x:Name="NextButton" Click="OnNext" Style="{StaticResource AuroraIconButtonStyle}"
+              Foreground="{StaticResource AuroraText}" ToolTipService.ToolTip="Next track"
+              AutomationProperties.Name="Next track">
+        <FontIcon Glyph="&#xE893;" FontSize="16"/>
       </Button>
     </StackPanel>
     <Grid Grid.Row="4" ColumnSpacing="10">
@@ -84,7 +85,7 @@
         <ColumnDefinition Width="*"/>
         <ColumnDefinition Width="36"/>
       </Grid.ColumnDefinitions>
-      <Button x:Name="MuteButton" Click="OnMute" Style="{StaticResource AuroraButtonStyle}" Padding="8"
+      <Button x:Name="MuteButton" Click="OnMute" Style="{StaticResource AuroraIconButtonStyle}"
               ToolTipService.ToolTip="Mute or unmute" AutomationProperties.Name="Mute or unmute">
         <FontIcon x:Name="MuteIcon" Glyph="&#xE767;" FontSize="16"/>
       </Button>
@@ -98,14 +99,14 @@
       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
       <ComboBox x:Name="DeviceBox" HorizontalAlignment="Stretch" MinWidth="195" SelectionChanged="OnDeviceChanged"
                 ToolTipService.ToolTip="Windows audio output" AutomationProperties.Name="Output device"/>
-      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
         <Button Click="OnOpenLibrary" ToolTipService.ToolTip="Open Music Assistant library"
-                AutomationProperties.Name="Open library" Style="{StaticResource AuroraButtonStyle}" Padding="10">
-          <FontIcon Glyph="&#xE8F1;" FontSize="17"/>
+                AutomationProperties.Name="Open library" Style="{StaticResource AuroraIconButtonStyle}">
+          <FontIcon Glyph="&#xE8F1;" FontSize="16"/>
         </Button>
         <Button Click="OnOpenSettings" ToolTipService.ToolTip="Settings" AutomationProperties.Name="Settings"
-                Style="{StaticResource AuroraButtonStyle}" Padding="10">
-          <FontIcon Glyph="&#xE713;" FontSize="17"/>
+                Style="{StaticResource AuroraIconButtonStyle}">
+          <FontIcon Glyph="&#xE713;" FontSize="16"/>
         </Button>
       </StackPanel>
       <TextBlock x:Name="StatusText" Grid.Row="1" Grid.ColumnSpan="2" MaxLines="1" AutomationProperties.LiveSetting="Polite"
