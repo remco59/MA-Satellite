@@ -68,7 +68,7 @@ body { display: grid; place-items: center; }
 
 .artist { opacity: 0.9; }
 .album { opacity: 0.6; }
-.status { opacity: 0.5; font-size: 11px; margin-top: 4px; }
+.status { opacity: 0.5; font-size: 11px; margin-top: 4px; white-space: normal; overflow-wrap: anywhere; }
 .status:empty { display: none; }
 
 .progress {
