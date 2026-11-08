@@ -13,12 +13,12 @@
           <ColumnDefinition Width="24"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="3*"/>
           <ColumnDefinition Width="2*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
-        <TextBlock Text="&#x2807;" FontFamily="Segoe UI Symbol" FontSize="18" Foreground="{StaticResource AuroraMuted}"
+        <TextBlock Text="&#x2807;" FontFamily="Segoe UI Symbol" FontSize="16" Foreground="{StaticResource AuroraMuted}"
                    VerticalAlignment="Center" HorizontalAlignment="Center" ToolTipService.ToolTip="Drag to reorder"/>
         <Grid Grid.Column="1" Width="44" Height="44">
-          <Rectangle RadiusX="8" RadiusY="8" Fill="{StaticResource AuroraCard}"/>
+          <Rectangle RadiusX="8" RadiusY="8" Fill="{StaticResource AuroraSurfaceRaised}"/>
           <FontIcon Glyph="&#xE8D6;" FontSize="16" Foreground="{StaticResource AuroraMuted}" Opacity="0.5" Visibility="{x:Bind PlaceholderVisibility}"/>
-          <Border CornerRadius="8">
+          <Border CornerRadius="{StaticResource AuroraRadiusS}">
             <Image Source="{x:Bind Image}" Stretch="UniformToFill"/>
           </Border>
         </Grid>
@@ -32,7 +32,7 @@
                    VerticalAlignment="Center" MinWidth="40" TextAlignment="Right"/>
         <Button Grid.Column="5" Click="OnRowMenuClick" Style="{StaticResource AuroraIconButtonStyle}" VerticalAlignment="Center"
                 ToolTipService.ToolTip="More options" AutomationProperties.Name="More options for this track">
-          <FontIcon Glyph="&#xE712;" FontSize="14"/>
+          <FontIcon Glyph="&#xE712;" FontSize="16"/>
         </Button>
       </Grid>
     </DataTemplate>
@@ -43,12 +43,12 @@
           <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
         <Grid Width="40" Height="40">
-          <Rectangle RadiusX="8" RadiusY="8" Fill="{StaticResource AuroraCard}"/>
-          <FontIcon Glyph="&#xE8D6;" FontSize="14" Foreground="{StaticResource AuroraMuted}" Opacity="0.5" Visibility="{x:Bind PlaceholderVisibility}"/>
-          <Border CornerRadius="8"><Image Source="{x:Bind Image}" Stretch="UniformToFill"/></Border>
+          <Rectangle RadiusX="8" RadiusY="8" Fill="{StaticResource AuroraSurfaceRaised}"/>
+          <FontIcon Glyph="&#xE8D6;" FontSize="16" Foreground="{StaticResource AuroraMuted}" Opacity="0.5" Visibility="{x:Bind PlaceholderVisibility}"/>
+          <Border CornerRadius="{StaticResource AuroraRadiusS}"><Image Source="{x:Bind Image}" Stretch="UniformToFill"/></Border>
         </Grid>
         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
-          <TextBlock Text="{x:Bind Title}" FontSize="13" Foreground="{StaticResource AuroraMuted}" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+          <TextBlock Text="{x:Bind Title}" FontSize="12" Foreground="{StaticResource AuroraMuted}" TextTrimming="CharacterEllipsis" MaxLines="1"/>
           <TextBlock Text="{x:Bind Artist}" Style="{StaticResource AuroraSubtitleStyle}" FontSize="12" TextTrimming="CharacterEllipsis" MaxLines="1"/>
         </StackPanel>
         <TextBlock Grid.Column="2" Text="{x:Bind DurationLabel}" Foreground="{StaticResource AuroraMuted}" FontSize="12" VerticalAlignment="Center"/>
@@ -60,9 +60,9 @@
           <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
         <Grid Width="44" Height="44">
-          <Rectangle RadiusX="8" RadiusY="8" Fill="{StaticResource AuroraCard}"/>
+          <Rectangle RadiusX="8" RadiusY="8" Fill="{StaticResource AuroraSurfaceRaised}"/>
           <FontIcon Glyph="&#xE8D6;" FontSize="16" Foreground="{StaticResource AuroraMuted}" Opacity="0.5" Visibility="{x:Bind PlaceholderVisibility}"/>
-          <Border CornerRadius="8">
+          <Border CornerRadius="{StaticResource AuroraRadiusS}">
             <Image Source="{x:Bind Image}" Stretch="UniformToFill"/>
           </Border>
         </Grid>
@@ -74,7 +74,7 @@
                    VerticalAlignment="Center" TextAlignment="Right"/>
         <Button Grid.Column="3" Click="OnRowMenuClick" Style="{StaticResource AuroraIconButtonStyle}" VerticalAlignment="Center"
                 ToolTipService.ToolTip="More options" AutomationProperties.Name="More options for this track">
-          <FontIcon Glyph="&#xE712;" FontSize="14"/>
+          <FontIcon Glyph="&#xE712;" FontSize="16"/>
         </Button>
       </Grid>
     </DataTemplate>
@@ -84,7 +84,7 @@
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="Padding" Value="16,10,16,12"/>
-      <Setter Property="CornerRadius" Value="10"/>
+      <Setter Property="CornerRadius" Value="{StaticResource AuroraRadiusM}"/>
       <Setter Property="Foreground" Value="{StaticResource AuroraMuted}"/>
     </Style>
   </UserControl.Resources>
@@ -94,17 +94,17 @@
     <StackPanel Spacing="22" Padding="12,0,12,32">
 
       <!-- Main player -->
-      <Border x:Name="HeroCard" CornerRadius="28" Padding="28" Background="{StaticResource AuroraHeroGradient}"
+      <Border x:Name="HeroCard" CornerRadius="{StaticResource AuroraRadiusL}" Padding="28" Background="{StaticResource AuroraHeroGradient}"
               BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1">
         <Grid x:Name="Hero" ColumnSpacing="36" RowSpacing="22">
           <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
           <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
 
-          <Border x:Name="ArtFrame" Width="280" Height="280" CornerRadius="22" Background="{StaticResource AuroraCard}"
+          <Border x:Name="ArtFrame" Width="280" Height="280" CornerRadius="{StaticResource AuroraRadiusL}" Background="{StaticResource AuroraSurfaceRaised}"
                   VerticalAlignment="Top" HorizontalAlignment="Left" BorderBrush="#339B8CFF" BorderThickness="1">
             <Grid>
               <FontIcon Glyph="&#xE8D6;" FontSize="64" Foreground="{StaticResource AuroraMuted}" Opacity="0.5"/>
-              <Border CornerRadius="22">
+              <Border CornerRadius="{StaticResource AuroraRadiusL}">
                 <Image x:Name="Artwork" Stretch="UniformToFill"/>
               </Border>
             </Grid>
@@ -113,11 +113,11 @@
           <StackPanel x:Name="HeroText" Grid.Column="1" Spacing="8" VerticalAlignment="Center">
             <Grid ColumnSpacing="8">
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-              <TextBlock Text="NOW PLAYING" Style="{StaticResource AuroraSectionLabelStyle}" Foreground="#D4CCFF" VerticalAlignment="Center"/>
+              <TextBlock Text="NOW PLAYING" Style="{StaticResource AuroraSectionLabelStyle}" Foreground="{StaticResource AuroraTextOnArt}" VerticalAlignment="Center"/>
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
                 <Button x:Name="FavoriteButton" Click="OnFavoriteClick" Style="{StaticResource AuroraIconButtonStyle}"
                         ToolTipService.ToolTip="Add to favourites" AutomationProperties.Name="Favourite">
-                  <FontIcon x:Name="FavoriteIcon" Glyph="&#xEB51;" FontSize="18"/>
+                  <FontIcon x:Name="FavoriteIcon" Glyph="&#xEB51;" FontSize="16"/>
                 </Button>
                 <Button Click="OnAddToPlaylistClick" Style="{StaticResource AuroraIconButtonStyle}"
                         ToolTipService.ToolTip="Add to playlist" AutomationProperties.Name="Add to playlist">
@@ -129,19 +129,19 @@
                 </Button>
               </StackPanel>
             </Grid>
-            <TextBlock x:Name="TitleText" Text="Nothing playing" FontSize="36" FontWeight="Bold" Foreground="White"
+            <TextBlock x:Name="TitleText" Text="Nothing playing" FontSize="32" FontWeight="SemiBold" Foreground="White"
                        TextWrapping="Wrap" TextTrimming="CharacterEllipsis" MaxLines="2"/>
-            <TextBlock x:Name="ArtistText" Text="Choose a player" FontSize="18" Foreground="#E3E7FA"
+            <TextBlock x:Name="ArtistText" Text="Choose a player" FontSize="16" Foreground="{StaticResource AuroraTextOnArt}"
                        TextTrimming="CharacterEllipsis" MaxLines="1"/>
-            <TextBlock x:Name="MetaText" FontSize="13" Foreground="#D9DEF2" TextTrimming="CharacterEllipsis" MaxLines="1" Visibility="Collapsed"/>
+            <TextBlock x:Name="MetaText" FontSize="12" Foreground="{StaticResource AuroraTextOnArt}" TextTrimming="CharacterEllipsis" MaxLines="1" Visibility="Collapsed"/>
             <Button x:Name="DeviceButton" Click="OnDeviceClick" Style="{StaticResource AuroraSurfaceButtonStyle}"
-                    HorizontalAlignment="Left" HorizontalContentAlignment="Left" Padding="0,2" CornerRadius="8"
+                    HorizontalAlignment="Left" HorizontalContentAlignment="Left" Padding="0,2" CornerRadius="{StaticResource AuroraRadiusS}"
                     ToolTipService.ToolTip="Choose where music plays" AutomationProperties.Name="Playback destination">
               <StackPanel Orientation="Horizontal" Spacing="8">
-                <FontIcon Glyph="&#xE7F4;" FontSize="14" Foreground="{StaticResource AuroraGood}"/>
-                <TextBlock x:Name="DeviceText" Text="No player" FontSize="13" Foreground="{StaticResource AuroraGood}"
+                <FontIcon Glyph="&#xE7F4;" FontSize="16" Foreground="{StaticResource AuroraGood}"/>
+                <TextBlock x:Name="DeviceText" Text="No player" FontSize="12" Foreground="{StaticResource AuroraGood}"
                            TextTrimming="CharacterEllipsis" MaxWidth="360"/>
-                <TextBlock x:Name="StateText" Text="" FontSize="13" Foreground="{StaticResource AuroraMuted}"
+                <TextBlock x:Name="StateText" Text="" FontSize="12" Foreground="{StaticResource AuroraMuted}"
                            AutomationProperties.LiveSetting="Polite"/>
               </StackPanel>
             </Button>
@@ -151,34 +151,34 @@
             <StackPanel Orientation="Horizontal" Spacing="14">
               <Button x:Name="ShuffleButton" Click="OnShuffleClick" IsEnabled="False" Style="{StaticResource AuroraIconButtonStyle}"
                       ToolTipService.ToolTip="Shuffle" AutomationProperties.Name="Toggle shuffle">
-                <FontIcon x:Name="ShuffleIcon" Glyph="&#xE8B1;" FontSize="17"/>
+                <FontIcon x:Name="ShuffleIcon" Glyph="&#xE8B1;" FontSize="16"/>
               </Button>
               <Button x:Name="PrevButton" Click="OnPreviousClick" Style="{StaticResource AuroraIconButtonStyle}"
                       Foreground="{StaticResource AuroraText}" ToolTipService.ToolTip="Previous" AutomationProperties.Name="Previous">
-                <FontIcon Glyph="&#xE892;" FontSize="18"/>
+                <FontIcon Glyph="&#xE892;" FontSize="16"/>
               </Button>
               <Button x:Name="PlayButton" Click="OnPlayPauseClick" Style="{StaticResource AuroraPlayButtonStyle}"
                       ToolTipService.ToolTip="Play or pause" AutomationProperties.Name="Play or pause">
                 <Grid Width="28" Height="28">
-                  <FontIcon x:Name="PlayIcon" Glyph="&#xE768;" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                  <FontIcon x:Name="PlayIcon" Glyph="&#xE768;" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                   <ProgressRing x:Name="PlaySpinner" IsActive="False" Visibility="Collapsed" Foreground="White" Width="28" Height="28"/>
                 </Grid>
               </Button>
               <Button x:Name="NextButton" Click="OnNextClick" Style="{StaticResource AuroraIconButtonStyle}"
                       Foreground="{StaticResource AuroraText}" ToolTipService.ToolTip="Next" AutomationProperties.Name="Next">
-                <FontIcon Glyph="&#xE893;" FontSize="18"/>
+                <FontIcon Glyph="&#xE893;" FontSize="16"/>
               </Button>
               <Button x:Name="RepeatButton" Click="OnRepeatClick" IsEnabled="False" Style="{StaticResource AuroraIconButtonStyle}"
                       ToolTipService.ToolTip="Repeat" AutomationProperties.Name="Cycle repeat mode">
-                <FontIcon x:Name="RepeatIcon" Glyph="&#xE8EE;" FontSize="17"/>
+                <FontIcon x:Name="RepeatIcon" Glyph="&#xE8EE;" FontSize="16"/>
               </Button>
             </StackPanel>
             <Grid ColumnSpacing="12" MaxWidth="640" HorizontalAlignment="Stretch">
               <Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/><ColumnDefinition Width="44"/></Grid.ColumnDefinitions>
-              <TextBlock x:Name="ElapsedText" Text="0:00" FontSize="12" Foreground="#D9DEF2" VerticalAlignment="Center" TextAlignment="Right"/>
+              <TextBlock x:Name="ElapsedText" Text="0:00" FontSize="12" Foreground="{StaticResource AuroraTextOnArt}" VerticalAlignment="Center" TextAlignment="Right"/>
               <Slider x:Name="SeekSlider" Grid.Column="1" Minimum="0" Maximum="1" IsEnabled="False" IsThumbToolTipEnabled="False"
                       ValueChanged="OnSeekChanged" AutomationProperties.Name="Track position" VerticalAlignment="Center"/>
-              <TextBlock x:Name="DurationText" Grid.Column="2" Text="—" FontSize="12" Foreground="#D9DEF2" VerticalAlignment="Center"/>
+              <TextBlock x:Name="DurationText" Grid.Column="2" Text="—" FontSize="12" Foreground="{StaticResource AuroraTextOnArt}" VerticalAlignment="Center"/>
             </Grid>
           </StackPanel>
         </Grid>
@@ -190,25 +190,25 @@
         <StackPanel Orientation="Horizontal" Spacing="4">
           <Button x:Name="TabUp" Tag="up" Click="OnTabClick" Style="{StaticResource NowTabStyle}" AutomationProperties.Name="Up Next">
             <Grid>
-              <StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE8FD;" FontSize="15"/><TextBlock Text="Up Next" FontSize="14"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE8FD;" FontSize="16"/><TextBlock Text="Up Next" FontSize="14"/></StackPanel>
               <Rectangle x:Name="UnderlineUp" Height="2" RadiusX="1" RadiusY="1" Fill="{StaticResource AuroraAccent}" VerticalAlignment="Bottom" Margin="0,0,0,-12"/>
             </Grid>
           </Button>
           <Button x:Name="TabLyrics" Tag="lyrics" Click="OnTabClick" Style="{StaticResource NowTabStyle}" AutomationProperties.Name="Lyrics">
             <Grid>
-              <StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE8F2;" FontSize="15"/><TextBlock Text="Lyrics" FontSize="14"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE8F2;" FontSize="16"/><TextBlock Text="Lyrics" FontSize="14"/></StackPanel>
               <Rectangle x:Name="UnderlineLyrics" Height="2" RadiusX="1" RadiusY="1" Fill="{StaticResource AuroraAccent}" VerticalAlignment="Bottom" Margin="0,0,0,-12" Opacity="0"/>
             </Grid>
           </Button>
           <Button x:Name="TabRelated" Tag="related" Click="OnTabClick" Style="{StaticResource NowTabStyle}" AutomationProperties.Name="Related">
             <Grid>
-              <StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE734;" FontSize="15"/><TextBlock Text="Related" FontSize="14"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE734;" FontSize="16"/><TextBlock Text="Related" FontSize="14"/></StackPanel>
               <Rectangle x:Name="UnderlineRelated" Height="2" RadiusX="1" RadiusY="1" Fill="{StaticResource AuroraAccent}" VerticalAlignment="Bottom" Margin="0,0,0,-12" Opacity="0"/>
             </Grid>
           </Button>
           <Button x:Name="TabAbout" Tag="about" Click="OnTabClick" Style="{StaticResource NowTabStyle}" AutomationProperties.Name="About">
             <Grid>
-              <StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE946;" FontSize="15"/><TextBlock Text="About" FontSize="14"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="9"><FontIcon Glyph="&#xE946;" FontSize="16"/><TextBlock Text="About" FontSize="14"/></StackPanel>
               <Rectangle x:Name="UnderlineAbout" Height="2" RadiusX="1" RadiusY="1" Fill="{StaticResource AuroraAccent}" VerticalAlignment="Bottom" Margin="0,0,0,-12" Opacity="0"/>
             </Grid>
           </Button>
@@ -216,24 +216,24 @@
       </Grid>
 
       <!-- Tab: Up Next -->
-      <Border x:Name="UpPanel" CornerRadius="22" Padding="22,18" Background="{StaticResource AuroraCardSoft}"
+      <Border x:Name="UpPanel" CornerRadius="{StaticResource AuroraRadiusL}" Padding="22,18" Background="{StaticResource AuroraSurface}"
               BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1">
         <StackPanel Spacing="14">
           <Grid ColumnSpacing="10">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
             <StackPanel VerticalAlignment="Center" Spacing="2">
-              <TextBlock Text="Up Next" Style="{StaticResource AuroraTitleStyle}" FontSize="24"/>
+              <TextBlock Text="Up Next" Style="{StaticResource AuroraTitleStyle}" FontSize="20"/>
               <TextBlock x:Name="UpSubtitle" Style="{StaticResource AuroraSubtitleStyle}" Text="Loading the queue…"/>
             </StackPanel>
             <Button x:Name="TransferButton" Grid.Column="1" Click="OnTransferClick" Style="{StaticResource AuroraButtonStyle}"
-                    Background="#26FFFFFF" CornerRadius="16" ToolTipService.ToolTip="Move this queue to another player"
+                    Background="{StaticResource AuroraGlass}" CornerRadius="{StaticResource AuroraRadiusL}" ToolTipService.ToolTip="Move this queue to another player"
                     AutomationProperties.Name="Transfer queue">
-              <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE8AB;" FontSize="13"/><TextBlock Text="Transfer queue" FontSize="12"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE8AB;" FontSize="12"/><TextBlock Text="Transfer queue" FontSize="12"/></StackPanel>
             </Button>
             <Button x:Name="ClearButton" Grid.Column="2" Click="OnClearClick" Style="{StaticResource AuroraButtonStyle}"
-                    Background="#26FFFFFF" CornerRadius="16" ToolTipService.ToolTip="Remove every track from the queue"
+                    Background="{StaticResource AuroraGlass}" CornerRadius="{StaticResource AuroraRadiusL}" ToolTipService.ToolTip="Remove every track from the queue"
                     AutomationProperties.Name="Clear queue" IsEnabled="False">
-              <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE74D;" FontSize="13"/><TextBlock Text="Clear queue" FontSize="12"/></StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE74D;" FontSize="12"/><TextBlock Text="Clear queue" FontSize="12"/></StackPanel>
             </Button>
           </Grid>
 
@@ -250,14 +250,14 @@
           </StackPanel>
 
           <!-- The track that is playing now: pinned above the list and clearly marked. -->
-          <Border x:Name="CurrentCard" Visibility="Collapsed" CornerRadius="14" Padding="12,10" Background="#1F9B8CFF"
+          <Border x:Name="CurrentCard" Visibility="Collapsed" CornerRadius="{StaticResource AuroraRadiusM}" Padding="12,10" Background="#1F9B8CFF"
                   BorderBrush="#559B8CFF" BorderThickness="1">
             <Grid ColumnSpacing="12">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
               <FontIcon Glyph="&#xE767;" FontSize="16" Foreground="{StaticResource AuroraAccent}" VerticalAlignment="Center"/>
-              <Border Grid.Column="1" Width="44" Height="44" CornerRadius="8" Background="{StaticResource AuroraCard}">
+              <Border Grid.Column="1" Width="44" Height="44" CornerRadius="{StaticResource AuroraRadiusS}" Background="{StaticResource AuroraSurfaceRaised}">
                 <Image x:Name="CurrentArt" Stretch="UniformToFill"/>
               </Border>
               <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="2">
@@ -265,7 +265,7 @@
                            TextTrimming="CharacterEllipsis" MaxLines="1"/>
                 <TextBlock x:Name="CurrentSub" Style="{StaticResource AuroraSubtitleStyle}" TextTrimming="CharacterEllipsis" MaxLines="1"/>
               </StackPanel>
-              <TextBlock Grid.Column="3" Text="Now playing" FontSize="11" Foreground="{StaticResource AuroraAccent}" VerticalAlignment="Center"/>
+              <TextBlock Grid.Column="3" Text="Now playing" FontSize="12" Foreground="{StaticResource AuroraAccent}" VerticalAlignment="Center"/>
             </Grid>
           </Border>
 
@@ -277,20 +277,20 @@
 
           <StackPanel x:Name="UpStatus" Spacing="10" HorizontalAlignment="Center" Padding="0,18" Visibility="Collapsed">
             <ProgressRing x:Name="UpBusy" Width="26" Height="26" IsActive="False" Foreground="{StaticResource AuroraAccent}" HorizontalAlignment="Center"/>
-            <TextBlock x:Name="UpStatusText" Foreground="{StaticResource AuroraMuted}" FontSize="13" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="420"/>
+            <TextBlock x:Name="UpStatusText" Foreground="{StaticResource AuroraMuted}" FontSize="12" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="420"/>
             <Button x:Name="UpRetry" Content="Try again" Click="OnUpRetryClick" Visibility="Collapsed" HorizontalAlignment="Center"
-                    Style="{StaticResource AuroraButtonStyle}" Background="#26FFFFFF"/>
+                    Style="{StaticResource AuroraButtonStyle}" Background="{StaticResource AuroraGlass}"/>
           </StackPanel>
         </StackPanel>
       </Border>
 
       <!-- Tab: Lyrics -->
-      <Border x:Name="LyricsPanel" Visibility="Collapsed" CornerRadius="22" Padding="28,22" Background="{StaticResource AuroraCardSoft}"
+      <Border x:Name="LyricsPanel" Visibility="Collapsed" CornerRadius="{StaticResource AuroraRadiusL}" Padding="28,22" Background="{StaticResource AuroraSurface}"
               BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1">
         <StackPanel Spacing="16">
           <Grid ColumnSpacing="10">
             <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-            <TextBlock Text="Lyrics" Style="{StaticResource AuroraTitleStyle}" FontSize="24"/>
+            <TextBlock Text="Lyrics" Style="{StaticResource AuroraTitleStyle}" FontSize="20"/>
             <TextBlock x:Name="LyricsSource" Grid.Column="1" FontSize="12" Foreground="{StaticResource AuroraMuted}" VerticalAlignment="Center"/>
           </Grid>
           <StackPanel x:Name="LyricsHost" Spacing="14"/>
@@ -298,7 +298,7 @@
             <ProgressRing x:Name="LyricsBusy" Width="26" Height="26" IsActive="False" Foreground="{StaticResource AuroraAccent}" HorizontalAlignment="Center"/>
             <TextBlock x:Name="LyricsStatusText" Foreground="{StaticResource AuroraMuted}" FontSize="14" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="440"/>
             <Button x:Name="LyricsRetry" Content="Try again" Click="OnRetryClick" Visibility="Collapsed" HorizontalAlignment="Center"
-                    Style="{StaticResource AuroraButtonStyle}" Background="#26FFFFFF"/>
+                    Style="{StaticResource AuroraButtonStyle}" Background="{StaticResource AuroraGlass}"/>
           </StackPanel>
         </StackPanel>
       </Border>
@@ -310,7 +310,7 @@
           <ProgressRing x:Name="RelatedBusy" Width="26" Height="26" IsActive="False" Foreground="{StaticResource AuroraAccent}" HorizontalAlignment="Center"/>
           <TextBlock x:Name="RelatedStatusText" Foreground="{StaticResource AuroraMuted}" FontSize="14" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="440"/>
           <Button x:Name="RelatedRetry" Content="Try again" Click="OnRetryClick" Visibility="Collapsed" HorizontalAlignment="Center"
-                  Style="{StaticResource AuroraButtonStyle}" Background="#26FFFFFF"/>
+                  Style="{StaticResource AuroraButtonStyle}" Background="{StaticResource AuroraGlass}"/>
         </StackPanel>
       </StackPanel>
 
@@ -321,7 +321,7 @@
           <ProgressRing x:Name="AboutBusy" Width="26" Height="26" IsActive="False" Foreground="{StaticResource AuroraAccent}" HorizontalAlignment="Center"/>
           <TextBlock x:Name="AboutStatusText" Foreground="{StaticResource AuroraMuted}" FontSize="14" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="440"/>
           <Button x:Name="AboutRetry" Content="Try again" Click="OnRetryClick" Visibility="Collapsed" HorizontalAlignment="Center"
-                  Style="{StaticResource AuroraButtonStyle}" Background="#26FFFFFF"/>
+                  Style="{StaticResource AuroraButtonStyle}" Background="{StaticResource AuroraGlass}"/>
         </StackPanel>
       </StackPanel>
     </StackPanel>

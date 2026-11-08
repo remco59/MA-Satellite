@@ -119,7 +119,7 @@ public sealed partial class NowPlayingPage
                     var block = new TextBlock
                     {
                         Text = line.Text.Length == 0 ? "♪" : line.Text,
-                        FontSize = 24,
+                        FontSize = 20,
                         FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
                         TextWrapping = TextWrapping.Wrap,
                         Foreground = R("AuroraText"),
@@ -140,7 +140,7 @@ public sealed partial class NowPlayingPage
                 LyricsHost.Children.Add(new TextBlock
                 {
                     Text = result.PlainText,
-                    FontSize = 17,
+                    FontSize = 16,
                     LineHeight = 28,
                     TextWrapping = TextWrapping.Wrap,
                     Foreground = R("AuroraText"),
@@ -273,7 +273,7 @@ public sealed partial class NowPlayingPage
                 Children =
                 {
                     SectionTitle(section.Title),
-                    new TextBlock { Text = section.Message ?? "Nothing to show.", FontSize = 13, Foreground = R("AuroraMuted"), TextWrapping = TextWrapping.Wrap },
+                    new TextBlock { Text = section.Message ?? "Nothing to show.", FontSize = 12, Foreground = R("AuroraMuted"), TextWrapping = TextWrapping.Wrap },
                 },
             };
         }
@@ -397,7 +397,7 @@ public sealed partial class NowPlayingPage
             {
                 // Shown only when the Cover Art Archive actually has a cover for this release.
                 var image = new Image { Stretch = Stretch.UniformToFill, Source = new BitmapImage(artUri) { DecodePixelWidth = 320 } };
-                var frame = new Border { Width = 140, Height = 140, CornerRadius = new CornerRadius(14), Child = image };
+                var frame = new Border { Width = 140, Height = 140, CornerRadius = new CornerRadius(12), Child = image };
                 var caption = CaptionText("Release artwork · Cover Art Archive");
                 var side = new StackPanel { Spacing = 6, Width = 140, Visibility = Visibility.Collapsed, VerticalAlignment = VerticalAlignment.Top, Children = { frame, caption } };
                 image.ImageOpened += (_, _) => side.Visibility = Visibility.Visible;
@@ -428,7 +428,7 @@ public sealed partial class NowPlayingPage
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var title = new StackPanel { Spacing = 2 };
         title.Children.Add(CaptionText("ARTIST"));
-        title.Children.Add(new TextBlock { Text = artist.Name, FontSize = 22, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = R("AuroraText"), TextWrapping = TextWrapping.Wrap });
+        title.Children.Add(new TextBlock { Text = artist.Name, FontSize = 20, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = R("AuroraText"), TextWrapping = TextWrapping.Wrap });
         header.Children.Add(title);
         if (!string.IsNullOrEmpty(artist.MusicAssistantUri))
         {
@@ -494,13 +494,13 @@ public sealed partial class NowPlayingPage
     {
         CornerRadius = new CornerRadius(20),
         Padding = new Thickness(22, 18, 22, 20),
-        Background = R("AuroraCardSoft"),
+        Background = R("AuroraSurface"),
         BorderBrush = R("AuroraBorder"),
         BorderThickness = new Thickness(1),
         Child = child,
     };
 
-    private static TextBlock SectionTitle(string text) => new() { Text = text, FontSize = 22, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = R("AuroraText") };
+    private static TextBlock SectionTitle(string text) => new() { Text = text, FontSize = 20, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = R("AuroraText") };
 
     private static TextBlock CaptionText(string text) => new() { Text = text, FontSize = 12, Foreground = R("AuroraMuted"), TextWrapping = TextWrapping.Wrap };
 
@@ -514,10 +514,10 @@ public sealed partial class NowPlayingPage
         };
         var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
         content.Children.Add(new Microsoft.UI.Xaml.Shapes.Ellipse { Width = 7, Height = 7, Fill = colour, VerticalAlignment = VerticalAlignment.Center });
-        content.Children.Add(new TextBlock { Text = text, FontSize = 11, Foreground = R("AuroraMuted") });
+        content.Children.Add(new TextBlock { Text = text, FontSize = 12, Foreground = R("AuroraMuted") });
         return new Border
         {
-            CornerRadius = new CornerRadius(10),
+            CornerRadius = new CornerRadius(12),
             Padding = new Thickness(8, 3, 10, 3),
             Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF)),
             Child = content,
@@ -527,8 +527,8 @@ public sealed partial class NowPlayingPage
     private static Border FactTile(AboutFact fact)
     {
         var stack = new StackPanel { Spacing = 4 };
-        stack.Children.Add(new TextBlock { Text = fact.Label.ToUpperInvariant(), FontSize = 10, CharacterSpacing = 60, Foreground = R("AuroraMuted") });
-        stack.Children.Add(new TextBlock { Text = fact.Value, FontSize = 15, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = R("AuroraText"), TextWrapping = TextWrapping.Wrap });
+        stack.Children.Add(new TextBlock { Text = fact.Label.ToUpperInvariant(), FontSize = 12, CharacterSpacing = 60, Foreground = R("AuroraMuted") });
+        stack.Children.Add(new TextBlock { Text = fact.Value, FontSize = 16, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = R("AuroraText"), TextWrapping = TextWrapping.Wrap });
         stack.Children.Add(TrustBadge(fact.Trust, fact.Trust switch
         {
             InfoTrust.Verified => $"Verified · {fact.Source}",
@@ -537,9 +537,9 @@ public sealed partial class NowPlayingPage
         }));
         return new Border
         {
-            CornerRadius = new CornerRadius(14),
+            CornerRadius = new CornerRadius(12),
             Padding = new Thickness(14, 12, 14, 12),
-            Background = R("AuroraCard"),
+            Background = R("AuroraSurfaceRaised"),
             Child = stack,
         };
     }
@@ -553,7 +553,7 @@ public sealed partial class NowPlayingPage
         {
             var chip = new Border
             {
-                CornerRadius = new CornerRadius(14),
+                CornerRadius = new CornerRadius(12),
                 Padding = new Thickness(12, 4, 12, 5),
                 Margin = new Thickness(0, 0, 8, 8),
                 Background = new SolidColorBrush(global::Windows.UI.Color.FromArgb(0x26, 0x9B, 0x8C, 0xFF)),

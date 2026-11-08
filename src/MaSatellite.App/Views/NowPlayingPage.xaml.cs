@@ -256,7 +256,7 @@ public sealed partial class NowPlayingPage : UserControl
         _narrow = narrow;
         ArtFrame.Width = ArtFrame.Height = narrow ? Math.Clamp(width - 96, 160, 260) : 280;
         HeroCard.Padding = new Thickness(narrow ? 18 : 28);
-        TitleText.FontSize = narrow ? 28 : 36;
+        TitleText.FontSize = narrow ? 20 : 32;
         Hero.RowDefinitions.Clear();
         if (narrow)
         {

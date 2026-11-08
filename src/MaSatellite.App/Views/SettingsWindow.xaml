@@ -5,15 +5,15 @@
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Grid Background="{StaticResource AuroraBackground}" RequestedTheme="Dark">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <Border Background="{StaticResource AuroraSidebarGradient}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,0,0,1" Padding="28,25">
+    <Border Background="{StaticResource AuroraSurface}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,0,0,1" Padding="28,25">
       <Grid>
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <StackPanel Spacing="5">
           <TextBlock Text="Settings" Style="{StaticResource AuroraTitleStyle}"/>
           <TextBlock Text="Make MA-Satellite sound and behave the way you want." Style="{StaticResource AuroraSubtitleStyle}"/>
         </StackPanel>
-        <Border Grid.Column="1" Padding="12,6" CornerRadius="14" Background="{StaticResource AuroraCard}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" VerticalAlignment="Center">
-          <TextBlock Text="MA-SATELLITE" FontSize="11" CharacterSpacing="90" FontWeight="SemiBold" Foreground="{StaticResource AuroraAccent}"/>
+        <Border Grid.Column="1" Padding="12,6" CornerRadius="{StaticResource AuroraRadiusM}" Background="{StaticResource AuroraSurfaceRaised}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="1" VerticalAlignment="Center">
+          <TextBlock Text="MA-SATELLITE" FontSize="12" CharacterSpacing="90" FontWeight="SemiBold" Foreground="{StaticResource AuroraAccent}"/>
         </Border>
       </Grid>
     </Border>
@@ -23,7 +23,7 @@
         <Border Style="{StaticResource AuroraCardStyle}" Background="{StaticResource AuroraHeroGradient}">
           <StackPanel Spacing="6">
             <TextBlock Text="CONNECTION STATUS" Style="{StaticResource AuroraSectionLabelStyle}"/>
-            <TextBlock x:Name="StatusLine" FontSize="17" FontWeight="SemiBold" Foreground="{StaticResource AuroraText}" TextWrapping="Wrap"/>
+            <TextBlock x:Name="StatusLine" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource AuroraText}" TextWrapping="Wrap"/>
             <TextBlock x:Name="NowPlayingLine" Foreground="{StaticResource AuroraText}" TextTrimming="CharacterEllipsis" MaxLines="1"/>
             <TextBlock x:Name="SecurityLine" Style="{StaticResource AuroraSubtitleStyle}" TextWrapping="Wrap"/>
           </StackPanel>
@@ -35,7 +35,7 @@
           <Border Grid.Column="0" Style="{StaticResource AuroraCardStyle}">
             <StackPanel Spacing="13">
               <StackPanel Spacing="4">
-                <TextBlock Text="Player &amp; output" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource AuroraText}"/>
+                <TextBlock Text="Player &amp; output" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource AuroraText}"/>
                 <TextBlock Text="Identity, speakers and startup." Style="{StaticResource AuroraSubtitleStyle}"/>
               </StackPanel>
               <TextBox x:Name="PlayerNameBox" Header="Player name" MaxLength="64"/>
@@ -47,7 +47,7 @@
           <Border Grid.Column="1" Style="{StaticResource AuroraCardStyle}">
             <StackPanel Spacing="13">
               <StackPanel Spacing="4">
-                <TextBlock Text="Music Assistant" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource AuroraText}"/>
+                <TextBlock Text="Music Assistant" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource AuroraText}"/>
                 <TextBlock Text="Connect and browse your library." Style="{StaticResource AuroraSubtitleStyle}"/>
               </StackPanel>
               <TextBox x:Name="HostBox" Header="Server address" PlaceholderText="192.168.0.98"/>
@@ -65,7 +65,7 @@
         <Border Style="{StaticResource AuroraCardStyle}">
           <StackPanel Spacing="13">
             <StackPanel Spacing="4">
-              <TextBlock Text="Playback &amp; sync" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource AuroraText}"/>
+              <TextBlock Text="Playback &amp; sync" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource AuroraText}"/>
               <TextBlock Text="Streaming protocol and latency adjustments." Style="{StaticResource AuroraSubtitleStyle}"/>
             </StackPanel>
             <Grid ColumnSpacing="16">
@@ -112,7 +112,7 @@
         </Expander>
       </StackPanel>
     </ScrollViewer>
-    <Border Grid.Row="2" Padding="24,14" Background="{StaticResource AuroraSidebar}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,1,0,0">
+    <Border Grid.Row="2" Padding="24,14" Background="{StaticResource AuroraSurface}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,1,0,0">
       <Grid ColumnSpacing="12">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <InfoBar x:Name="MessageBar" IsOpen="False" IsClosable="True" VerticalAlignment="Center"/>

@@ -1625,7 +1625,7 @@ public sealed partial class LibraryWindow : Window
         FooterPlayPauseButton.IsEnabled = _canPlayPause || pending;
         FooterPlayPauseButton.IsHitTestVisible = !pending;
         var background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-            pending ? "AuroraAccentSoft" : "AuroraAccentGradient"];
+            pending ? "AuroraSelected" : "AuroraAccentGradient"];
         var accent = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraAccent"];
         FooterPlayPauseButton.Background = background;
         FooterPlayPauseButton.BorderBrush = accent;

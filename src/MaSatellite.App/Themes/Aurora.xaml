@@ -2,28 +2,34 @@
 <ResourceDictionary
   xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
   xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <!-- Aurora 3.0: near-black charcoal with indigo undertones, violet accent, quiet borders. All colours, type and spacing tokens live here. -->
+  <!--
+    Aurora 3.1: near-black charcoal with indigo undertones, one violet accent, quiet borders.
+    The whole system is deliberately small. Colour: 4 surfaces, text/muted, one accent. Type: 12, 14, 16, 20, 32 in regular and semibold.
+    Radius: 8, 12, 20 (pills and circles take half their height). Space: 8, 16, 24, 36. Do not add a value that is not here.
+  -->
 
   <!-- Surfaces -->
   <SolidColorBrush x:Key="AuroraBackground" Color="#0A0A12"/>
-  <SolidColorBrush x:Key="AuroraSidebar" Color="#0D0D17"/>
-  <SolidColorBrush x:Key="AuroraPlayerBar" Color="#0C0C16"/>
-  <SolidColorBrush x:Key="AuroraCard" Color="#1C1B33"/>
-  <SolidColorBrush x:Key="AuroraCardSoft" Color="#131320"/>
-  <SolidColorBrush x:Key="AuroraSurfaceRaised" Color="#1A1A2E"/>
-  <SolidColorBrush x:Key="AuroraAccentSoft" Color="#2E2760"/>
-  <SolidColorBrush x:Key="AuroraInput" Color="#151526"/>
+  <SolidColorBrush x:Key="AuroraSurface" Color="#131320"/>
+  <SolidColorBrush x:Key="AuroraSurfaceRaised" Color="#1C1B33"/>
+  <SolidColorBrush x:Key="AuroraSelected" Color="#2A2556"/>
   <SolidColorBrush x:Key="AuroraBorder" Color="#24233A"/>
+  <SolidColorBrush x:Key="AuroraHover" Color="#14FFFFFF"/>
+  <!-- 15% white: slider track and buttons that sit on top of artwork. -->
+  <SolidColorBrush x:Key="AuroraGlass" Color="#26FFFFFF"/>
+  <!-- Dim layer behind a control that sits on artwork. -->
+  <SolidColorBrush x:Key="AuroraOverlay" Color="#B30A0A12"/>
 
   <!-- Text -->
   <SolidColorBrush x:Key="AuroraText" Color="#F4F3FA"/>
   <SolidColorBrush x:Key="AuroraMuted" Color="#9C99B4"/>
+  <!-- Secondary text laid over artwork or a hero gradient. -->
+  <SolidColorBrush x:Key="AuroraTextOnArt" Color="#D9DEF2"/>
 
   <!-- Accent and status -->
   <SolidColorBrush x:Key="AuroraAccent" Color="#A78BFA"/>
+  <SolidColorBrush x:Key="AuroraAccentLight" Color="#C4B5FD"/>
   <SolidColorBrush x:Key="AuroraGood" Color="#42DFBB"/>
-  <SolidColorBrush x:Key="AuroraHover" Color="#14FFFFFF"/>
-  <SolidColorBrush x:Key="AuroraSelected" Color="#2A2556"/>
   <LinearGradientBrush x:Key="AuroraAccentGradient" StartPoint="0,0" EndPoint="1,1">
     <GradientStop Color="#8B5CF6" Offset="0"/>
     <GradientStop Color="#6366F1" Offset="1"/>
@@ -33,34 +39,13 @@
     <GradientStop Color="#44246E" Offset="0.6"/>
     <GradientStop Color="#1C2866" Offset="1"/>
   </LinearGradientBrush>
-  <LinearGradientBrush x:Key="AuroraSidebarGradient" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="#10101E" Offset="0"/>
-    <GradientStop Color="#0B0B15" Offset="1"/>
-  </LinearGradientBrush>
   <!-- Text-protection scrim over artwork on featured cards. -->
   <LinearGradientBrush x:Key="AuroraScrim" StartPoint="0,0.5" EndPoint="1,0.5">
     <GradientStop Color="#F00A0A12" Offset="0"/>
     <GradientStop Color="#B00A0A12" Offset="0.5"/>
     <GradientStop Color="#000A0A12" Offset="1"/>
   </LinearGradientBrush>
-
-  <!-- Shape tokens -->
-  <CornerRadius x:Key="AuroraRadiusS">8</CornerRadius>
-  <CornerRadius x:Key="AuroraRadiusM">12</CornerRadius>
-  <CornerRadius x:Key="AuroraRadiusL">16</CornerRadius>
-  <CornerRadius x:Key="AuroraRadiusXL">24</CornerRadius>
-  <x:Double x:Key="AuroraPagePadding">32</x:Double>
-
-  <!-- Spacing scale (4-pt grid). Pages use M between related items and XL between sections. -->
-  <x:Double x:Key="AuroraSpaceS">8</x:Double>
-  <x:Double x:Key="AuroraSpaceM">16</x:Double>
-  <x:Double x:Key="AuroraSpaceL">24</x:Double>
-  <x:Double x:Key="AuroraSpaceXL">36</x:Double>
-
-  <!-- Atmosphere: two soft tints used behind hero areas and the Now Playing backdrop. -->
-  <Color x:Key="AuroraGlowViolet">#7C3AED</Color>
-  <Color x:Key="AuroraGlowMagenta">#C026D3</Color>
-  <Color x:Key="AuroraGlowBlue">#2563EB</Color>
+  <!-- Atmosphere: a soft tint behind hero areas, and a glow behind the Now Playing page. -->
   <LinearGradientBrush x:Key="AuroraAtmosphereGradient" StartPoint="0,0" EndPoint="1,1">
     <GradientStop Color="#40351E8A" Offset="0"/>
     <GradientStop Color="#2A7C1D8F" Offset="0.55"/>
@@ -70,11 +55,18 @@
     <GradientStop Color="#55C026D3" Offset="0"/>
     <GradientStop Color="#003B1E8A" Offset="0.7"/>
   </LinearGradientBrush>
-  <!-- Fades the Now Playing backdrop into the page background at the bottom. -->
-  <LinearGradientBrush x:Key="AuroraBackdropFade" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="#000A0A12" Offset="0"/>
-    <GradientStop Color="#CC0A0A12" Offset="1"/>
-  </LinearGradientBrush>
+
+  <!-- Radius: three steps. A pill or circle uses half its height and is not a token. -->
+  <CornerRadius x:Key="AuroraRadiusS">8</CornerRadius>
+  <CornerRadius x:Key="AuroraRadiusM">12</CornerRadius>
+  <CornerRadius x:Key="AuroraRadiusL">20</CornerRadius>
+  <x:Double x:Key="AuroraPagePadding">32</x:Double>
+
+  <!-- Spacing scale. Pages use M between related items and XL between sections. -->
+  <x:Double x:Key="AuroraSpaceS">8</x:Double>
+  <x:Double x:Key="AuroraSpaceM">16</x:Double>
+  <x:Double x:Key="AuroraSpaceL">24</x:Double>
+  <x:Double x:Key="AuroraSpaceXL">36</x:Double>
 
   <!-- Sliders follow the Aurora accent instead of the Windows accent colour. -->
   <SolidColorBrush x:Key="SliderTrackFill" Color="#26FFFFFF"/>
@@ -84,7 +76,7 @@
   <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#A78BFA"/>
   <SolidColorBrush x:Key="SliderThumbBackground" Color="#FFFFFF"/>
   <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#FFFFFF"/>
-  <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#E6E3FF"/>
+  <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#FFFFFF"/>
 
   <!-- Text styles -->
   <Style x:Key="AuroraTitleStyle" TargetType="TextBlock">
@@ -93,9 +85,9 @@
     <Setter Property="Foreground" Value="{StaticResource AuroraText}"/>
     <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
   </Style>
-  <!-- Type hierarchy: page title 32, section 22, item title 14/semibold, body 13, meta 12 (nothing smaller than 11). -->
+  <!-- Type hierarchy: display 32, section 20, heading 16, body 14 (item title semibold), caption 12 (nothing smaller than 12). -->
   <Style x:Key="AuroraSectionTitleStyle" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="22"/>
+    <Setter Property="FontSize" Value="20"/>
     <Setter Property="FontWeight" Value="SemiBold"/>
     <Setter Property="Foreground" Value="{StaticResource AuroraText}"/>
     <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
@@ -106,13 +98,8 @@
     <Setter Property="Foreground" Value="{StaticResource AuroraText}"/>
     <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
   </Style>
-  <Style x:Key="AuroraMetaStyle" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="12"/>
-    <Setter Property="Foreground" Value="{StaticResource AuroraMuted}"/>
-    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
-  </Style>
   <Style x:Key="AuroraSubtitleStyle" TargetType="TextBlock">
-    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="FontSize" Value="12"/>
     <Setter Property="Foreground" Value="{StaticResource AuroraMuted}"/>
     <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
   </Style>
@@ -128,19 +115,11 @@
     <Setter Property="CharacterSpacing" Value="100"/>
   </Style>
   <Style x:Key="AuroraCardStyle" TargetType="Border">
-    <Setter Property="Background" Value="{StaticResource AuroraCardSoft}"/>
+    <Setter Property="Background" Value="{StaticResource AuroraSurface}"/>
     <Setter Property="BorderBrush" Value="{StaticResource AuroraBorder}"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="CornerRadius" Value="18"/>
-    <Setter Property="Padding" Value="18"/>
-  </Style>
-  <!-- A raised surface for hero panels: a faint violet-to-charcoal gradient instead of a flat fill. -->
-  <Style x:Key="AuroraPanelStyle" TargetType="Border">
-    <Setter Property="Background" Value="{StaticResource AuroraAtmosphereGradient}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource AuroraBorder}"/>
-    <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="CornerRadius" Value="22"/>
-    <Setter Property="Padding" Value="24"/>
+    <Setter Property="CornerRadius" Value="{StaticResource AuroraRadiusL}"/>
+    <Setter Property="Padding" Value="16"/>
   </Style>
 
   <!--
@@ -201,7 +180,7 @@
     <Setter Property="Foreground" Value="{StaticResource AuroraText}"/>
     <Setter Property="BorderBrush" Value="{StaticResource AuroraBorder}"/>
     <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="CornerRadius" Value="12"/>
+    <Setter Property="CornerRadius" Value="{StaticResource AuroraRadiusM}"/>
     <Setter Property="MinHeight" Value="36"/>
     <Setter Property="Padding" Value="14,8"/>
     <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -235,12 +214,6 @@
     <Setter Property="MinHeight" Value="52"/>
     <Setter Property="Padding" Value="0"/>
   </Style>
-  <Style x:Key="AuroraPillButtonStyle" TargetType="Button" BasedOn="{StaticResource AuroraButtonStyle}">
-    <Setter Property="Background" Value="{StaticResource AuroraInput}"/>
-    <Setter Property="CornerRadius" Value="22"/>
-    <Setter Property="MinHeight" Value="44"/>
-    <Setter Property="Padding" Value="16,0"/>
-  </Style>
   <!-- A transparent full-surface hit target, used behind the content of clickable cards. -->
   <Style x:Key="AuroraSurfaceButtonStyle" TargetType="Button" BasedOn="{StaticResource AuroraButtonStyle}">
     <Setter Property="Background" Value="Transparent"/>
@@ -254,7 +227,7 @@
     <Setter Property="Foreground" Value="{StaticResource AuroraMuted}"/>
     <Setter Property="HorizontalContentAlignment" Value="Left"/>
     <Setter Property="HorizontalAlignment" Value="Stretch"/>
-    <Setter Property="CornerRadius" Value="12"/>
+    <Setter Property="CornerRadius" Value="{StaticResource AuroraRadiusM}"/>
     <Setter Property="Padding" Value="14,0"/>
     <Setter Property="MinHeight" Value="44"/>
     <Setter Property="BorderThickness" Value="0"/>
@@ -269,7 +242,7 @@
   <!-- Filter chip (search result types). -->
   <Style x:Key="AuroraChipStyle" TargetType="ToggleButton">
     <Setter Property="Foreground" Value="{StaticResource AuroraMuted}"/>
-    <Setter Property="Background" Value="{StaticResource AuroraInput}"/>
+    <Setter Property="Background" Value="{StaticResource AuroraSurface}"/>
     <Setter Property="Padding" Value="14,6"/>
     <Setter Property="MinHeight" Value="32"/>
     <Setter Property="UseSystemFocusVisuals" Value="True"/>
@@ -284,8 +257,8 @@
             <VisualStateManager.VisualStateGroups>
               <VisualStateGroup x:Name="CommonStates">
                 <VisualState x:Name="Normal"/>
-                <VisualState x:Name="PointerOver"><VisualState.Setters><Setter Target="Surface.Background" Value="{StaticResource AuroraCard}"/></VisualState.Setters></VisualState>
-                <VisualState x:Name="Pressed"><VisualState.Setters><Setter Target="Surface.Background" Value="{StaticResource AuroraAccentSoft}"/></VisualState.Setters></VisualState>
+                <VisualState x:Name="PointerOver"><VisualState.Setters><Setter Target="Surface.Background" Value="{StaticResource AuroraSurfaceRaised}"/></VisualState.Setters></VisualState>
+                <VisualState x:Name="Pressed"><VisualState.Setters><Setter Target="Surface.Background" Value="{StaticResource AuroraSelected}"/></VisualState.Setters></VisualState>
                 <VisualState x:Name="Disabled"><VisualState.Setters><Setter Target="ContentPresenter.Opacity" Value="0.38"/></VisualState.Setters></VisualState>
                 <VisualState x:Name="Checked">
                   <VisualState.Setters>
@@ -301,7 +274,7 @@
                 </VisualState>
                 <VisualState x:Name="CheckedPressed">
                   <VisualState.Setters>
-                    <Setter Target="Surface.Background" Value="{StaticResource AuroraAccentSoft}"/>
+                    <Setter Target="Surface.Background" Value="{StaticResource AuroraSelected}"/>
                     <Setter Target="ContentPresenter.Foreground" Value="{StaticResource AuroraText}"/>
                   </VisualState.Setters>
                 </VisualState>

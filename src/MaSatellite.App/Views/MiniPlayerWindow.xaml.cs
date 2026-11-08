@@ -217,7 +217,7 @@ internal sealed partial class MiniPlayerWindow : Window
             PlayPauseButton.IsEnabled = view.CanPlayPause || pending;
             PlayPauseButton.IsHitTestVisible = !pending;
             PlayPauseButton.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                pending ? "AuroraAccentSoft" : "AuroraAccentGradient"];
+                pending ? "AuroraSelected" : "AuroraAccentGradient"];
             PlayPauseButton.BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraAccent"];
             PlayPauseButton.BorderThickness = new Thickness(pending ? 1.5 : 0);
             AutomationProperties.SetName(PlayPauseButton, pending ? _pendingPlayback!.Label : "Play or pause");
