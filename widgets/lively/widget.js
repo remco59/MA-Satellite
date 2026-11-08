@@ -149,6 +149,19 @@
       return;
     }
     socket = ws;
+    // If the handshake neither succeeds nor fails, say so and probe plain HTTP to tell the cases apart.
+    setTimeout(function () {
+      if (socket !== ws || connected) { return; }
+      diag = ' [v3: handshake pending, readyState ' + ws.readyState + ', origin ' + location.origin + ']';
+      render();
+      try {
+        fetch(apiUrl('/api/health')).then(function (r) {
+          if (!connected) { diag += ' [health HTTP ' + r.status + ']'; render(); }
+        }, function (err) {
+          if (!connected) { diag += ' [health fetch failed: ' + err.message + ']'; render(); }
+        });
+      } catch (err) { /* ignore */ }
+    }, 3000);
     ws.onopen = function () { connected = true; diag = ''; retryMs = 1000; render(); };
     ws.onmessage = onMessage;
     ws.onclose = function (e) {
@@ -159,7 +172,7 @@
       render();
       scheduleRetry();
     };
-    ws.onerror = function () { /* onclose follows */ };
+    ws.onerror = function () { if (!connected) { diag = ' [v3: socket error, origin ' + location.origin + ']'; render(); } };
   }
 
   function scheduleRetry() {
