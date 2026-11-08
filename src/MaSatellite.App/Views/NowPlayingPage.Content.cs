@@ -538,7 +538,7 @@ public sealed partial class NowPlayingPage
         return new Border
         {
             CornerRadius = new CornerRadius(14),
-            Padding = new Thickness(14, 12),
+            Padding = new Thickness(14, 12, 14, 12),
             Background = R("AuroraCard"),
             Child = stack,
         };
