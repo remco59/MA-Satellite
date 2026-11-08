@@ -79,16 +79,6 @@ public sealed class ListRow
 
     public Visibility PlaceholderVisibility => Image is null ? Visibility.Visible : Visibility.Collapsed;
 
-    /// <summary>Highlights the playing entry in the queue.</summary>
-    public Brush RowBackground => IsCurrent
-        ? (Brush)Application.Current.Resources["AuroraAccentSoft"]
-        : new SolidColorBrush(Microsoft.UI.Colors.Transparent);
-
-    public Visibility NowIconVisibility => IsCurrent ? Visibility.Visible : Visibility.Collapsed;
-
-    /// <summary>The queue number is replaced by the "playing" icon on the current entry.</summary>
-    public Visibility PositionVisibilityWhenIdle => IsCurrent ? Visibility.Collapsed : Visibility.Visible;
-
     public Visibility MenuVisibility => Item is { IsPlayable: true } ? Visibility.Visible : Visibility.Collapsed;
 
     public static ListRow From(MaItem item, bool showType = false, int? position = null)

@@ -7,6 +7,7 @@ using MaSatellite.Host.Autostart;
 using MaSatellite.Host.Infrastructure;
 using MaSatellite.Host.Library;
 using MaSatellite.Host.Logging;
+using MaSatellite.Host.NowPlaying;
 using MaSatellite.Host.Orchestration;
 using MaSatellite.Host.Security;
 using MaSatellite.Host.Settings;
@@ -42,6 +43,7 @@ internal sealed class SatelliteShell : IDisposable
     private LibraryWindow? _libraryWindow;
     private MaLibraryService? _library;
     private LibraryController? _libraryController;
+    private NowPlayingController? _nowPlaying;
     private SmtcController? _smtc;
     private DispatcherQueue? _ui;
     private WasapiAudioOutput? _output;
@@ -117,6 +119,7 @@ internal sealed class SatelliteShell : IDisposable
             _logger?.LogWarning(ex, "Stopping the player failed");
         }
 
+        _nowPlaying?.Dispose();
         _library?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(2));
         _smtc?.Dispose();
         _volume?.Dispose();
@@ -153,6 +156,7 @@ internal sealed class SatelliteShell : IDisposable
             var library = new MaLibraryService(_settings!, secrets, loggers.CreateLogger<MaLibraryService>());
             _library = library;
             _libraryController = new LibraryController(library, _settings!);
+            _nowPlaying = NowPlayingFactory.Create(_libraryController, _paths, version, loggers);
             host.StatusChanged += OnStatusChanged;
             var smtc = new SmtcController(loggers.CreateLogger<SmtcController>());
             _smtc = smtc;
@@ -331,14 +335,14 @@ internal sealed class SatelliteShell : IDisposable
 
     private void ShowLibrary()
     {
-        if (_libraryController is null || _host is null)
+        if (_libraryController is null || _nowPlaying is null || _host is null)
         {
             return;
         }
 
         if (_libraryWindow is null)
         {
-            _libraryWindow = new LibraryWindow(_libraryController, _host, ShowSettings);
+            _libraryWindow = new LibraryWindow(_libraryController, _nowPlaying, _host, ShowSettings);
             _libraryWindow.Closed += (_, _) => _libraryWindow = null;
         }
 

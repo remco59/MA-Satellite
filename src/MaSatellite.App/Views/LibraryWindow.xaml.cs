@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices.WindowsRuntime;
 using MaSatellite.Core.Session;
 using MaSatellite.Host.Library;
+using MaSatellite.Host.NowPlaying;
 using MaSatellite.Host.Orchestration;
 using MaSatellite.Host.Presentation;
 using MaSatellite.MaApi;
@@ -77,23 +78,15 @@ public sealed partial class LibraryWindow : Window
     private bool _canPlayPause;
     private int _pendingPollTicks;
     private Brush? _tintedBrush;
-    private int _queueLoadId;
-    private string _nowTab = "upnext"; // "upnext", "lyrics" or "related": the tab open on the Now Playing page
-    private string _nowNavKey = "now"; // which sidebar item opened Now Playing ("now" or "queue")
-    private bool _nowStacked;
-    private MaItem? _nowItem;
-    private string? _resolvedKey;
-    private int _resolveId;
-    private string? _relatedKey;
-    private int _relatedId;
     private IReadOnlyList<MaItem> _discoverAlbums = [];
 
-    internal LibraryWindow(LibraryController controller, SatelliteHost host, Action openSettings)
+    internal LibraryWindow(LibraryController controller, NowPlayingController nowPlaying, SatelliteHost host, Action openSettings)
     {
         _controller = controller;
         _host = host;
         _openSettings = openSettings;
         InitializeComponent();
+        WireNowPage(nowPlaying);
         // Every shelf uses the shared card template; the "Recently played" row uses the compact size.
         var cardTemplate = (DataTemplate)LibraryRoot.Resources["CardTemplate"];
         foreach (var shelf in HomeShelfControls)
@@ -126,9 +119,13 @@ public sealed partial class LibraryWindow : Window
         _queueRefresh.Tick += (_, _) =>
         {
             _ = RefreshPlaybackSummaryAsync();
-            if (_tab == "now")
+            if (_tab == "now" && _openedItem is null)
             {
-                _ = LoadQueueAsync();
+                _ = NowPage.RefreshQueueAsync();
+            }
+            else
+            {
+                NowPage.MarkQueueStale();
             }
         };
 
@@ -177,7 +174,6 @@ public sealed partial class LibraryWindow : Window
             _footerSeekDebounce.Stop();
             _footerVolumeDebounce.Stop();
             _sidebarTween?.Stop();
-            StopNowGlow();
             _host.Volume.Changed -= OnFooterSystemVolumeChanged;
             ++_artworkRequestId;
             _controller.Service.ServerEvent -= OnServerEvent;
@@ -270,12 +266,88 @@ public sealed partial class LibraryWindow : Window
         ResetFooterControls();
         await RefreshFooterVolumeAsync();
         await RefreshPlaybackSummaryAsync();
-        _resolvedKey = null;
-        TrackChanged(_latestPlayback);
-        if (_tab == "now")
+        await NowPage.ResetForTargetChangeAsync();
+    }
+
+
+    // ---- Now playing page: player, Up Next, Lyrics, Related and About ----
+
+    /// <summary>Connects the page to the window's existing playback code; the page keeps no playback state of its own.</summary>
+    private void WireNowPage(NowPlayingController nowPlaying)
+    {
+        NowPage.Initialize(nowPlaying, () => SelectedTarget);
+        NowPage.CardTemplate = (DataTemplate)LibraryRoot.Resources["CardTemplate"];
+        NowPage.ItemClick += OnItemClick;
+        NowPage.RowPlayRequested += OnCardPlay;
+        NowPage.RowMenuRequested += OnRowMenu;
+        NowPage.PlayPauseRequested += (_, _) => _ = QueueCommandAsync("play_pause");
+        NowPage.NextRequested += (_, _) => _ = QueueCommandAsync("next");
+        NowPage.PreviousRequested += (_, _) => _ = QueueCommandAsync("previous");
+        NowPage.ShuffleRequested += async (_, _) => await ToggleShuffleAsync();
+        NowPage.RepeatRequested += async (_, _) => await CycleRepeatAsync();
+        NowPage.SeekRequested += (_, milliseconds) =>
         {
-            await LoadQueueAsync();
+            _pendingSeekMs = milliseconds;
+            _footerSeekDebounce.Stop();
+            _footerSeekDebounce.Start();
+        };
+        NowPage.TransferRequested += (_, anchor) => ShowTransferFlyout(anchor);
+        NowPage.DeviceRequested += (_, anchor) => ShowTargetFlyout(anchor);
+        NowPage.PlayIndexRequested += async (_, index) =>
+        {
+            if (SelectedTarget is { } target)
+            {
+                await StartPlaybackAsync(target, () => _controller.PlayQueueIndexAsync(target, index),
+                    "Starting selected track…", waitForTrackChange: true);
+            }
+        };
+        NowPage.InfoRaised += (_, text) => ShowInfo(text);
+        NowPage.ErrorRaised += (_, ex) => ShowError(ex);
+        NowPage.OpenItemRequested += async (_, item) => await GoToAsync(new NavState(_tab, item, QueryFor(_tab)));
+    }
+
+    /// <summary>The footer's queue button: Now playing, on its Up Next tab.</summary>
+    private async void OnOpenQueue(object sender, RoutedEventArgs e)
+    {
+        await NavigateAsync("now");
+        await NowPage.ShowTabAsync("up");
+    }
+
+    private async Task ShowNowPageAsync()
+    {
+        LoadingState.Visibility = Visibility.Collapsed;
+        Busy.IsActive = false;
+        EmptyState.Visibility = Visibility.Collapsed;
+        PageHeader.Visibility = Visibility.Collapsed;
+        Body.Visibility = Visibility.Collapsed;
+        NowPage.Visibility = Visibility.Visible;
+        NowPage.SetTint(_tintedBrush);
+        _ = EnsurePaletteAsync();
+        SyncNowPage();
+        await NowPage.SetShownAsync(true);
+    }
+
+    /// <summary>Hands the page what the footer controls already know, so there is one source of truth for transport state.</summary>
+    private void SyncNowPage()
+    {
+        if (_closed)
+        {
+            return;
         }
+
+        var pending = _pendingPlayback is not null && SelectedTarget?.QueueId == _pendingTargetId;
+        NowPage.SetTransport(new TransportState(
+            FooterPreviousButton.IsEnabled,
+            FooterNextButton.IsEnabled,
+            _canPlayPause,
+            _latestPlayback.IsPlaying,
+            pending,
+            _pendingPlayback?.Label ?? string.Empty,
+            FooterShuffleButton.IsEnabled,
+            _remoteShuffle,
+            FooterRepeatButton.IsEnabled,
+            _remoteRepeat,
+            FooterSeekSlider.IsEnabled));
     }
 
     private async void OnNavigate(object sender, RoutedEventArgs e)
@@ -313,16 +385,6 @@ public sealed partial class LibraryWindow : Window
     {
         _tab = state.Tab;
         _openedItem = state.Item;
-        if (state.Tab == "now")
-        {
-            // The query slot carries which sidebar item opened Now Playing; Queue lands on the Up next tab.
-            _nowNavKey = state.Query == "queue" ? "queue" : "now";
-            if (_nowNavKey == "queue")
-            {
-                _nowTab = "upnext";
-            }
-        }
-
         if (state.Tab == "search")
         {
             // Other pages leave the remembered query alone so the sidebar's Search item can restore it.
@@ -484,8 +546,6 @@ public sealed partial class LibraryWindow : Window
         FooterShuffleButton.Visibility = width < 820 ? Visibility.Collapsed : Visibility.Visible;
         FooterRepeatButton.Visibility = width < 820 ? Visibility.Collapsed : Visibility.Visible;
 
-        LayoutNowPage(width);
-
         var stack = width < 1060;
         if (stack != _stackFeatured)
         {
@@ -547,7 +607,8 @@ public sealed partial class LibraryWindow : Window
         foreach (var button in new[] { NavHome, NavDiscover, NavSearch, NavPlaylist, NavAlbum, NavArtist, NavTrack, NavRadio, NavNow, NavQueue })
         {
             var tag = (string?)button.Tag;
-            var active = tag is "now" or "queue" ? _tab == "now" && tag == _nowNavKey : tag == section;
+            // Queue opens the Now playing page on its Up Next tab, so only Now playing is lit there.
+            var active = tag == "queue" ? false : tag == section;
             button.Style = active ? selected : regular;
         }
 
@@ -797,13 +858,21 @@ public sealed partial class LibraryWindow : Window
     private async Task LoadTabAsync(bool backgroundRefresh = false)
     {
         var id = ++_loadId;
-        if (_tab == "now")
+        if (_tab == "now" && _openedItem is null)
         {
-            await EnterNowPageAsync();
+            UpdateNavigationState();
+            await ShowNowPageAsync();
             return;
         }
 
-        ShowNowPage(false);
+        if (NowPage.Visibility == Visibility.Visible)
+        {
+            NowPage.Visibility = Visibility.Collapsed;
+            PageHeader.Visibility = Visibility.Visible;
+            Body.Visibility = Visibility.Visible;
+            _ = NowPage.SetShownAsync(false);
+        }
+
         // Queue refreshes can turn an empty state into a populated list without a navigation.
         EmptyState.Visibility = Visibility.Collapsed;
         RetryButton.Visibility = Visibility.Collapsed;
@@ -1466,7 +1535,7 @@ public sealed partial class LibraryWindow : Window
         }
     }
 
-    private void OnTransferClick(object sender, RoutedEventArgs e)
+    private void ShowTransferFlyout(FrameworkElement anchor)
     {
         var flyout = new MenuFlyout();
         var others = _targets.Where(t => t.QueueId != SelectedTarget?.QueueId).ToList();
@@ -1480,7 +1549,7 @@ public sealed partial class LibraryWindow : Window
             flyout.Items.Add(MenuItem(to.Name, () => TransferToAsync(to)));
         }
 
-        flyout.ShowAt((FrameworkElement)sender);
+        flyout.ShowAt(anchor);
     }
 
     private async Task TransferToAsync(PlayTarget to)
@@ -1562,18 +1631,20 @@ public sealed partial class LibraryWindow : Window
         FooterPlayPauseButton.BorderBrush = accent;
         FooterPlayPauseButton.BorderThickness =
             new Thickness(pending ? 1.5 : 0);
-        FooterState.Foreground = NowPlayingState.Foreground =
-            (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
-                pending ? "AuroraAccent" : "AuroraGood"];
+        var stateBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+            pending ? "AuroraAccent" : "AuroraGood"];
+        FooterState.Foreground = stateBrush;
         var label = pending ? _pendingPlayback!.Label : "Play or pause";
         AutomationProperties.SetName(FooterPlayPauseButton, label);
         var target = SelectedTarget?.Name ?? "No player selected";
         var state = _latestPlayback.HasTrack
             ? (_latestPlayback.IsPlaying ? "Playing" : "Paused")
             : "Idle";
-        FooterState.Text = NowPlayingState.Text = pending
+        FooterState.Text = pending
             ? $"{_pendingPlayback!.Label} · {target}"
             : $"{state} · {target}";
+        NowPage.SetStatus(pending ? _pendingPlayback!.Label : state, stateBrush);
+        SyncNowPage();
     }
 
     private void ShowPlaybackWarning()
@@ -1661,10 +1732,8 @@ public sealed partial class LibraryWindow : Window
     {
         FooterTitle.Text = summary.Title;
         FooterArtist.Text = summary.Artist;
-        NowPlayingTitle.Text = summary.Title;
-        NowPlayingArtist.Text = summary.Artist;
-
         _latestPlayback = summary;
+        NowPage.SetPlayback(summary, SelectedTarget?.Name);
         if (_pendingPlayback is not null && SelectedTarget?.QueueId == _pendingTargetId &&
             _pendingPlayback.IsConfirmed(summary.IsPlaying, summary.Title))
         {
@@ -1692,7 +1761,6 @@ public sealed partial class LibraryWindow : Window
 
         UpdatePlaybackFeedbackUi();
         UpdatePlaybackArtwork(summary);
-        TrackChanged(summary);
         if (SelectedTarget is null)
         {
             ResetFooterControls();
@@ -1717,6 +1785,8 @@ public sealed partial class LibraryWindow : Window
             FooterVolumeSlider.IsEnabled = false;
         }
         finally { _updatingFooter = false; }
+
+        SyncNowPage();
     }
 
     private void ApplyLocalFooterControls()
@@ -1732,6 +1802,7 @@ public sealed partial class LibraryWindow : Window
         FooterVolumeSlider.IsEnabled = true;
         SetFooterVolume(_host.Status.Volume, _host.Status.Muted);
         UpdateFooterProgress();
+        SyncNowPage();
     }
 
     private void ApplyRemoteFooterControls(QueueView view)
@@ -1760,6 +1831,7 @@ public sealed partial class LibraryWindow : Window
         FooterRepeatIcon.Glyph = _remoteRepeat == "one" ? "\uE8ED" : "\uE8EE";
         ToolTipService.SetToolTip(FooterRepeatButton, $"Repeat: {_remoteRepeat}");
         ToolTipService.SetToolTip(FooterShuffleButton, _remoteShuffle ? "Shuffle on" : "Shuffle off");
+        SyncNowPage();
     }
 
     private void UpdateFooterProgress()
@@ -1776,6 +1848,7 @@ public sealed partial class LibraryWindow : Window
             position = _remoteElapsedMs + Math.Max(0, elapsed);
         }
         var duration = _footerDurationMs;
+        NowPage.SetProgress(Math.Max(0, position), duration);
         _updatingFooter = true;
         try
         {
@@ -1897,14 +1970,18 @@ public sealed partial class LibraryWindow : Window
         }
     }
 
-    private async void OnFooterShuffle(object sender, RoutedEventArgs e)
+    private async void OnFooterShuffle(object sender, RoutedEventArgs e) => await ToggleShuffleAsync();
+
+    private async Task ToggleShuffleAsync()
     {
         if (SelectedTarget is not { IsThisPc: false } target) return;
         await RunAsync(() => _controller.SetShuffleAsync(target, !_remoteShuffle));
         await RefreshPlaybackSummaryAsync();
     }
 
-    private async void OnFooterRepeat(object sender, RoutedEventArgs e)
+    private async void OnFooterRepeat(object sender, RoutedEventArgs e) => await CycleRepeatAsync();
+
+    private async Task CycleRepeatAsync()
     {
         if (SelectedTarget is not { IsThisPc: false } target) return;
         var next = _remoteRepeat switch { "off" => "all", "all" => "one", _ => "off" };
@@ -1928,7 +2005,7 @@ public sealed partial class LibraryWindow : Window
         if (summary.LocalArtwork is { } artwork)
         {
             FooterArtwork.Source = null;
-            NowPlayingArtwork.Source = null;
+            NowPage.SetArtwork(null);
             _ = LoadLocalArtworkAsync(artwork, request);
         }
         else
@@ -1937,11 +2014,10 @@ public sealed partial class LibraryWindow : Window
                 ? null
                 : new ListRow(summary.Title, summary.Artist, summary.ArtworkUrl).Image;
             FooterArtwork.Source = image;
-            NowPlayingArtwork.Source = image;
+            NowPage.SetArtwork(image);
             if (image is not null)
             {
                 Motion.FadeIn(FooterArtwork);
-                Motion.FadeIn(NowPlayingArtwork);
             }
 
             var url = summary.ArtworkUrl;
@@ -1959,7 +2035,7 @@ public sealed partial class LibraryWindow : Window
         }
     }
 
-    /// <summary>Tints the Now Playing panel with a dark tone of the artwork's colour (only while it is open).</summary>
+    /// <summary>Tints the Now playing page with a dark tone of the artwork's colour (only while it is open).</summary>
     private async Task EnsurePaletteAsync()
     {
         var key = _paletteSourceKey;
@@ -1993,7 +2069,7 @@ public sealed partial class LibraryWindow : Window
         if (color is not { } picked || picked == Rgb.Fallback)
         {
             _tintedBrush = null;
-            ApplyNowBackdrop();
+            NowPage.SetTint(null);
             return;
         }
 
@@ -2008,7 +2084,7 @@ public sealed partial class LibraryWindow : Window
                 new GradientStop { Color = global::Windows.UI.Color.FromArgb(255, 10, 10, 18), Offset = 1 },
             },
         };
-        ApplyNowBackdrop();
+        NowPage.SetTint(_tintedBrush);
     }
 
     private async Task LoadLocalArtworkAsync(ArtworkImage artwork, int request)
@@ -2024,9 +2100,8 @@ public sealed partial class LibraryWindow : Window
             if (!_closed && request == _artworkRequestId && SelectedTarget?.IsThisPc == true)
             {
                 FooterArtwork.Source = image;
-                NowPlayingArtwork.Source = image;
+                NowPage.SetArtwork(image);
                 Motion.FadeIn(FooterArtwork);
-                Motion.FadeIn(NowPlayingArtwork);
                 var data = artwork.Data;
                 SetPaletteSource($"sendspin:{request}", () => Task.FromResult<byte[]?>(data));
             }
@@ -2036,7 +2111,7 @@ public sealed partial class LibraryWindow : Window
             if (!_closed && request == _artworkRequestId)
             {
                 FooterArtwork.Source = null;
-                NowPlayingArtwork.Source = null;
+                NowPage.SetArtwork(null);
             }
         }
     }
@@ -2097,6 +2172,27 @@ public sealed partial class LibraryWindow : Window
         {
             await PlayAsync(pick.Playlist, MaQueueOption.Replace);
         }
+    }
+
+    /// <summary>The player bar's menu: shortcuts into the Now playing page's tabs and the queue transfer.</summary>
+    private void OnFooterMore(object sender, RoutedEventArgs e)
+    {
+        var anchor = (FrameworkElement)sender;
+        async Task OpenAsync(string tab)
+        {
+            await NavigateAsync("now");
+            await NowPage.ShowTabAsync(tab);
+        }
+
+        var flyout = new MenuFlyout();
+        flyout.Items.Add(MenuItem("Open now playing", () => OpenAsync("up")));
+        flyout.Items.Add(MenuItem("Show up next", () => OpenAsync("up")));
+        flyout.Items.Add(MenuItem("Show lyrics", () => OpenAsync("lyrics")));
+        flyout.Items.Add(MenuItem("Show related artists", () => OpenAsync("related")));
+        flyout.Items.Add(new MenuFlyoutSeparator());
+        flyout.Items.Add(new MenuFlyoutItem { Text = "Transfer queue to…" });
+        ((MenuFlyoutItem)flyout.Items[^1]).Click += (_, _) => ShowTransferFlyout(anchor);
+        flyout.ShowAt(anchor);
     }
 
     private async void OnLibraryTab(object sender, RoutedEventArgs e)

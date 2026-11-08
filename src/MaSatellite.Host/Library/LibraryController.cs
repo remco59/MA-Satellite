@@ -1,4 +1,3 @@
-using MaSatellite.Host.Presentation;
 using MaSatellite.Host.Settings;
 using MaSatellite.MaApi;
 using MaSatellite.MaApi.Models;
@@ -115,30 +114,17 @@ public sealed class LibraryController
         await client.SetPlayerMutedAsync(target.QueueId, muted, ct).ConfigureAwait(false);
     }
 
-    public async Task PlayQueueIndexAsync(PlayTarget target, int index, CancellationToken ct = default)
+    /// <summary>Moves a queue item by <paramref name="positionShift"/> places (negative = up).</summary>
+    public async Task MoveQueueItemAsync(PlayTarget target, string queueItemId, int positionShift, CancellationToken ct = default)
     {
         var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
-        await client.PlayQueueIndexAsync(target.QueueId, index, ct).ConfigureAwait(false);
-    }
-
-    /// <summary>The entry a queue is on right now. One cheap call; used to find the playing track's library item.</summary>
-    public async Task<MaQueueItem?> GetCurrentQueueItemAsync(PlayTarget target, CancellationToken ct = default)
-    {
-        var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
-        var queues = await client.GetQueuesAsync(ct).ConfigureAwait(false);
-        return queues.FirstOrDefault(q => q.QueueId == target.QueueId)?.CurrentItem;
+        await client.MoveQueueItemAsync(target.QueueId, queueItemId, positionShift, ct).ConfigureAwait(false);
     }
 
     public async Task RemoveQueueItemAsync(PlayTarget target, string queueItemId, CancellationToken ct = default)
     {
         var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
-        await client.RemoveQueueItemAsync(target.QueueId, queueItemId, ct).ConfigureAwait(false);
-    }
-
-    public async Task MoveQueueItemAsync(PlayTarget target, string queueItemId, int positions, CancellationToken ct = default)
-    {
-        var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
-        await client.MoveQueueItemAsync(target.QueueId, queueItemId, positions, ct).ConfigureAwait(false);
+        await client.DeleteQueueItemAsync(target.QueueId, queueItemId, ct).ConfigureAwait(false);
     }
 
     public async Task ClearQueueAsync(PlayTarget target, CancellationToken ct = default)
@@ -147,34 +133,27 @@ public sealed class LibraryController
         await client.ClearQueueAsync(target.QueueId, ct).ConfigureAwait(false);
     }
 
-    /// <summary>The library item behind a queue entry (favourite flag, lyrics, genres), or null when unknown.</summary>
-    public async Task<MaItem?> GetItemByUriAsync(string uri, CancellationToken ct = default)
+    /// <summary>Playlists from the library; the server rejects the add when a playlist is not editable.</summary>
+    public async Task<IReadOnlyList<MaItem>> GetPlaylistsAsync(CancellationToken ct = default)
     {
         var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
-        return await client.GetItemByUriAsync(uri, ct).ConfigureAwait(false);
+        return await client.GetLibraryAsync(MaMediaType.Playlist, limit: 200, sortField: "name", ct: ct).ConfigureAwait(false);
     }
 
-    public async Task SetFavoriteAsync(MaItem item, bool favorite, CancellationToken ct = default)
+    public async Task AddToPlaylistAsync(MaItem playlist, string trackUri, CancellationToken ct = default)
     {
-        var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
-        await client.SetFavoriteAsync(item, favorite, ct).ConfigureAwait(false);
-    }
-
-    /// <summary>
-    /// Artists similar to the one named on the current track. The server is asked, never guessed: the artist is
-    /// looked up by name and must match exactly, otherwise there is nothing related to show.
-    /// </summary>
-    public async Task<IReadOnlyList<MaItem>> GetRelatedArtistsAsync(string artistNames, CancellationToken ct = default)
-    {
-        var name = RelatedArtist.PrimaryName(artistNames);
-        if (name is null)
+        if (string.IsNullOrEmpty(trackUri))
         {
-            return [];
+            throw new MaException("This track has no address to add to a playlist.");
         }
 
         var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
-        var found = await client.SearchAsync(name, 10, ct).ConfigureAwait(false);
-        var artist = RelatedArtist.Pick(found.Artists, name);
-        return artist is null ? [] : await client.GetSimilarArtistsAsync(artist, 16, ct).ConfigureAwait(false);
+        await client.AddToPlaylistAsync(playlist.ItemId, [trackUri], ct).ConfigureAwait(false);
+    }
+
+    public async Task PlayQueueIndexAsync(PlayTarget target, int index, CancellationToken ct = default)
+    {
+        var client = await _service.GetClientAsync(ct).ConfigureAwait(false);
+        await client.PlayQueueIndexAsync(target.QueueId, index, ct).ConfigureAwait(false);
     }
 }

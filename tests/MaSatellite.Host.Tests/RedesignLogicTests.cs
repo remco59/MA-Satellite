@@ -93,14 +93,13 @@ public class RedesignLogicTests
         using var doc = JsonDocument.Parse("""
             {"media_type":"track","item_id":"1","provider":"library","name":"T","uri":"library://track/1",
              "timestamp_added":1700000000,"last_played":0,"play_count":3,"favorite":true,
-             "metadata":{"lyrics":"la la"}}
+             "metadata":{}}
             """);
         var item = MaItemParser.ParseItem(doc.RootElement, "http://x");
         Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(1700000000), item.AddedAt);
         Assert.Null(item.LastPlayed);
         Assert.Equal(3, item.PlayCount);
         Assert.True(item.Favorite);
-        Assert.Equal("la la", item.Lyrics);
     }
 
     [Fact]
@@ -128,13 +127,5 @@ public class RedesignLogicTests
         Assert.Equal("Because you played Discovery", because!.Value.Title);
         Assert.Equal(["Homework"], because.Value.Items.Select(i => i.Name));
         Assert.Null(DiscoverComposer.Because([], albums));
-    }
-
-    [Fact]
-    public void Lrc_lyrics_lose_their_time_tags_but_plain_lyrics_are_untouched()
-    {
-        var lrc = "[ar:Artist]\n[00:12.30]First line\n[01:02.5][01:30.00]Second line\n";
-        Assert.Equal("First line" + Environment.NewLine + "Second line", LyricsFormatter.ToPlainText(lrc));
-        Assert.Equal("Just words" + Environment.NewLine + "More", LyricsFormatter.ToPlainText("Just words\nMore"));
     }
 }
