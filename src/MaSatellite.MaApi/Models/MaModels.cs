@@ -24,7 +24,12 @@ public sealed record MaItem(
     string? ImageUrl,
     bool IsPlayable = true,
     string? Overview = null,
-    IReadOnlyList<string>? Genres = null)
+    IReadOnlyList<string>? Genres = null,
+    DateTimeOffset? AddedAt = null,
+    DateTimeOffset? LastPlayed = null,
+    int? PlayCount = null,
+    bool Favorite = false,
+    string? Lyrics = null)
 {
     /// <summary>"Artist · Album" style one-liner for lists.</summary>
     public string Description => string.Join(" · ", new[] { Subtitle, AlbumName, Year?.ToString() }.Where(s => !string.IsNullOrWhiteSpace(s)));

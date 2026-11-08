@@ -24,7 +24,7 @@
       <FontIcon x:Name="Placeholder" Glyph="&#xE8D6;" FontSize="18" Foreground="{StaticResource AuroraMuted}" Opacity="0.5"/>
       <Rectangle x:Name="ArtRect" RadiusX="8" RadiusY="8"/>
       <Button x:Name="PlayButton" Click="OnPlayClick" Style="{StaticResource AuroraIconButtonStyle}"
-              Background="#B30B1020" Foreground="White" Width="48" Height="48" MinHeight="48" CornerRadius="8" Opacity="0"
+              Background="#B30A0A12" Foreground="White" Width="48" Height="48" MinHeight="48" CornerRadius="8" Opacity="0"
               ToolTipService.ToolTip="Play now" AutomationProperties.Name="Play now">
         <Button.OpacityTransition><ScalarTransition Duration="0:0:0.15"/></Button.OpacityTransition>
         <FontIcon Glyph="&#xE768;" FontSize="16"/>

@@ -437,4 +437,47 @@ public class MaClientTests
 
         Assert.True(cond());
     }
+
+    [Fact]
+    public async Task Queue_edit_commands_send_the_expected_arguments()
+    {
+        await using var server = new FakeMaServer();
+        server.Handlers["player_queues/delete_item"] = _ => null;
+        server.Handlers["player_queues/move_item"] = _ => null;
+        server.Handlers["player_queues/clear"] = _ => null;
+        await using var client = await ConnectAsync(server);
+
+        await client.RemoveQueueItemAsync("q1", "item-7");
+        await client.MoveQueueItemAsync("q1", "item-7", -2);
+        await client.ClearQueueAsync("q1");
+
+        var remove = server.Received.Single(r => r.Command == "player_queues/delete_item").Args;
+        Assert.Equal("q1", remove.GetProperty("queue_id").GetString());
+        Assert.Equal("item-7", remove.GetProperty("item_id_or_index").GetString());
+        var move = server.Received.Single(r => r.Command == "player_queues/move_item").Args;
+        Assert.Equal(-2, move.GetProperty("pos_shift").GetInt32());
+        Assert.Equal("item-7", move.GetProperty("queue_item_id").GetString());
+        Assert.Equal("q1", server.Received.Single(r => r.Command == "player_queues/clear").Args.GetProperty("queue_id").GetString());
+    }
+
+    [Fact]
+    public async Task Favourites_add_by_uri_and_remove_by_library_id_and_library_can_filter_favourites()
+    {
+        await using var server = new FakeMaServer();
+        server.Handlers["music/favorites/add_item"] = _ => null;
+        server.Handlers["music/favorites/remove_item"] = _ => null;
+        server.Handlers["music/albums/library_items"] = _ => new[] { Album };
+        await using var client = await ConnectAsync(server);
+        var item = new MaItem(MaMediaType.Album, "12", "library", "Kid A", "library://album/12", null, null, 2000, null, null);
+
+        await client.SetFavoriteAsync(item, true);
+        await client.SetFavoriteAsync(item, false);
+        await client.GetLibraryAsync(MaMediaType.Album, favoriteOnly: true);
+
+        Assert.Equal("library://album/12", server.Received.Single(r => r.Command == "music/favorites/add_item").Args.GetProperty("item").GetString());
+        var remove = server.Received.Single(r => r.Command == "music/favorites/remove_item").Args;
+        Assert.Equal("album", remove.GetProperty("media_type").GetString());
+        Assert.Equal("12", remove.GetProperty("library_item_id").GetString());
+        Assert.True(server.Received.Single(r => r.Command == "music/albums/library_items").Args.GetProperty("favorite").GetBoolean());
+    }
 }

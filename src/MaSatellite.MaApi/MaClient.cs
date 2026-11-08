@@ -91,7 +91,7 @@ public sealed class MaClient : IAsyncDisposable
     }
 
     /// <summary>Lists a library collection with optional server-side sorting across the whole library.</summary>
-    public async Task<IReadOnlyList<MaItem>> GetLibraryAsync(MaMediaType type, string? search = null, int limit = 100, int offset = 0, string? sortField = null, string? sortDirection = null, CancellationToken ct = default)
+    public async Task<IReadOnlyList<MaItem>> GetLibraryAsync(MaMediaType type, string? search = null, int limit = 100, int offset = 0, string? sortField = null, string? sortDirection = null, bool favoriteOnly = false, CancellationToken ct = default)
     {
         var command = type switch
         {
@@ -109,6 +109,11 @@ public sealed class MaClient : IAsyncDisposable
             ["limit"] = limit,
             ["offset"] = offset,
         };
+        if (favoriteOnly)
+        {
+            args["favorite"] = true;
+        }
+
         if (!string.IsNullOrWhiteSpace(sortField))
         {
             // Music Assistant 2.11 switched from the legacy order_by parameter
@@ -260,6 +265,43 @@ public sealed class MaClient : IAsyncDisposable
             ["player_id"] = playerId,
             ["muted"] = muted,
         }, cancellationToken: ct);
+
+    /// <summary>Removes one entry from a queue.</summary>
+    public Task RemoveQueueItemAsync(string queueId, string queueItemId, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("player_queues/delete_item", new Dictionary<string, object?>
+        {
+            ["queue_id"] = queueId,
+            ["item_id_or_index"] = queueItemId,
+        }, cancellationToken: ct);
+
+    /// <summary>Moves a queue entry up (negative) or down (positive) by <paramref name="positions"/> places.</summary>
+    public Task MoveQueueItemAsync(string queueId, string queueItemId, int positions, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("player_queues/move_item", new Dictionary<string, object?>
+        {
+            ["queue_id"] = queueId,
+            ["queue_item_id"] = queueItemId,
+            ["pos_shift"] = positions,
+        }, cancellationToken: ct);
+
+    public Task ClearQueueAsync(string queueId, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("player_queues/clear", new Dictionary<string, object?> { ["queue_id"] = queueId }, cancellationToken: ct);
+
+    /// <summary>Fetches a library item (with favourite flag and lyrics metadata) by its URI, or null when it is unknown.</summary>
+    public async Task<MaItem?> GetItemByUriAsync(string uri, CancellationToken ct = default)
+    {
+        var result = await _connection.SendCommandAsync("music/item_by_uri", new Dictionary<string, object?> { ["uri"] = uri }, cancellationToken: ct).ConfigureAwait(false);
+        return result.ValueKind == JsonValueKind.Object ? MaItemParser.ParseItem(result, _baseUrl, imageSize: 512) : null;
+    }
+
+    /// <summary>Adds an item to, or removes it from, the user's favourites.</summary>
+    public Task SetFavoriteAsync(MaItem item, bool favorite, CancellationToken ct = default) =>
+        favorite
+            ? _connection.SendCommandAsync("music/favorites/add_item", new Dictionary<string, object?> { ["item"] = item.Uri }, cancellationToken: ct)
+            : _connection.SendCommandAsync("music/favorites/remove_item", new Dictionary<string, object?>
+            {
+                ["media_type"] = item.Type.ToString().ToLowerInvariant(),
+                ["library_item_id"] = item.ItemId,
+            }, cancellationToken: ct);
 
     /// <summary>Finds the player that represents this PC: by client id, then by name.</summary>
     public static MaPlayer? FindThisPlayer(IEnumerable<MaPlayer> players, string clientId, string playerName)

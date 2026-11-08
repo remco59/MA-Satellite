@@ -36,7 +36,7 @@ internal static class Motion
     }
 
     /// <summary>A slow breathing opacity loop for loading skeletons. Runs on the compositor.</summary>
-    public static void Pulse(UIElement element)
+    public static void Pulse(UIElement element, int milliseconds = 900)
     {
         if (!Enabled)
         {
@@ -47,7 +47,7 @@ internal static class Motion
         var animation = visual.Compositor.CreateScalarKeyFrameAnimation();
         animation.InsertKeyFrame(0f, 0.55f);
         animation.InsertKeyFrame(1f, 1f);
-        animation.Duration = TimeSpan.FromMilliseconds(900);
+        animation.Duration = TimeSpan.FromMilliseconds(milliseconds);
         animation.Direction = Microsoft.UI.Composition.AnimationDirection.Alternate;
         animation.IterationBehavior = Microsoft.UI.Composition.AnimationIterationBehavior.Forever;
         visual.StartAnimation("Opacity", animation);

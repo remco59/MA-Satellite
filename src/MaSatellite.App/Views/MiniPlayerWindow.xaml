@@ -111,7 +111,7 @@
               ToolTipService.ToolTip="Play or pause" AutomationProperties.Name="Play or pause">
         <Grid Width="28" Height="28">
           <Ellipse x:Name="PlayPauseTrack" Visibility="Collapsed" Width="26" Height="26"
-                   Stroke="#B3A8FF" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                   Stroke="#C4B5FD" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
           <FontIcon x:Name="PlayPauseIcon" Glyph="&#xE768;" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
           <ProgressRing x:Name="PlayPauseSpinner" IsActive="False" Visibility="Collapsed"
                         Foreground="White" Width="28" Height="28"/>
