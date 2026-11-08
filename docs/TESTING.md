@@ -61,7 +61,7 @@ Layout and motion are XAML-only, so they need a hands-on pass on Windows (CI onl
 - [ ] Play something to the PC: audio starts, no dropouts for 1 hour (check the log for `Dropped an undecodable audio chunk` and the settings window diagnostics: `in sync`, sync error under a few ms).
 - [ ] Group the PC with another Sendspin/Cast/other player and clap or play a click track: no audible offset. If there is one, adjust *Static delay* (also adjustable from MA's player settings).
 - [ ] Volume: move the MA slider → the Windows volume changes; change the Windows volume (keyboard, flyout) → MA's slider follows within a second. Mute likewise.
-- [ ] Switch the output device in Settings or the flyout while playing: audio continues on the new device after a moment. Unplug USB/Bluetooth headphones while playing: playback falls back to / waits for the default device and resumes.
+- [ ] Switch the output device in Settings while playing: audio continues on the new device after a moment. Unplug USB/Bluetooth headphones while playing: playback falls back to / waits for the default device and resumes.
 - [ ] Pause/skip in MA behave instantly; seeking in MA does not glitch.
 
 ### Encrypted protocol (once, with *Allow legacy clients* still on)
@@ -73,7 +73,8 @@ Layout and motion are XAML-only, so they need a hands-on pass on Windows (CI onl
 - [ ] *Automatic* with *Allow legacy clients* on and encryption working: log shows the encrypted session, not legacy.
 
 ### M2 – mini-player and Windows integration
-- [ ] Left-click the tray icon: flyout shows artwork, title/artist/album, seek bar, volume and output device; it closes when you click elsewhere.
+- [ ] Left-click the tray icon: a small flyout shows artwork, title/artist/album, seek bar, transport and volume; it closes when you click elsewhere. The *Queue* tab lists the queue with the current track highlighted, and clicking a row jumps to it.
+- [ ] Double-click the tray icon: the full app (library window) opens and the flyout does not stay open.
 - [ ] Play/pause/next/previous and the seek bar control MA; buttons grey out when MA does not offer them.
 - [ ] Media keys (play/pause/next/previous) control MA.
 - [ ] The Windows volume flyout and the lock screen show the track card with the right info and artwork.

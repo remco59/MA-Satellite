@@ -21,6 +21,7 @@ public sealed class TrayIcon : IDisposable
     private IntPtr _hIcon;
     private string _tooltip = "ma-satellite";
     private bool _added;
+    private bool _ignoreNextRelease;
     private bool _disposed;
 
     public TrayIcon(string iconPath)
@@ -38,6 +39,9 @@ public sealed class TrayIcon : IDisposable
 
     /// <summary>Primary-click on the icon.</summary>
     public event Action? Clicked;
+
+    /// <summary>Double-click on the icon. The first click of the pair has already raised <see cref="Clicked"/>.</summary>
+    public event Action? DoubleClicked;
 
     public void Show()
     {
@@ -156,7 +160,18 @@ public sealed class TrayIcon : IDisposable
             switch ((uint)(lParam.ToInt64() & 0xFFFF))
             {
                 case WM_LBUTTONUP:
+                    // The button release that ends a double click must not count as another single click.
+                    if (_ignoreNextRelease)
+                    {
+                        _ignoreNextRelease = false;
+                        break;
+                    }
+
                     Clicked?.Invoke();
+                    break;
+                case WM_LBUTTONDBLCLK:
+                    _ignoreNextRelease = true;
+                    DoubleClicked?.Invoke();
                     break;
                 case WM_RBUTTONUP:
                     ShowContextMenu();

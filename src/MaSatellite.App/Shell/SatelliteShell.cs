@@ -79,6 +79,7 @@ internal sealed class SatelliteShell : IDisposable
         };
         _tray.MenuItemInvoked += OnMenuItem;
         _tray.Clicked += ToggleMiniPlayer;
+        _tray.DoubleClicked += OpenFullApp;
         _tray.Show();
         _tray.SetTooltip($"ma-satellite — {settings.PlayerName}");
 
@@ -256,7 +257,19 @@ internal sealed class SatelliteShell : IDisposable
             return null;
         }
 
-        return _miniPlayer ??= new MiniPlayerWindow(_host, _settings, _devices, ShowSettings, ShowLibrary, () => _tray?.GetScreenRect());
+        return _miniPlayer ??= new MiniPlayerWindow(_host, () => _libraryController, () => _tray?.GetScreenRect());
+    }
+
+    /// <summary>Double-clicking the tray icon opens the full app; the flyout opened by its first click goes away.</summary>
+    private void OpenFullApp()
+    {
+        _trayHover.SuppressUntilIconExit();
+        if (_miniPlayer is { IsShown: true })
+        {
+            _miniPlayer.HideFlyout();
+        }
+
+        ShowLibrary();
     }
 
     private void ToggleMiniPlayer()
