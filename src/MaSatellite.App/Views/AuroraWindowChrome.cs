@@ -8,8 +8,23 @@ namespace MaSatellite.App.Views;
 /// <summary>Keep native Windows caption buttons visually consistent with the dark app.</summary>
 internal static class AuroraWindowChrome
 {
+    /// <summary>Gives a window the app icon so the taskbar and title bar do not show the generic placeholder.</summary>
+    public static void SetIcon(Window window)
+    {
+        try
+        {
+            window.AppWindow.SetIcon(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "tray.ico"));
+        }
+        catch (Exception)
+        {
+            // A missing icon file must never prevent a window from opening.
+        }
+    }
+
     public static void Apply(Window window, UIElement? dragRegion = null)
     {
+        SetIcon(window);
+
         // The library window draws its own title area; the caption buttons then sit on top of the page.
         if (dragRegion is not null && AppWindowTitleBar.IsCustomizationSupported())
         {
