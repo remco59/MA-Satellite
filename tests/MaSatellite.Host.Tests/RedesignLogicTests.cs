@@ -67,8 +67,9 @@ public class RedesignLogicTests
     public void Discover_has_no_insight_or_stats_without_data()
     {
         var layout = DiscoverComposer.Compose([], [Item("a")], [], [], null, [], null);
-        Assert.Null(layout.Insight);
         Assert.Null(layout.Stats);
+        // Without play counts or genres the insight only states what the library contains.
+        Assert.Equal("Your library has 1 albums.", layout.Insight!.Detail);
         Assert.Single(layout.Undiscovered);
         Assert.Empty(layout.NewAlbums);
     }

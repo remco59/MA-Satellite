@@ -39,7 +39,7 @@ public static class DiscoverComposer
     {
         var genres = Genres(albums);
         var stats = Stats(recent, albums, artistsByPlays);
-        var insight = Insight(genres, stats, similarArtists);
+        var insight = Insight(genres, stats, similarArtists, albums);
         var newAlbums = albums.Where(a => a.IsPlayable && !string.IsNullOrWhiteSpace(a.Uri) && a.AddedAt.HasValue)
             .OrderByDescending(a => a.AddedAt).Take(20).ToList();
         // "Not discovered yet": library albums that have never been played (the server reports a play count of 0 or none).
@@ -100,13 +100,8 @@ public static class DiscoverComposer
             top);
     }
 
-    private static MusicInsight? Insight(IReadOnlyList<GenreCount> genres, ListeningStats? stats, IReadOnlyList<MaItem> similar)
+    private static MusicInsight? Insight(IReadOnlyList<GenreCount> genres, ListeningStats? stats, IReadOnlyList<MaItem> similar, IReadOnlyList<MaItem> albums)
     {
-        if (genres.Count == 0 && stats?.TopArtist is null)
-        {
-            return null;
-        }
-
         var parts = new List<string>();
         if (stats?.TopArtist is { } top)
         {
@@ -119,6 +114,17 @@ public static class DiscoverComposer
             parts.Add($"Most of your albums are tagged {string.Join(" and ", names)}.");
         }
 
-        return new MusicInsight("Your music insight", string.Join(" ", parts), similar.Take(4).ToList());
+        var shown = similar.Take(4).ToList();
+        if (parts.Count == 0 && albums.Count > 0)
+        {
+            // No play counts or genre tags on this server: say what the library itself contains, nothing more.
+            var unplayed = albums.Count(a => a.LastPlayed is null && (a.PlayCount ?? 0) == 0);
+            parts.Add($"Your library has {albums.Count:N0} albums" + (unplayed > 0 && unplayed < albums.Count
+                ? $", {unplayed:N0} of which you haven't played yet."
+                : "."));
+            shown = albums.Where(a => !string.IsNullOrWhiteSpace(a.ImageUrl)).Take(4).ToList();
+        }
+
+        return parts.Count == 0 ? null : new MusicInsight("Your music insight", string.Join(" ", parts), shown);
     }
 }

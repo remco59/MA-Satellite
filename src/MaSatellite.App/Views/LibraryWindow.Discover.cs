@@ -94,18 +94,18 @@ public sealed partial class LibraryWindow
         GenreSection.Visibility = layout.Genres.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         SetShelf(DiscoverGenreShelf, []);
 
+        // Only statistics the server actually reported: a zero from a server without play counts would be misleading.
+        var statTiles = new List<ExploreTile>();
         if (layout.Stats is { } stats)
         {
-            StatsList.ItemsSource = new List<ExploreTile>
-            {
-                new("plays", "\uE768", stats.TotalPlays.ToString("N0"), "album plays counted in your library"),
-                new("albums", "\uE93C", stats.PlayedAlbums.ToString("N0"), "albums you have played"),
-                new("artists", "\uE77B", stats.DistinctArtists.ToString("N0"), "artists in your recent listening"),
-                new("top", "\uE734", stats.TopArtist ?? "—", "your most played artist"),
-            };
+            if (stats.TotalPlays > 0) statTiles.Add(new("plays", "\uE768", stats.TotalPlays.ToString("N0"), "album plays counted in your library"));
+            if (stats.PlayedAlbums > 0) statTiles.Add(new("albums", "\uE93C", stats.PlayedAlbums.ToString("N0"), "albums you have played"));
+            if (stats.DistinctArtists > 0) statTiles.Add(new("artists", "\uE77B", stats.DistinctArtists.ToString("N0"), "artists in your recent listening"));
+            if (stats.TopArtist is not null) statTiles.Add(new("top", "\uE734", stats.TopArtist, "your most played artist"));
         }
 
-        StatsPanel.Visibility = layout.Stats is null ? Visibility.Collapsed : Visibility.Visible;
+        StatsList.ItemsSource = statTiles.Count > 0 ? statTiles : null;
+        StatsPanel.Visibility = statTiles.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         // Quick links to the sections that exist.
         var tiles = new List<ExploreTile>();
@@ -129,15 +129,17 @@ public sealed partial class LibraryWindow
             tiles.Add(new("genres", "\uE8EC", "Explore genres", $"{layout.Genres.Count} genres in your library"));
         }
 
-        if (layout.Stats is not null)
+        if (statTiles.Count > 0)
         {
             tiles.Add(new("stats", "\uE9D9", "Listening stats", "Your music in numbers"));
         }
 
-        ExploreTiles.ItemsSource = tiles.Count > 0 ? tiles : null;
-        ExploreSection.Visibility = tiles.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        // A lone shortcut is not worth a section of its own.
+        var showTiles = tiles.Count >= 2;
+        ExploreTiles.ItemsSource = showTiles ? tiles : null;
+        ExploreSection.Visibility = showTiles ? Visibility.Visible : Visibility.Collapsed;
 
-        return layout.Insight is null && tiles.Count == 0 && layout.Undiscovered.Count == 0;
+        return layout.Insight is null && tiles.Count == 0 && layout.Undiscovered.Count == 0 && layout.NewAlbums.Count == 0;
     }
 
     private void ClearDiscover()
@@ -174,7 +176,7 @@ public sealed partial class LibraryWindow
         };
         ToolTipService.SetToolTip(button, artist.Name);
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, $"Open {artist.Name}");
-        button.Click += async (_, _) => await GoToAsync(new NavState("artist", artist));
+        button.Click += async (_, _) => await GoToAsync(new NavState(artist.Type == MaMediaType.Artist ? "artist" : "album", artist));
         return button;
     }
 
