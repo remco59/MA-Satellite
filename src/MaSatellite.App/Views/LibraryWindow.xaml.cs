@@ -598,8 +598,9 @@ public sealed partial class LibraryWindow : Window
                     // Only advertise "On repeat" when the server can actually rank play counts.
                 }
 
-                playlistRows = playlistItems.Where(i => i.IsPlayable).Take(20)
-                    .Select(i => ListRow.From(i)).ToList();
+                playlistRows = playlistItems.Where(i => i.IsPlayable)
+                    .DistinctBy(i => i.Uri, StringComparer.OrdinalIgnoreCase)
+                    .Take(20).Select(i => ListRow.From(i)).ToList();
                 timeRows = TimeOfDayPicks(playlistItems, DateTime.Now.Hour);
 
                 if (recentItems.Count > 0)
@@ -668,14 +669,18 @@ public sealed partial class LibraryWindow : Window
                 : [];
             var quickUris = quickRows.Select(r => r.Item?.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
             // Shelves below never immediately repeat what quick access already shows.
+            // Hide the shelf rather than repeating quick-access items when too few remain.
             List<ListRow> playlistShelf = isHome ? playlistRows.Where(r => !quickUris.Contains(r.Item?.Uri)).ToList() : [];
-            if (playlistShelf.Count < 4)
+            if (playlistShelf.Count < 3)
             {
-                playlistShelf = isHome ? playlistRows : [];
+                playlistShelf = [];
             }
 
             var newPlaylistShelf = isHome
-                ? newPlaylistRows.Where(r => !playlistRows.Any(p => p.Item?.Uri == r.Item?.Uri)).ToList()
+                ? newPlaylistRows
+                    .DistinctBy(r => r.Item?.Uri, StringComparer.OrdinalIgnoreCase)
+                    .Where(r => !playlistRows.Any(p => string.Equals(p.Item?.Uri, r.Item?.Uri, StringComparison.OrdinalIgnoreCase)))
+                    .ToList()
                 : [];
             HomeGreeting.Text = HomeGreetingText(DateTime.Now);
             HomeQuickGrid.ItemsSource = isHome ? quickRows : null;
