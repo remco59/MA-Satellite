@@ -16,4 +16,4 @@ Use a screenshot of the main window and mini-player plus the log in `%LOCALAPPDA
 
 ## Publishing a release
 
-Set `<Version>` in `Directory.Build.props` (and the manifest's `Identity Version`), merge, then push a matching tag (for example `git tag v0.2.0 && git push origin v0.2.0`). CI builds, tests and attaches the installer and MSIX files to a new GitHub Release (it fails if the tag and the version disagree).
+Set `<Version>` in `Directory.Build.props` (and the manifest's `Identity Version`), merge, then push a matching tag (for example `git tag v0.3.0 && git push origin v0.3.0`). CI builds, tests and attaches the installer and MSIX files to a new GitHub Release (it fails if the tag and the version disagree).
