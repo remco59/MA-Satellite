@@ -247,10 +247,11 @@
         <!-- Search: result-type filter. -->
         <StackPanel x:Name="SearchChips" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
           <ToggleButton x:Name="ChipAll" Tag="all" Content="All" IsChecked="True" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
-          <ToggleButton x:Name="ChipAlbums" Tag="Album" Content="Albums" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
-          <ToggleButton x:Name="ChipArtists" Tag="Artist" Content="Artists" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
           <ToggleButton x:Name="ChipTracks" Tag="Track" Content="Tracks" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
+          <ToggleButton x:Name="ChipArtists" Tag="Artist" Content="Artists" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
+          <ToggleButton x:Name="ChipAlbums" Tag="Album" Content="Albums" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
           <ToggleButton x:Name="ChipPlaylists" Tag="Playlist" Content="Playlists" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
+          <ToggleButton x:Name="ChipRadio" Tag="Radio" Content="Radio" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
         </StackPanel>
         <!-- Queue: moving the queue to another player. -->
         <StackPanel x:Name="QueueBar" Orientation="Horizontal" Visibility="Collapsed">

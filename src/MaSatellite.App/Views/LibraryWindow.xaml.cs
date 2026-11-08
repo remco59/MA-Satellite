@@ -322,7 +322,7 @@ public sealed partial class LibraryWindow : Window
         }
     }
 
-    private IEnumerable<ToggleButton> SearchChipButtons => [ChipAll, ChipAlbums, ChipArtists, ChipTracks, ChipPlaylists];
+    private IEnumerable<ToggleButton> SearchChipButtons => [ChipAll, ChipTracks, ChipArtists, ChipAlbums, ChipPlaylists, ChipRadio];
 
     private async void OnBack(object sender, RoutedEventArgs e) => await GoBackAsync();
 
@@ -847,7 +847,8 @@ public sealed partial class LibraryWindow : Window
             {
                 var client = await _controller.Service.GetClientAsync();
                 var results = await client.SearchAsync(_lastQuery);
-                rows = results.Albums.Concat(results.Artists).Concat(results.Tracks).Concat(results.Playlists).Select(i => ListRow.From(i, showType: true)).ToList();
+                rows = results.InDisplayOrder.Select(i => ListRow.From(i, showType: true)).ToList();
+                ChipRadio.Content = $"Radio ({results.Radios.Count})";
                 ChipAlbums.Content = $"Albums ({results.Albums.Count})";
                 ChipArtists.Content = $"Artists ({results.Artists.Count})";
                 ChipTracks.Content = $"Tracks ({results.Tracks.Count})";

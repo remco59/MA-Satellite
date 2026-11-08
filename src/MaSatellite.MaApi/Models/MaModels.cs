@@ -34,11 +34,15 @@ public sealed record MaSearchResults(
     IReadOnlyList<MaItem> Artists,
     IReadOnlyList<MaItem> Albums,
     IReadOnlyList<MaItem> Tracks,
-    IReadOnlyList<MaItem> Playlists)
+    IReadOnlyList<MaItem> Playlists,
+    IReadOnlyList<MaItem> Radios)
 {
-    public static MaSearchResults Empty { get; } = new([], [], [], []);
+    public static MaSearchResults Empty { get; } = new([], [], [], [], []);
 
-    public bool IsEmpty => Artists.Count + Albums.Count + Tracks.Count + Playlists.Count == 0;
+    public bool IsEmpty => Artists.Count + Albums.Count + Tracks.Count + Playlists.Count + Radios.Count == 0;
+
+    /// <summary>All results in the order Music Assistant's own search shows them: tracks, artists, albums, playlists, radio.</summary>
+    public IEnumerable<MaItem> InDisplayOrder => Tracks.Concat(Artists).Concat(Albums).Concat(Playlists).Concat(Radios);
 }
 
 public sealed record MaPlayer(string PlayerId, string Name, bool Available, bool? Powered, string PlaybackState, string Type, int? Volume);
