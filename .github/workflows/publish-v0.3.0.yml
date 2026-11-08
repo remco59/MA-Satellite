@@ -1,0 +1,86 @@
+name: Publish ma-satellite v0.3.0
+
+# One-time release workflow: only the merge that adds this file to main starts it.
+# The Windows installer must be the artifact from the *same* commit's green CI.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-v0.3.0.yml'
+
+permissions:
+  contents: write
+  actions: read
+  checks: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify exact release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F '<Version>0.3.0</Version>' Directory.Build.props
+          grep -F 'Name="MaSatellite" Publisher="CN=MaSatellite Dev" Version="0.3.0.0"' src/MaSatellite.App/Package.appxmanifest
+
+      - name: Wait for successful CI of this exact main commit
+        id: ci
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          run_id=""
+          for i in $(seq 1 40); do
+            run_id="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$GITHUB_SHA" --event push --json databaseId --jq '.[0].databaseId // empty')"
+            if [[ -n "$run_id" ]]; then break; fi
+            sleep 15
+          done
+          if [[ -z "$run_id" ]]; then echo "::error::Matching main-branch CI was not found"; exit 1; fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          gh run watch "$run_id" --repo "$GITHUB_REPOSITORY" --exit-status
+          result="$(gh run view "$run_id" --repo "$GITHUB_REPOSITORY" --json headSha,conclusion --jq '[.headSha,.conclusion] | join(" ")')"
+          test "$result" = "$GITHUB_SHA success" || { echo "::error::Release CI SHA or conclusion did not match: $result"; exit 1; }
+
+      - name: Download tested EXE installer
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.ci.outputs.run_id }}
+          name: ma-satellite-installer
+          path: release
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download signed MSIX and installation tools
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ steps.ci.outputs.run_id }}
+          name: ma-satellite-msix
+          path: release
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish verified v0.3.0 assets and checksums
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ls -lh release
+          test -f release/ma-satellite-setup-0.3.0.exe
+          test -f release/MaSatellite.App_0.3.0.0_x64.msix
+          test -f release/MaSatellite.Dev.cer
+          test -f release/Install-Dev.ps1
+          if gh release view v0.3.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::v0.3.0 already exists; refusing to overwrite"
+            exit 1
+          fi
+          (cd release && sha256sum ma-satellite-setup-0.3.0.exe MaSatellite.App_0.3.0.0_x64.msix MaSatellite.Dev.cer Install-Dev.ps1 > SHA256SUMS.txt)
+          gh release create v0.3.0 release/* \
+            --target "$GITHUB_SHA" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "ma-satellite v0.3.0 — Aurora 2.0, radio and tray mini-player" \
+            --latest \
+            --notes "Aurora 2.0 desktop redesign: new design tokens and card components, redesigned Library window, radio integrated into Library, Home and search, rich album/playlist detail pages with track numbers and durations, a compact tray mini-player with queue view (hover or double-click the tray icon), docked Now playing and Queue panels, and an app icon on the exe and windows. Built and installer-smoke-tested by Windows CI for this exact commit. Includes Windows x64 .exe installer and signed development MSIX. Music Assistant device-specific and visual acceptance testing is still recommended."
