@@ -267,7 +267,10 @@ public sealed partial class LibraryWindow : Window
 
     // All navigation comes through one path so focus, selection and back/forward history stay in sync.
     private async Task NavigateAsync(string tab, bool forceReload = false) =>
-        await GoToAsync(new NavState(tab, null, tab == "search" ? _lastQuery : string.Empty), forceReload);
+        await GoToAsync(new NavState(tab, null, QueryFor(tab)), forceReload);
+
+    /// <summary>The query is part of history only on the search page.</summary>
+    private string QueryFor(string tab) => tab == "search" ? _lastQuery : string.Empty;
 
     private async Task GoToAsync(NavState next, bool forceReload = false)
     {
@@ -289,7 +292,12 @@ public sealed partial class LibraryWindow : Window
     {
         _tab = state.Tab;
         _openedItem = state.Item;
-        _lastQuery = state.Query;
+        if (state.Tab == "search")
+        {
+            // Other pages leave the remembered query alone so the sidebar's Search item can restore it.
+            _lastQuery = state.Query;
+        }
+
         if (state.Tab == "search" && state.Item is null && SearchBox.Text != state.Query)
         {
             SearchBox.Text = state.Query;
@@ -1016,7 +1024,7 @@ public sealed partial class LibraryWindow : Window
     {
         if (row.Item is { } item)
         {
-            await GoToAsync(new NavState(_tab, item, _lastQuery));
+            await GoToAsync(new NavState(_tab, item, QueryFor(_tab)));
         }
     }
 
@@ -1175,7 +1183,7 @@ public sealed partial class LibraryWindow : Window
         // and the row menu still offer immediate playback without navigating.
         if (item.Type is MaMediaType.Album or MaMediaType.Artist or MaMediaType.Playlist or MaMediaType.Track)
         {
-            await GoToAsync(new NavState(_tab, item, _lastQuery));
+            await GoToAsync(new NavState(_tab, item, QueryFor(_tab)));
         }
         else
         {
