@@ -62,6 +62,24 @@ public class NowPlayingApiTests
     }
 
     [Fact]
+    public async Task Queue_items_are_numbered_by_their_place_in_the_queue_not_by_the_server()
+    {
+        await using var server = new FakeMaServer();
+        // Music Assistant sends no usable index: every item would otherwise be number 0.
+        server.Handlers["player_queues/items"] = _ => new[]
+        {
+            new { queue_item_id = "a", name = "One" },
+            new { queue_item_id = "b", name = "Two" },
+            new { queue_item_id = "c", name = "Three" },
+        };
+        await using var client = await ConnectAsync(server);
+
+        var items = await client.GetQueueItemsAsync("q1", limit: 50, offset: 10);
+
+        Assert.Equal([10, 11, 12], items.Select(i => i.Index));
+    }
+
+    [Fact]
     public async Task Details_expose_lyrics_ids_label_and_credited_artists()
     {
         await using var server = new FakeMaServer();

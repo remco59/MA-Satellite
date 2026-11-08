@@ -36,6 +36,24 @@
         </Button>
       </Grid>
     </DataTemplate>
+    <!-- A track that has already played: dimmed, no drag handle. Clicking plays it again. -->
+    <DataTemplate x:Key="QueueRowPlayed" x:DataType="local:QueueRow">
+      <Grid Padding="4,5" ColumnSpacing="12" MinHeight="54" Opacity="0.5">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+        <Grid Width="40" Height="40">
+          <Rectangle RadiusX="8" RadiusY="8" Fill="{StaticResource AuroraCard}"/>
+          <FontIcon Glyph="&#xE8D6;" FontSize="14" Foreground="{StaticResource AuroraMuted}" Opacity="0.5" Visibility="{x:Bind PlaceholderVisibility}"/>
+          <Border CornerRadius="8"><Image Source="{x:Bind Image}" Stretch="UniformToFill"/></Border>
+        </Grid>
+        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+          <TextBlock Text="{x:Bind Title}" FontSize="13" Foreground="{StaticResource AuroraMuted}" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+          <TextBlock Text="{x:Bind Artist}" Style="{StaticResource AuroraSubtitleStyle}" FontSize="12" TextTrimming="CharacterEllipsis" MaxLines="1"/>
+        </StackPanel>
+        <TextBlock Grid.Column="2" Text="{x:Bind DurationLabel}" Foreground="{StaticResource AuroraMuted}" FontSize="12" VerticalAlignment="Center"/>
+      </Grid>
+    </DataTemplate>
     <DataTemplate x:Key="QueueRowNarrow" x:DataType="local:QueueRow">
       <Grid Padding="4,6" ColumnSpacing="12" MinHeight="60">
         <Grid.ColumnDefinitions>
@@ -218,6 +236,18 @@
               <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE74D;" FontSize="13"/><TextBlock Text="Clear queue" FontSize="12"/></StackPanel>
             </Button>
           </Grid>
+
+          <!-- Already played: dimmed and scrolled to the end, so the latest ones sit just above the current track. -->
+          <StackPanel x:Name="HistoryBlock" Spacing="6" Visibility="Collapsed">
+            <TextBlock Text="PLAYED" Style="{StaticResource AuroraSectionLabelStyle}"/>
+            <ScrollViewer x:Name="HistoryScroller" MaxHeight="172" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <ListView x:Name="HistoryList" IsItemClickEnabled="True" SelectionMode="None" ItemClick="OnHistoryItemClick"
+                        ItemTemplate="{StaticResource QueueRowPlayed}" ItemContainerStyle="{StaticResource AuroraListItemStyle}"
+                        ScrollViewer.VerticalScrollMode="Disabled" ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                        Margin="-10,0,-10,0" AutomationProperties.Name="Already played"/>
+            </ScrollViewer>
+            <Border Height="1" Background="{StaticResource AuroraBorder}" Margin="0,4,0,2"/>
+          </StackPanel>
 
           <!-- The track that is playing now: pinned above the list and clearly marked. -->
           <Border x:Name="CurrentCard" Visibility="Collapsed" CornerRadius="14" Padding="12,10" Background="#1F9B8CFF"

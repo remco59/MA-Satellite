@@ -261,8 +261,10 @@ public sealed class MaClient : IAsyncDisposable
             ["limit"] = limit,
             ["offset"] = offset,
         }, cancellationToken: ct).ConfigureAwait(false);
+        // Music Assistant does not number queue items itself: their place in the returned list (plus the page
+        // offset) is the index that current_index and play_index refer to.
         return result.ValueKind == JsonValueKind.Array
-            ? result.EnumerateArray().Select(i => MaItemParser.ParseQueueItem(i, _baseUrl)).ToList()
+            ? result.EnumerateArray().Select((i, position) => MaItemParser.ParseQueueItem(i, _baseUrl) with { Index = offset + position }).ToList()
             : [];
     }
 
