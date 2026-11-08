@@ -133,6 +133,23 @@ public class MaClientTests
     }
 
     [Fact]
+    public async Task Radio_library_uses_the_radios_command_and_parses_stations()
+    {
+        await using var server = new FakeMaServer();
+        server.Handlers["music/radios/library_items"] = _ => new[]
+        {
+            new { media_type = "radio", name = "SLAM!", item_id = "r1", provider = "library", uri = "library://radio/r1" },
+        };
+        await using var client = await ConnectAsync(server);
+
+        var items = await client.GetLibraryAsync(MaMediaType.Radio, limit: 20);
+
+        var station = Assert.Single(items);
+        Assert.Equal(MaMediaType.Radio, station.Type);
+        Assert.Equal("SLAM!", station.Name);
+    }
+
+    [Fact]
     public async Task Legacy_music_assistant_sends_order_by_for_descending_library_sort()
     {
         // MA <= 2.10 ignores sort_field and sort_direction without an error.

@@ -115,6 +115,13 @@
                 <FontIcon Glyph="&#xE8D6;" FontSize="17"/><TextBlock Grid.Column="1" Tag="label" Text="Tracks" VerticalAlignment="Center"/>
               </Grid>
             </Button>
+            <Button x:Name="NavRadio" Tag="radio" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                    ToolTipService.ToolTip="Radio" AutomationProperties.Name="Radio">
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE93E;" FontSize="17"/><TextBlock Grid.Column="1" Tag="label" Text="Radio" VerticalAlignment="Center"/>
+              </Grid>
+            </Button>
 
             <TextBlock Tag="label" Text="PLAYBACK" Margin="14,18,0,6" Style="{StaticResource AuroraSectionLabelStyle}"/>
             <Button x:Name="NavNow" Tag="now" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
@@ -374,8 +381,10 @@
                          ShowAllTarget="playlist"/>
             <local:Shelf x:Name="HomeNewPlaylistsShelf" Visibility="Collapsed" ItemClick="OnItemClick" ShowAll="OnShelfShowAll"
                          ShowAllTarget="playlist" Title="Recently added" Subtitle="Fresh additions to your playlists."/>
+            <local:Shelf x:Name="HomeRadioShelf" Visibility="Collapsed" ItemClick="OnItemClick" ShowAll="OnShelfShowAll"
+                         ShowAllTarget="radio" Title="Radio stations" Subtitle="Live stations from your library."/>
             <local:Shelf x:Name="HomeRecentShelf" Visibility="Collapsed" ItemClick="OnItemClick"
-                         Title="Jump back in" Subtitle="Albums and tracks you listened to recently."/>
+                         Title="Jump back in" Subtitle="Albums, tracks and stations you listened to recently."/>
           </StackPanel>
         </ScrollViewer>
 

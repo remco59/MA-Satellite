@@ -99,6 +99,7 @@ public sealed class MaClient : IAsyncDisposable
             MaMediaType.Album => "music/albums/library_items",
             MaMediaType.Track => "music/tracks/library_items",
             MaMediaType.Playlist => "music/playlists/library_items",
+            MaMediaType.Radio => "music/radios/library_items",
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported library type"),
         };
 
