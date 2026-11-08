@@ -74,7 +74,7 @@ The token is stored encrypted using Windows DPAPI for your account, not in plain
 - **Home:** Greeting and quick-access playlists, then playlist shelves (most played, time of day, recently added), recent listening, frequently played tracks, albums and similar artists where supported.
 - **Library / Playlists:** Toggle **List** or **Grid** and use **Sort library**. View/sort choices are tracked separately per section during the app session.
 - **Search:** Find music across the connected Music Assistant providers.
-- **Now playing / Queue:** See the selected target's current track, control playback, play a queue item, or transfer the queue to another player.
+- **Now playing / Queue:** Panels that expand from the player bar without covering the library. See the selected target's current track, control playback, play a queue item, or transfer the queue to another player.
 - **Player footer:** Control playback and volume while navigating your library. For **This PC**, MA Satellite uses live Sendspin playback state; other players are controlled through the Music Assistant API.
 
 **Volume behavior:** The MA Satellite player's volume is the **Windows master volume for the selected output device**. Changing it from Music Assistant also affects other applications using that device.

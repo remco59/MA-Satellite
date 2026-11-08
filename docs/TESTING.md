@@ -34,7 +34,7 @@ Layout and motion are XAML-only, so they need a hands-on pass on Windows (CI onl
 - [ ] Home shows one greeting (no "Welcome back"), then only sections that have data: featured cards, Recently played, Made for you, Your most played playlists, Recently added, Jump back in. No playlist is repeated across Featured / Made for you / Most played / Recently added. Shuffle on a featured card works for another player and is disabled for "This PC".
 - [ ] Cards: artwork zooms slightly on hover; play and "…" appear on hover or keyboard focus; right-click opens the same menu (Play now / Play next / Add to queue).
 - [ ] Library pages: filter box, sort and list/grid switch work; Search has result-type chips with counts.
-- [ ] Now Playing: large artwork, background tinted from the artwork (falls back to the default gradient), prev/play/next work, "Up next" lists the queue.
+- [ ] Now Playing: opens as a panel that slides up out of the player bar (artwork, title, tint from the artwork, falling back to the default gradient). The library above stays scrollable and searchable while it is open; the bar controls drive playback. Clicking the artwork, the expand button or *Now playing* toggles it; the chevron collapses it.
 - [ ] Player bar: play/pause shows the spinner while a command is pending; seek, volume, mute, shuffle and repeat behave as before; Windows "Animations" off disables the motion.
 
 ### M0 – skeleton
@@ -88,7 +88,7 @@ Layout and motion are XAML-only, so they need a hands-on pass on Windows (CI onl
 - [ ] Settings: enter the MA host and a long-lived token (Music Assistant → your profile → *Long-lived access tokens*), press *Test connection*.
 - [ ] Library…: Albums/Artists/Playlists/Tracks load; search finds items across providers; opening an album lists its tracks.
 - [ ] Play an album on *This PC* and on another player; *Play next* and *Add to queue* work.
-- [ ] Queue tab shows the queue of the chosen player and updates live; *Transfer* moves it to another player and playback continues there.
+- [ ] The Queue panel (slides up out of the player bar, same as Now Playing; switching between the two keeps it open) shows the queue of the chosen player and updates live; clicking a track plays it; *Transfer* moves it to another player and playback continues there.
 - [ ] A wrong token shows a clear message with a button to open the settings; the token is never visible in logs.
 
 ## Troubleshooting

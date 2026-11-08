@@ -23,7 +23,7 @@
       <KeyboardAccelerator Key="Right" Modifiers="Menu" Invoked="OnForwardAccelerator"/>
     </Grid.KeyboardAccelerators>
     <Grid.RowDefinitions>
-      <RowDefinition Height="40"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
+      <RowDefinition Height="40"/><RowDefinition Height="*"/><RowDefinition x:Name="DockRow" Height="0"/><RowDefinition Height="Auto"/>
     </Grid.RowDefinitions>
     <Grid.ColumnDefinitions>
       <ColumnDefinition x:Name="SidebarColumn" Width="232"/><ColumnDefinition Width="*"/>
@@ -124,14 +124,14 @@
             </Button>
 
             <TextBlock Tag="label" Text="PLAYBACK" Margin="14,18,0,6" Style="{StaticResource AuroraSectionLabelStyle}"/>
-            <Button x:Name="NavNow" Tag="now" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+            <Button x:Name="NavNow" Tag="now" Click="OnToggleDock" Style="{StaticResource AuroraNavButtonStyle}"
                     ToolTipService.ToolTip="Now playing" AutomationProperties.Name="Now playing">
               <Grid ColumnSpacing="14">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <FontIcon Glyph="&#xE767;" FontSize="17"/><TextBlock Grid.Column="1" Tag="label" Text="Now playing" VerticalAlignment="Center"/>
               </Grid>
             </Button>
-            <Button x:Name="NavQueue" Tag="queue" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+            <Button x:Name="NavQueue" Tag="queue" Click="OnToggleDock" Style="{StaticResource AuroraNavButtonStyle}"
                     ToolTipService.ToolTip="Queue" AutomationProperties.Name="Queue">
               <Grid ColumnSpacing="14">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -260,15 +260,6 @@
           <ToggleButton x:Name="ChipPlaylists" Tag="Playlist" Content="Playlists" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
           <ToggleButton x:Name="ChipRadio" Tag="Radio" Content="Radio" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
         </StackPanel>
-        <!-- Queue: moving the queue to another player. -->
-        <StackPanel x:Name="QueueBar" Orientation="Horizontal" Visibility="Collapsed">
-          <Button x:Name="TransferButton" Click="OnTransferClick" Style="{StaticResource AuroraButtonStyle}"
-                  ToolTipService.ToolTip="Move this queue to another player" AutomationProperties.Name="Transfer queue">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <FontIcon Glyph="&#xE8AB;" FontSize="14"/><TextBlock Text="Transfer queue"/>
-            </StackPanel>
-          </Button>
-        </StackPanel>
       </StackPanel>
 
       <Grid x:Name="Body" Grid.Row="3" RowSpacing="16">
@@ -314,49 +305,6 @@
           <TextBlock x:Name="DetailSectionTitle" FontSize="20" FontWeight="SemiBold"
                      Foreground="{StaticResource AuroraText}" Text="Tracks"/>
         </StackPanel>
-
-        <!-- Now playing: large artwork on a colour taken from the artwork. -->
-        <Border x:Name="NowPlayingHero" Grid.Row="0" Visibility="Collapsed" Background="{StaticResource AuroraHeroGradient}"
-                CornerRadius="24" Padding="32">
-          <Grid ColumnSpacing="36">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-            <Border x:Name="NowPlayingArtworkFrame" Width="260" Height="260" Background="{StaticResource AuroraCard}" CornerRadius="16">
-              <Grid>
-                <FontIcon Glyph="&#xE8D6;" FontSize="56" Foreground="{StaticResource AuroraMuted}" Opacity="0.5"/>
-                <Image x:Name="NowPlayingArtwork" Stretch="UniformToFill"/>
-              </Grid>
-            </Border>
-            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="10">
-              <TextBlock Text="NOW PLAYING" Style="{StaticResource AuroraSectionLabelStyle}" Foreground="#D4CCFF"/>
-              <TextBlock x:Name="NowPlayingTitle" Text="Nothing playing" FontSize="34" FontWeight="Bold"
-                         TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2" Foreground="White"/>
-              <TextBlock x:Name="NowPlayingArtist" Text="Choose a player" FontSize="17"
-                         TextTrimming="CharacterEllipsis" MaxLines="1" Foreground="#D9DEF2"/>
-              <TextBlock x:Name="NowPlayingState" Text="Idle" AutomationProperties.LiveSetting="Polite"
-                         Foreground="{StaticResource AuroraGood}" FontSize="12" TextTrimming="CharacterEllipsis"/>
-              <StackPanel Orientation="Horizontal" Spacing="14" Margin="0,12,0,0">
-                <Button x:Name="QueuePreviousButton" Click="OnQueuePrevious" Style="{StaticResource AuroraIconButtonStyle}"
-                        Foreground="White" ToolTipService.ToolTip="Previous" AutomationProperties.Name="Previous">
-                  <FontIcon Glyph="&#xE892;" FontSize="18"/>
-                </Button>
-                <Button x:Name="QueuePlayPauseButton" Click="OnQueuePlayPause" Style="{StaticResource AuroraPlayButtonStyle}"
-                        ToolTipService.ToolTip="Play or pause" AutomationProperties.Name="Play or pause">
-                  <Grid Width="28" Height="28">
-                    <Ellipse x:Name="QueuePlayPauseTrack" Visibility="Collapsed" Width="26" Height="26"
-                             Stroke="#B3A8FF" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    <FontIcon x:Name="QueuePlayPauseIcon" Glyph="&#xE768;" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                    <ProgressRing x:Name="QueuePlayPauseSpinner" IsActive="False" Visibility="Collapsed"
-                                  Foreground="White" Width="28" Height="28"/>
-                  </Grid>
-                </Button>
-                <Button x:Name="QueueNextButton" Click="OnQueueNext" Style="{StaticResource AuroraIconButtonStyle}"
-                        Foreground="White" ToolTipService.ToolTip="Next" AutomationProperties.Name="Next">
-                  <FontIcon Glyph="&#xE893;" FontSize="18"/>
-                </Button>
-              </StackPanel>
-            </StackPanel>
-          </Grid>
-        </Border>
 
         <!-- Home: greeting and real library data only. -->
         <ScrollViewer x:Name="HomeShelves" Grid.Row="2" Visibility="Collapsed" Margin="-12,0,-12,0"
@@ -432,8 +380,69 @@
       </Grid>
     </Grid>
 
+    <!-- Dock: Now playing and Queue are panels attached to the playback bar. They grow upwards out of the bar and
+         shrink the library above them instead of covering it, so browsing and searching keep working while one is open. -->
+    <Border x:Name="DockHost" Grid.Row="2" Grid.ColumnSpan="2" Visibility="Collapsed" SizeChanged="OnDockHostSizeChanged">
+      <Border x:Name="DockPanel" VerticalAlignment="Bottom" CornerRadius="20,20,0,0" Padding="28,20,20,16"
+              Background="{StaticResource AuroraHeroGradient}" BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,1,0,0">
+        <Grid>
+          <!-- Now playing -->
+          <Grid x:Name="NowView" ColumnSpacing="32">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <Border x:Name="NowPlayingArtworkFrame" Width="200" Height="200" VerticalAlignment="Center"
+                    Background="{StaticResource AuroraCard}" CornerRadius="16">
+              <Grid>
+                <FontIcon Glyph="&#xE8D6;" FontSize="48" Foreground="{StaticResource AuroraMuted}" Opacity="0.5"/>
+                <Image x:Name="NowPlayingArtwork" Stretch="UniformToFill"/>
+              </Grid>
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="8">
+              <TextBlock Text="NOW PLAYING" Style="{StaticResource AuroraSectionLabelStyle}" Foreground="#D4CCFF"/>
+              <TextBlock x:Name="NowPlayingTitle" Text="Nothing playing" FontSize="32" FontWeight="Bold"
+                         TextTrimming="CharacterEllipsis" TextWrapping="Wrap" MaxLines="2" Foreground="White"/>
+              <TextBlock x:Name="NowPlayingArtist" Text="Choose a player" FontSize="17"
+                         TextTrimming="CharacterEllipsis" MaxLines="1" Foreground="#D9DEF2"/>
+              <TextBlock x:Name="NowPlayingState" Text="Idle" AutomationProperties.LiveSetting="Polite"
+                         Foreground="{StaticResource AuroraGood}" FontSize="12" TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+            <Button Grid.Column="2" VerticalAlignment="Top" Click="OnCloseDock" Style="{StaticResource AuroraIconButtonStyle}"
+                    ToolTipService.ToolTip="Collapse" AutomationProperties.Name="Collapse now playing">
+              <FontIcon Glyph="&#xE70D;" FontSize="14"/>
+            </Button>
+          </Grid>
+
+          <!-- Queue -->
+          <Grid x:Name="QueueView" Visibility="Collapsed" RowSpacing="8">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <Grid ColumnSpacing="10">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <StackPanel VerticalAlignment="Center" Spacing="2">
+                <TextBlock Text="Queue" Style="{StaticResource AuroraTitleStyle}" FontSize="22"/>
+                <TextBlock x:Name="QueueSubtitle" Style="{StaticResource AuroraSubtitleStyle}" Text="Manage what's coming up next."/>
+              </StackPanel>
+              <Button Grid.Column="1" Click="OnTransferClick" Style="{StaticResource AuroraButtonStyle}" Background="#26FFFFFF" CornerRadius="16"
+                      ToolTipService.ToolTip="Move this queue to another player" AutomationProperties.Name="Transfer queue">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <FontIcon Glyph="&#xE8AB;" FontSize="13"/><TextBlock Text="Transfer queue" FontSize="12"/>
+                </StackPanel>
+              </Button>
+              <Button Grid.Column="2" Click="OnCloseDock" Style="{StaticResource AuroraIconButtonStyle}"
+                      ToolTipService.ToolTip="Collapse" AutomationProperties.Name="Collapse queue">
+                <FontIcon Glyph="&#xE70D;" FontSize="14"/>
+              </Button>
+            </Grid>
+            <ListView x:Name="QueueList" Grid.Row="1" IsItemClickEnabled="True" SelectionMode="None" ItemClick="OnItemClick"
+                      ItemTemplate="{StaticResource RowTemplate}" ItemContainerStyle="{StaticResource AuroraListItemStyle}"
+                      Margin="-10,0,-10,0" AutomationProperties.Name="Queue"/>
+            <TextBlock x:Name="QueueEmpty" Grid.Row="1" Text="The queue is empty." Visibility="Collapsed"
+                       Foreground="{StaticResource AuroraMuted}" FontSize="13" VerticalAlignment="Top" Margin="0,8,0,0"/>
+          </Grid>
+        </Grid>
+      </Border>
+    </Border>
+
     <!-- Playback bar: track, transport and progress, output options. Always visible, full width. -->
-    <Border x:Name="PlayerBar" Grid.Row="2" Grid.ColumnSpan="2" Background="{StaticResource AuroraPlayerBar}"
+    <Border x:Name="PlayerBar" Grid.Row="3" Grid.ColumnSpan="2" Background="{StaticResource AuroraPlayerBar}"
             BorderBrush="{StaticResource AuroraBorder}" BorderThickness="0,1,0,0">
       <Grid Padding="20,10" ColumnSpacing="20" MinHeight="92">
         <Grid.ColumnDefinitions>
@@ -442,7 +451,7 @@
 
         <Grid Grid.Column="0" ColumnSpacing="14">
           <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-          <Button Tag="now" Click="OnNavigate" Style="{StaticResource AuroraButtonStyle}" Padding="0" CornerRadius="10"
+          <Button Tag="now" Click="OnToggleDock" Style="{StaticResource AuroraButtonStyle}" Padding="0" CornerRadius="10"
                   BorderThickness="0" Background="Transparent" VerticalAlignment="Center"
                   ToolTipService.ToolTip="Open now playing" AutomationProperties.Name="Open now playing">
             <Border Width="60" Height="60" CornerRadius="10" Background="{StaticResource AuroraHeroGradient}">
@@ -519,13 +528,13 @@
                     ValueChanged="OnFooterVolumeChanged" AutomationProperties.Name="Player volume"
                     VerticalAlignment="Center"/>
           </StackPanel>
-          <Button Tag="queue" Click="OnNavigate" Style="{StaticResource AuroraIconButtonStyle}"
+          <Button x:Name="FooterQueueButton" Tag="queue" Click="OnToggleDock" Style="{StaticResource AuroraIconButtonStyle}"
                   ToolTipService.ToolTip="Open queue" AutomationProperties.Name="Open queue">
             <FontIcon Glyph="&#xE8FD;" FontSize="16"/>
           </Button>
-          <Button x:Name="FooterExpandButton" Tag="now" Click="OnNavigate" Style="{StaticResource AuroraIconButtonStyle}"
+          <Button x:Name="FooterExpandButton" Tag="now" Click="OnToggleDock" Style="{StaticResource AuroraIconButtonStyle}"
                   ToolTipService.ToolTip="Open now playing" AutomationProperties.Name="Expand now playing">
-            <FontIcon Glyph="&#xE740;" FontSize="15"/>
+            <FontIcon x:Name="FooterExpandIcon" Glyph="&#xE70E;" FontSize="15"/>
           </Button>
         </StackPanel>
       </Grid>
