@@ -26,6 +26,17 @@ It connects a fake-audio player to the server, finds it in MA, plays a track on 
 
 ## Manual checklists (one per milestone)
 
+### UI 2.0 (library window)
+Layout and motion are XAML-only, so they need a hands-on pass on Windows (CI only proves the app builds).
+- [ ] At 1920×1080, 1600×900, 1366×768 and 1280×720, and when dragging the window narrow: no clipped content and no horizontal scrollbar; the sidebar collapses to icons below ~980 px, the featured cards stack below ~1060 px, the volume slider and expand button drop out of the player bar before play/pause does.
+- [ ] Sidebar: the menu button collapses/expands it with a short animation; every item still opens its page; the active item has the accent bar; collapsed items show tooltips.
+- [ ] Top bar: back/forward follow your real history (including opened albums/playlists and searches; Alt+Left / Alt+Right work); Ctrl+K focuses search and Enter searches; the device pill lists players and switching works (also from the player bar).
+- [ ] Home shows one greeting (no "Welcome back"), then only sections that have data: featured cards, Recently played, Made for you, Your most played playlists, Recently added, Jump back in. No playlist is repeated across Featured / Made for you / Most played / Recently added. Shuffle on a featured card works for another player and is disabled for "This PC".
+- [ ] Cards: artwork zooms slightly on hover; play and "…" appear on hover or keyboard focus; right-click opens the same menu (Play now / Play next / Add to queue).
+- [ ] Library pages: filter box, sort and list/grid switch work; Search has result-type chips with counts.
+- [ ] Now Playing: large artwork, background tinted from the artwork (falls back to the default gradient), prev/play/next work, "Up next" lists the queue.
+- [ ] Player bar: play/pause shows the spinner while a command is pending; seek, volume, mute, shuffle and repeat behave as before; Windows "Animations" off disables the motion.
+
 ### M0 – skeleton
 - [ ] CI is green and publishes the `ma-satellite-msix` artifact.
 - [ ] Install via `Install-Dev.ps1` (elevated once); the icon appears in the notification area.
