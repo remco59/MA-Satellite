@@ -56,12 +56,17 @@ public sealed class MaClient : IAsyncDisposable
     }
 
     /// <summary>Returns recent library listening history; the server is the source of truth.</summary>
-    public async Task<IReadOnlyList<MaItem>> GetRecentlyPlayedAsync(int limit = 12, CancellationToken ct = default)
+    public async Task<IReadOnlyList<MaItem>> GetRecentlyPlayedAsync(int limit = 12, CancellationToken ct = default) =>
+        await GetRecentlyPlayedAsync(limit, RecentlyPlayedMediaTypes, ct).ConfigureAwait(false);
+
+    /// <summary>Recent listening history restricted to the given MA media types (e.g. "playlist", "album", "track").</summary>
+    public async Task<IReadOnlyList<MaItem>> GetRecentlyPlayedAsync(int limit, IReadOnlyList<string> mediaTypes, CancellationToken ct = default)
     {
+        ArgumentNullException.ThrowIfNull(mediaTypes);
         var result = await _connection.SendCommandAsync("music/recently_played_items", new Dictionary<string, object?>
         {
             ["limit"] = limit,
-            ["media_types"] = RecentlyPlayedMediaTypes,
+            ["media_types"] = mediaTypes,
         }, cancellationToken: ct).ConfigureAwait(false);
         return MaItemParser.ParseItems(result, _baseUrl);
     }
