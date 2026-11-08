@@ -6,9 +6,15 @@ using FontWeight = global::Windows.UI.Text.FontWeight;
 
 namespace MaSatellite.App.Views;
 
+/// <summary>Raised by cards and rows: the row that was acted on and the element a flyout should anchor to.</summary>
+public sealed record RowAction(ListRow Row, FrameworkElement Anchor);
+
 /// <summary>One line in the library/queue list: a media item or a queue entry.</summary>
 public sealed class ListRow
 {
+    private readonly string? _imageUrl;
+    private ImageSource? _largeImage;
+
     public ListRow(string title, string subtitle, string? imageUrl, MaItem? item = null, MaQueueItem? queueItem = null, bool isCurrent = false, int? position = null)
     {
         Title = title;
@@ -17,6 +23,7 @@ public sealed class ListRow
         QueueItem = queueItem;
         IsCurrent = isCurrent;
         Position = position;
+        _imageUrl = imageUrl;
         if (!string.IsNullOrEmpty(imageUrl) && Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri))
         {
             Image = new BitmapImage(uri) { DecodePixelWidth = 256 };
@@ -28,6 +35,19 @@ public sealed class ListRow
     public string Subtitle { get; }
 
     public ImageSource? Image { get; }
+
+    /// <summary>A higher-resolution decode of the artwork for featured cards.</summary>
+    public ImageSource? LargeImage => _largeImage ??= !string.IsNullOrEmpty(_imageUrl) &&
+        Uri.TryCreate(_imageUrl, UriKind.Absolute, out var uri) ? new BitmapImage(uri) { DecodePixelWidth = 720 } : Image;
+
+    /// <summary>Second line on cards: what the item is, plus who it belongs to when that is known.</summary>
+    public string CardSubtitle => Item?.Type switch
+    {
+        MaMediaType.Playlist => string.IsNullOrWhiteSpace(Item.Subtitle) ? "Playlist" : $"Playlist · {Item.Subtitle}",
+        MaMediaType.Artist => "Artist",
+        MaMediaType.Album or MaMediaType.Track when !string.IsNullOrWhiteSpace(Item.Subtitle) => Item.Subtitle,
+        _ => Subtitle,
+    };
 
     public MaItem? Item { get; }
 

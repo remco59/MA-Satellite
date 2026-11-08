@@ -23,6 +23,8 @@ public sealed record FeaturedPick(FeaturedKind Kind, MaItem Item);
 public sealed record HomeLayout(
     FeaturedPick? FirstFeatured,
     FeaturedPick? SecondFeatured,
+    IReadOnlyList<MaItem> Recent,
+    IReadOnlyList<MaItem> MadeForYou,
     IReadOnlyList<MaItem> Rotation,
     IReadOnlyList<MaItem> Added)
 {
@@ -32,7 +34,7 @@ public sealed record HomeLayout(
 
 /// <summary>
 /// Decides what Home shows without inventing anything: every pick comes from playlists the server returned,
-/// and the same playlist is never shown in two of these sections.
+/// and a playlist is not repeated across Featured, Made for you, Most played and Recently added.
 /// </summary>
 public static class HomeComposer
 {
@@ -41,6 +43,7 @@ public static class HomeComposer
         bool playlistsRanked,
         IReadOnlyList<MaItem> timePicks,
         IReadOnlyList<MaItem> newestPlaylists,
+        IReadOnlyList<MaItem>? recentPlaylists = null,
         int rotationCount = 20,
         int addedCount = 20)
     {
@@ -72,8 +75,14 @@ public static class HomeComposer
             second = new FeaturedPick(playlistsRanked ? FeaturedKind.YourRotation : FeaturedKind.FromYourPlaylists, top);
         }
 
+        // Recently played is a different signal (recency, not frequency), so it may overlap Rotation,
+        // but never repeats a featured card.
+        var recent = (recentPlaylists ?? [])
+            .Where(i => Usable(i) && !seen.Contains(i.Uri)).DistinctBy(i => i.Uri, StringComparer.OrdinalIgnoreCase)
+            .Take(rotationCount).ToList();
+        var madeForYou = timePicks.Where(Claim).Take(rotationCount).ToList();
         var rotation = playlistsByPlays.Where(Claim).Take(rotationCount).ToList();
         var added = newestPlaylists.Where(Claim).Take(addedCount).ToList();
-        return new HomeLayout(first, second, rotation, added);
+        return new HomeLayout(first, second, recent, madeForYou, rotation, added);
     }
 }

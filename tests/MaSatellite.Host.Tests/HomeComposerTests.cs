@@ -46,6 +46,24 @@ public class HomeComposerTests
     }
 
     [Fact]
+    public void Made_for_you_excludes_the_featured_pick_and_precedes_rotation()
+    {
+        var layout = HomeComposer.Compose([Playlist("A"), Playlist("Focus2")], true,
+            [Playlist("Focus1"), Playlist("Focus2")], []);
+        Assert.Equal(["Focus2"], layout.MadeForYou.Select(i => i.Name));
+        Assert.DoesNotContain(layout.Rotation, i => i.Name == "Focus2");
+    }
+
+    [Fact]
+    public void Recent_may_overlap_rotation_but_never_repeats_a_featured_card()
+    {
+        var a = Playlist("A");
+        var b = Playlist("B");
+        var layout = HomeComposer.Compose([a, b], true, [], [], recentPlaylists: [a, b]);
+        Assert.Equal(["B"], layout.Recent.Select(i => i.Name));
+    }
+
+    [Fact]
     public void Unplayable_or_uri_less_items_are_never_featured()
     {
         var layout = HomeComposer.Compose([Playlist("X", playable: false)], true, [], []);

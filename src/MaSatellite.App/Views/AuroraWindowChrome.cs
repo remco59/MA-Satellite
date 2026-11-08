@@ -1,3 +1,4 @@
+using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Windows.UI;
@@ -7,15 +8,22 @@ namespace MaSatellite.App.Views;
 /// <summary>Keep native Windows caption buttons visually consistent with the dark app.</summary>
 internal static class AuroraWindowChrome
 {
-    public static void Apply(Window window)
+    public static void Apply(Window window, UIElement? dragRegion = null)
     {
+        // The library window draws its own title area; the caption buttons then sit on top of the page.
+        if (dragRegion is not null && AppWindowTitleBar.IsCustomizationSupported())
+        {
+            window.ExtendsContentIntoTitleBar = true;
+            window.SetTitleBar(dragRegion);
+        }
+
         if (!AppWindowTitleBar.IsCustomizationSupported())
         {
             return;
         }
 
         var bar = window.AppWindow.TitleBar;
-        var background = Color.FromArgb(255, 14, 21, 36);
+        var background = dragRegion is not null ? Colors.Transparent : Color.FromArgb(255, 11, 16, 32);
         var foreground = Color.FromArgb(255, 237, 242, 255);
         bar.BackgroundColor = background;
         bar.ForegroundColor = foreground;
@@ -23,9 +31,11 @@ internal static class AuroraWindowChrome
         bar.InactiveForegroundColor = Color.FromArgb(255, 154, 170, 199);
         bar.ButtonBackgroundColor = background;
         bar.ButtonForegroundColor = foreground;
-        bar.ButtonHoverBackgroundColor = Color.FromArgb(255, 39, 52, 77);
+        bar.ButtonInactiveBackgroundColor = background;
+        bar.ButtonInactiveForegroundColor = Color.FromArgb(255, 154, 170, 199);
+        bar.ButtonHoverBackgroundColor = Color.FromArgb(255, 39, 46, 77);
         bar.ButtonHoverForegroundColor = foreground;
-        bar.ButtonPressedBackgroundColor = Color.FromArgb(255, 57, 72, 103);
+        bar.ButtonPressedBackgroundColor = Color.FromArgb(255, 57, 64, 103);
         bar.ButtonPressedForegroundColor = foreground;
     }
 }
