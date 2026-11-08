@@ -126,4 +126,33 @@ public class NowPlayingControllerTests
             r => Assert.Equal("queue-1", r.Args.GetProperty("queue_id").GetString()));
         Assert.Equal(3, rig.Server.Received.Count(r => r.Command.StartsWith("player_queues/", StringComparison.Ordinal)));
     }
+
+    [Fact]
+    public async Task About_without_a_music_assistant_record_still_runs_on_title_and_artist()
+    {
+        var http = new StubHttp(_ => (HttpStatusCode.OK, """{"recordings":[],"artists":[]}"""));
+        await using var rig = new Rig(new FakeMaServer(), http);
+
+        var about = await rig.Controller.GetAboutAsync(null, "Intoxicated", "Martin Solveig", 158);
+
+        Assert.Contains("No confident", about.MatchNote);
+        Assert.DoesNotContain(rig.Server.Received, r => r.Command == "music/item_by_uri");
+    }
+
+    [Fact]
+    public async Task Favourite_add_and_remove_use_the_library_copy()
+    {
+        await using var rig = new Rig(new FakeMaServer(), new StubHttp(_ => (HttpStatusCode.OK, "{}")));
+        rig.Server.Handlers["music/favorites/add_item"] = _ => null;
+        rig.Server.Handlers["music/favorites/remove_item"] = _ => null;
+        SeedTrack(rig.Server);
+
+        Assert.True(await rig.Controller.SetFavoriteAsync("library://track/1", true));
+        Assert.False(await rig.Controller.SetFavoriteAsync("library://track/1", false));
+
+        Assert.Equal("library://track/1", rig.Server.Received.Single(r => r.Command == "music/favorites/add_item").Args.GetProperty("item").GetString());
+        var remove = rig.Server.Received.Single(r => r.Command == "music/favorites/remove_item").Args;
+        Assert.Equal("track", remove.GetProperty("media_type").GetString());
+        Assert.Equal("1", remove.GetProperty("library_item_id").GetString());
+    }
 }

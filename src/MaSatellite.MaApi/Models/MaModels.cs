@@ -113,6 +113,7 @@ public sealed record MaItemDetails(
     string? ReleaseDate,
     IReadOnlyList<string> Genres,
     string? Description,
-    IReadOnlyList<MaLink> Links);
+    IReadOnlyList<MaLink> Links,
+    bool IsFavorite = false);
 
 public sealed record MaLink(string Type, string Url);

@@ -16,18 +16,25 @@ public sealed class NowPlayingController : IDisposable
     private readonly LyricsService _lyrics;
     private readonly AboutService _about;
     private readonly ConcurrentDictionary<string, Task<MaItemDetails>> _details = new();
+    private readonly IDisposable[] _owned;
 
-    public NowPlayingController(LibraryController library, LyricsService lyrics, AboutService about)
+    /// <param name="owned">Resources (HTTP client, rate limiter) that live and die with this controller.</param>
+    public NowPlayingController(LibraryController library, LyricsService lyrics, AboutService about, params IDisposable[] owned)
     {
         _library = library;
         _lyrics = lyrics;
         _about = about;
+        _owned = owned;
     }
 
     public LibraryController Library => _library;
 
     public void Dispose()
     {
+        foreach (var resource in _owned)
+        {
+            resource.Dispose();
+        }
     }
 
     /// <summary>Full Music Assistant record for an item, remembered for the session so tab switches cost nothing.</summary>
@@ -69,9 +76,39 @@ public sealed class NowPlayingController : IDisposable
         return await _lyrics.GetAsync(query, details, ct).ConfigureAwait(false);
     }
 
-    public async Task<AboutInfo> GetAboutAsync(string uri, CancellationToken ct = default)
+    /// <summary>
+    /// About information for the playing track. Without a usable Music Assistant record (for example playback that
+    /// is not in a queue) the lookup still runs on title, artist and length alone and says so in its match note.
+    /// </summary>
+    public async Task<AboutInfo> GetAboutAsync(string? uri, string title, string artist, int? durationSeconds, CancellationToken ct = default)
     {
-        var track = await GetDetailsAsync(uri, ct).ConfigureAwait(false);
+        MaItemDetails? track = null;
+        if (!string.IsNullOrEmpty(uri))
+        {
+            try
+            {
+                track = await GetDetailsAsync(uri, ct).ConfigureAwait(false);
+            }
+            catch (MaException)
+            {
+                // Fall through to the bare track below.
+            }
+        }
+
+        if (track is null)
+        {
+            track = new MaItemDetails(
+                new MaItem(MaMediaType.Track, string.Empty, string.Empty, title, uri ?? string.Empty, artist, null, null, durationSeconds, null),
+                string.IsNullOrWhiteSpace(artist) ? [] : [new MaArtistRef(artist, null, null, null, null)],
+                null, null, null, null, null, null, null, null, null, null, null, null, [], null, []);
+            return await _about.BuildAsync(track, [], ct).ConfigureAwait(false);
+        }
+
+        return await GetAboutAsync(track, ct).ConfigureAwait(false);
+    }
+
+    private async Task<AboutInfo> GetAboutAsync(MaItemDetails track, CancellationToken ct)
+    {
         var artists = new List<MaItemDetails>();
         foreach (var a in track.Artists.Where(a => !string.IsNullOrEmpty(a.Uri)).Take(3))
         {
@@ -86,6 +123,29 @@ public sealed class NowPlayingController : IDisposable
         }
 
         return await _about.BuildAsync(track, artists, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Adds or removes the track from the user's favourites and returns the new state.</summary>
+    public async Task<bool> SetFavoriteAsync(string uri, bool favorite, CancellationToken ct = default)
+    {
+        var client = await _library.Service.GetClientAsync(ct).ConfigureAwait(false);
+        if (favorite)
+        {
+            await client.AddFavoriteAsync(uri, ct).ConfigureAwait(false);
+            _details.TryRemove(uri, out _);
+            return true;
+        }
+
+        _details.TryRemove(uri, out _);
+        var current = await client.GetDetailsAsync(uri, ct).ConfigureAwait(false);
+        if (current.Item.Provider != "library" || string.IsNullOrEmpty(current.Item.ItemId))
+        {
+            throw new MaException("Music Assistant needs the library copy of this track to remove it from favourites.");
+        }
+
+        await client.RemoveFavoriteAsync(MaMediaType.Track, current.Item.ItemId, ct).ConfigureAwait(false);
+        _details.TryRemove(uri, out _);
+        return false;
     }
 
     /// <summary>Only what the server and its providers actually return; each section says why it is empty.</summary>

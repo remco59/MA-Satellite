@@ -167,6 +167,18 @@ public sealed class MaClient : IAsyncDisposable
         return MaItemParser.ParseDetails(result, _baseUrl);
     }
 
+    /// <summary>Adds an item (by URI) to the user's favourites.</summary>
+    public Task AddFavoriteAsync(string uri, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("music/favorites/add_item", new Dictionary<string, object?> { ["item"] = uri }, cancellationToken: ct);
+
+    /// <summary>Removes a favourite; Music Assistant identifies it by media type and library item id.</summary>
+    public Task RemoveFavoriteAsync(MaMediaType type, string libraryItemId, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("music/favorites/remove_item", new Dictionary<string, object?>
+        {
+            ["media_type"] = type.ToString().ToLowerInvariant(),
+            ["library_item_id"] = libraryItemId,
+        }, cancellationToken: ct);
+
     /// <summary>Provider-backed similar tracks for a track; providers without support yield an error or an empty list.</summary>
     public async Task<IReadOnlyList<MaItem>> GetSimilarTracksAsync(string itemId, string provider, int limit = 20, CancellationToken ct = default)
     {

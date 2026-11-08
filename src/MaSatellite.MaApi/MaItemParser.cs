@@ -233,7 +233,8 @@ public static class MaItemParser
             release,
             item.Genres ?? [],
             description,
-            links);
+            links,
+            Bool(e, "favorite") ?? false);
     }
 
     /// <summary><c>external_ids</c> is a list of <c>[type, value]</c> pairs (or <c>{type, value}</c> objects) depending on the server version.</summary>
