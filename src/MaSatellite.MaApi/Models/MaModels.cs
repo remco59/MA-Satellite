@@ -67,7 +67,9 @@ public sealed record MaQueueItem(
     int? DurationSeconds,
     int Index,
     string? ImageUrl,
-    string? Uri);
+    string? Uri,
+    string? Artist = null,
+    string? Album = null);
 
 /// <summary>How new media is added to a queue (maps to MA's <c>QueueOption</c>).</summary>
 public enum MaQueueOption
@@ -86,3 +88,32 @@ public enum MaQueueOption
 }
 
 public sealed record MaServerInfo(string ServerId, string ServerVersion, int SchemaVersion, int MinSupportedSchemaVersion, string? Name);
+
+/// <summary>A credited artist on a track, with the ids needed to look the artist up again.</summary>
+public sealed record MaArtistRef(string Name, string? ItemId, string? Provider, string? Uri, string? MusicBrainzId);
+
+/// <summary>
+/// Everything Music Assistant knows about one item that the Now playing tabs need beyond the list view:
+/// lyrics, external ids, label and credited artists. Every field is optional; providers fill different parts.
+/// </summary>
+public sealed record MaItemDetails(
+    MaItem Item,
+    IReadOnlyList<MaArtistRef> Artists,
+    string? AlbumName,
+    string? AlbumUri,
+    string? AlbumItemId,
+    string? AlbumProvider,
+    string? PlainLyrics,
+    string? SyncedLyrics,
+    string? MusicBrainzId,
+    string? AlbumMusicBrainzId,
+    string? Isrc,
+    string? Label,
+    string? Copyright,
+    string? ReleaseDate,
+    IReadOnlyList<string> Genres,
+    string? Description,
+    IReadOnlyList<MaLink> Links,
+    bool IsFavorite = false);
+
+public sealed record MaLink(string Type, string Url);
