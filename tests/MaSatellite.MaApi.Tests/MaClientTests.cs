@@ -437,4 +437,16 @@ public class MaClientTests
 
         Assert.True(cond());
     }
+
+    [Fact]
+    public async Task Library_can_filter_to_favourites()
+    {
+        await using var server = new FakeMaServer();
+        server.Handlers["music/albums/library_items"] = _ => new[] { Album };
+        await using var client = await ConnectAsync(server);
+
+        await client.GetLibraryAsync(MaMediaType.Album, favoriteOnly: true);
+
+        Assert.True(server.Received.Single(r => r.Command == "music/albums/library_items").Args.GetProperty("favorite").GetBoolean());
+    }
 }

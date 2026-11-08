@@ -25,4 +25,7 @@ public static class Greeting
             ? $"{text}, {char.ToUpperInvariant(userName[0])}{userName[1..].ToLowerInvariant()}"
             : text;
     }
+
+    /// <summary>The line under the greeting; honest about what it is (a prompt, not a recommendation).</summary>
+    public static string Subtitle(int hour) => $"Here's your music for this {PartOfDay(hour)}.";
 }

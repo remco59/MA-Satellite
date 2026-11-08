@@ -36,6 +36,7 @@ public sealed partial class NowPlayingPage : UserControl
     private static readonly TimeSpan UserScrollPause = TimeSpan.FromSeconds(5);
 
     private readonly ObservableCollection<QueueRow> _upcoming = [];
+    private readonly ObservableCollection<QueueRow> _played = [];
     private NowPlayingController? _controller;
     private Func<PlayTarget?>? _target;
     private string _tab = "up";
@@ -64,6 +65,7 @@ public sealed partial class NowPlayingPage : UserControl
         InitializeComponent();
         PageScroll.AddHandler(PointerWheelChangedEvent, new PointerEventHandler((_, _) => _userScrolledAt = DateTimeOffset.UtcNow), handledEventsToo: true);
         QueueList.ItemsSource = _upcoming;
+        HistoryList.ItemsSource = _played;
         SelectTab("up", animate: false);
     }
 
@@ -227,6 +229,8 @@ public sealed partial class NowPlayingPage : UserControl
     {
         _queueDirty = true;
         _upcoming.Clear();
+        _played.Clear();
+        HistoryBlock.Visibility = Visibility.Collapsed;
         OnTrackChanged();
         if (_shown)
         {
@@ -599,6 +603,8 @@ public sealed partial class NowPlayingPage : UserControl
             ? c
             : view.Items.FirstOrDefault(i => i.Index == currentIndex);
         var upcoming = view.Items.Where(i => currentIndex is null || i.Index > currentIndex).OrderBy(i => i.Index).ToList();
+        var played = view.Items.Where(i => currentIndex is not null && i.Index < currentIndex).OrderBy(i => i.Index).ToList();
+        ApplyHistory(played);
 
         if (current is not null)
         {
@@ -643,6 +649,39 @@ public sealed partial class NowPlayingPage : UserControl
         else
         {
             UpStatus.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    /// <summary>Shows what has already played above the current track, scrolled so the most recent one is next to it.</summary>
+    private void ApplyHistory(List<MaQueueItem> played)
+    {
+        var same = _played.Count == played.Count
+            && _played.Select(r => r.Item.QueueItemId).SequenceEqual(played.Select(i => i.QueueItemId));
+        HistoryBlock.Visibility = played.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        if (same)
+        {
+            return;
+        }
+
+        _played.Clear();
+        foreach (var item in played)
+        {
+            _played.Add(new QueueRow(item));
+        }
+
+        // Wait for the rows to be measured, then show the end of the list; older tracks are a scroll up.
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            HistoryScroller.UpdateLayout();
+            HistoryScroller.ChangeView(null, HistoryScroller.ScrollableHeight, null, disableAnimation: true);
+        });
+    }
+
+    private void OnHistoryItemClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is QueueRow row)
+        {
+            PlayIndexRequested?.Invoke(this, row.Item.Index);
         }
     }
 

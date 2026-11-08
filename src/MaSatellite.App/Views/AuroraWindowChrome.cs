@@ -38,19 +38,19 @@ internal static class AuroraWindowChrome
         }
 
         var bar = window.AppWindow.TitleBar;
-        var background = dragRegion is not null ? Colors.Transparent : Color.FromArgb(255, 11, 16, 32);
-        var foreground = Color.FromArgb(255, 237, 242, 255);
+        var background = dragRegion is not null ? Colors.Transparent : Color.FromArgb(255, 10, 10, 18);
+        var foreground = Color.FromArgb(255, 244, 243, 250);
         bar.BackgroundColor = background;
         bar.ForegroundColor = foreground;
         bar.InactiveBackgroundColor = background;
-        bar.InactiveForegroundColor = Color.FromArgb(255, 154, 170, 199);
+        bar.InactiveForegroundColor = Color.FromArgb(255, 156, 153, 180);
         bar.ButtonBackgroundColor = background;
         bar.ButtonForegroundColor = foreground;
         bar.ButtonInactiveBackgroundColor = background;
-        bar.ButtonInactiveForegroundColor = Color.FromArgb(255, 154, 170, 199);
-        bar.ButtonHoverBackgroundColor = Color.FromArgb(255, 39, 46, 77);
+        bar.ButtonInactiveForegroundColor = Color.FromArgb(255, 156, 153, 180);
+        bar.ButtonHoverBackgroundColor = Color.FromArgb(255, 38, 36, 66);
         bar.ButtonHoverForegroundColor = foreground;
-        bar.ButtonPressedBackgroundColor = Color.FromArgb(255, 57, 64, 103);
+        bar.ButtonPressedBackgroundColor = Color.FromArgb(255, 54, 50, 92);
         bar.ButtonPressedForegroundColor = foreground;
     }
 }

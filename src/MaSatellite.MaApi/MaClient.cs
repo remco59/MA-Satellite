@@ -91,7 +91,7 @@ public sealed class MaClient : IAsyncDisposable
     }
 
     /// <summary>Lists a library collection with optional server-side sorting across the whole library.</summary>
-    public async Task<IReadOnlyList<MaItem>> GetLibraryAsync(MaMediaType type, string? search = null, int limit = 100, int offset = 0, string? sortField = null, string? sortDirection = null, CancellationToken ct = default)
+    public async Task<IReadOnlyList<MaItem>> GetLibraryAsync(MaMediaType type, string? search = null, int limit = 100, int offset = 0, string? sortField = null, string? sortDirection = null, bool favoriteOnly = false, CancellationToken ct = default)
     {
         var command = type switch
         {
@@ -109,6 +109,11 @@ public sealed class MaClient : IAsyncDisposable
             ["limit"] = limit,
             ["offset"] = offset,
         };
+        if (favoriteOnly)
+        {
+            args["favorite"] = true;
+        }
+
         if (!string.IsNullOrWhiteSpace(sortField))
         {
             // Music Assistant 2.11 switched from the legacy order_by parameter
@@ -256,8 +261,10 @@ public sealed class MaClient : IAsyncDisposable
             ["limit"] = limit,
             ["offset"] = offset,
         }, cancellationToken: ct).ConfigureAwait(false);
+        // Music Assistant does not number queue items itself: their place in the returned list (plus the page
+        // offset) is the index that current_index and play_index refer to.
         return result.ValueKind == JsonValueKind.Array
-            ? result.EnumerateArray().Select(i => MaItemParser.ParseQueueItem(i, _baseUrl)).ToList()
+            ? result.EnumerateArray().Select((i, position) => MaItemParser.ParseQueueItem(i, _baseUrl) with { Index = offset + position }).ToList()
             : [];
     }
 

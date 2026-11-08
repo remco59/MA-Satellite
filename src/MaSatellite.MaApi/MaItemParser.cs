@@ -76,8 +76,18 @@ public static class MaItemParser
             ImageUrl(e, baseUrl, imageSize),
             !e.TryGetProperty("is_playable", out var p) || p.ValueKind != JsonValueKind.False,
             overview,
-            genres);
+            genres,
+            UnixTime(e, "timestamp_added"),
+            UnixTime(e, "last_played"),
+            e.TryGetProperty("play_count", out var pc) && pc.ValueKind == JsonValueKind.Number && pc.TryGetInt32(out var pcv) ? pcv : null,
+            Bool(e, "favorite") ?? false);
     }
+
+    /// <summary>Music Assistant reports dates as Unix seconds; 0 or missing means "unknown".</summary>
+    private static DateTimeOffset? UnixTime(JsonElement e, string name) =>
+        e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt64(out var seconds) && seconds > 0
+            ? DateTimeOffset.FromUnixTimeSeconds(seconds)
+            : null;
 
     public static IReadOnlyList<MaItem> ParseItems(JsonElement array, string baseUrl, int imageSize = 256)
     {
