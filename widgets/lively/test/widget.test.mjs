@@ -99,9 +99,10 @@ try {
       for (let i = 0; i < 200; i++) { const c = list[i % list.length]; px.set([c[0], c[1], c[2], 255], i * 4); }
       return window.__maWidget.pickPalette(px);
     }, rgbs);
-    assert.deepEqual(await pick([[30, 95, 214]]), { primary: 7, secondary: -1 });            // blue -> blue
-    assert.deepEqual(await pick([[107, 106, 42]]), { primary: 2, secondary: -1 });           // muddy olive -> amber, not mud
-    assert.deepEqual(await pick([[230, 99, 10]]), { primary: 1, secondary: -1 });            // orange
+    assert.deepEqual(await pick([[30, 95, 214]]), { primary: 7, secondary: -1, analogous: 8 });            // blue -> blue
+    assert.deepEqual(await pick([[107, 106, 42]]), { primary: 2, secondary: -1, analogous: 3 });           // muddy olive -> amber, not mud
+    assert.deepEqual(await pick([[230, 99, 10]]), { primary: 1, secondary: -1, analogous: 2 });            // orange
+    assert.equal((await pick([[143, 127, 166]])).primary, 9);                                 // washed-out purple still -> violet
     assert.deepEqual(await pick([[128, 128, 128]]), { neutral: true });                      // grey cover -> neutral slate
     assert.deepEqual(await pick([[10, 10, 10]]), { neutral: true });                         // near-black -> neutral
     const duo = await pick([[30, 95, 214], [30, 95, 214], [30, 95, 214], [220, 40, 70]]);   // dominant blue, red accent

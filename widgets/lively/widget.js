@@ -183,9 +183,10 @@
     retryMs = Math.min(retryMs * 2, 10000);
   }
 
-  function frame() {
+  function frame(now) {
     renderProgress();
     tweenBackground();
+    drawGL(now || 0);
     requestAnimationFrame(frame);
   }
 
@@ -230,7 +231,7 @@
     ['#a21caf', '#d946ef', '#f0abfc'], // 300 fuchsia
     ['#be185d', '#ec4899', '#f9a8d4'], // 330 pink
   ];
-  var NEUTRAL = ['#1f2937', '#475569', '#94a3b8']; // slate, for black/white/grey covers
+  var NEUTRAL = ['#1e293b', '#3f5278', '#8fa3c4']; // slate, for black/white/grey covers
 
   function hexToRgb(hex) {
     return [parseInt(hex.substr(1, 2), 16), parseInt(hex.substr(3, 2), 16), parseInt(hex.substr(5, 2), 16)];
@@ -246,7 +247,7 @@
       var r = px[i] / 255, g = px[i + 1] / 255, b = px[i + 2] / 255;
       var max = Math.max(r, g, b), d = max - Math.min(r, g, b);
       var s = max === 0 ? 0 : d / max;
-      if (s < 0.25 || max < 0.2) { continue; } // grey / near-black / washed-out pixels carry no hue
+      if (s < 0.14 || max < 0.15) { continue; } // grey / near-black pixels carry no hue
       var hue;
       if (max === r) { hue = ((g - b) / d) % 6; } else if (max === g) { hue = (b - r) / d + 2; } else { hue = (r - g) / d + 4; }
       hue = (hue * 60 + 360) % 360;
@@ -254,7 +255,7 @@
       hist[Math.round(hue / 30) % 12] += weight;
       total += weight;
     }
-    if (total < count * 0.05) { return { neutral: true }; }
+    if (total < count * 0.03) { return { neutral: true }; }
 
     var sm = hist.map(function (v, k) { return v + 0.5 * (hist[(k + 11) % 12] + hist[(k + 1) % 12]); });
     var primary = 0;
@@ -265,7 +266,9 @@
       if (dist >= 2 && sm[k] > best) { best = sm[k]; secondary = k; }
     }
     if (best < sm[primary] * 0.3) { secondary = -1; } // accent colour too faint to matter
-    return { primary: primary, secondary: secondary };
+    // Neighbouring family (towards whichever side the cover leans), used when there is no real second colour.
+    var analogous = sm[(primary + 1) % 12] >= sm[(primary + 11) % 12] ? (primary + 1) % 12 : (primary + 11) % 12;
+    return { primary: primary, secondary: secondary, analogous: analogous };
   }
 
   var bgCurrent = [NEUTRAL[0], NEUTRAL[1], NEUTRAL[1], NEUTRAL[2], NEUTRAL[0]].map(hexToRgb);
@@ -273,7 +276,8 @@
 
   function applyPalette(pick) {
     var a = pick.neutral ? NEUTRAL : PALETTES[pick.primary];
-    var b = pick.neutral || pick.secondary < 0 ? a : PALETTES[pick.secondary];
+    var accent = pick.neutral ? -1 : (pick.secondary >= 0 ? pick.secondary : pick.analogous); // a single-colour cover still gets a neighbouring accent
+    var b = accent < 0 ? a : PALETTES[accent];
     bgTarget = [a[0], a[1], b[1], a[2], b[0]].map(hexToRgb);
   }
 
@@ -304,6 +308,94 @@
     }
   }
 
+
+  // ---- WebGL liquid ---------------------------------------------------------------------
+  // A domain-warped noise field, stretched into diagonal streaks and mapped through the five palette
+  // colours: it reads like flowing paint. The CSS blobs stay as the fallback if WebGL is missing.
+  var VERT = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }';
+  var FRAG = [
+    'precision highp float;',
+    'uniform vec2 u_res; uniform float u_time;',
+    'uniform vec3 u_c0; uniform vec3 u_c1; uniform vec3 u_c2; uniform vec3 u_c3; uniform vec3 u_c4;',
+    'float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }',
+    'float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);',
+    '  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }',
+    'float fbm(vec2 p){ float v = 0.0; float a = 0.5; mat2 m = mat2(1.6, 1.2, -1.2, 1.6);',
+    '  for (int i = 0; i < 5; i++) { v += a * noise(p); p = m * p; a *= 0.5; } return v; }',
+    'vec3 ramp(float t){ t = clamp(t, 0.0, 1.0) * 4.0;',
+    '  vec3 c = mix(u_c0, u_c1, smoothstep(0.0, 1.0, t));',
+    '  c = mix(c, u_c2, smoothstep(1.0, 2.0, t));',
+    '  c = mix(c, u_c3, smoothstep(2.0, 3.0, t));',
+    '  return mix(c, u_c4, smoothstep(3.0, 4.0, t)); }',
+    'void main(){',
+    '  vec2 uv = gl_FragCoord.xy / u_res;',
+    '  vec2 p = (uv - 0.5) * vec2(u_res.x / u_res.y, 1.0);',
+    '  float a = -0.62; p = mat2(cos(a), -sin(a), sin(a), cos(a)) * p;',
+    '  p *= vec2(0.75, 1.9);',                       // stretch into diagonal streaks
+    '  float t = u_time * 0.16;',
+    '  vec2 q = vec2(fbm(p + vec2(0.0, t)), fbm(p + vec2(5.2, 1.3) - vec2(t * 0.8, 0.0)));',
+    '  vec2 r = vec2(fbm(p + 3.2 * q + vec2(1.7, 9.2) + t * 0.7), fbm(p + 3.2 * q + vec2(8.3, 2.8) - t * 0.55));',
+    '  float f = fbm(p + 3.0 * r);',
+    '  float k = smoothstep(0.12, 0.88, f * 0.85 + (q.x - 0.5) * 0.7 + 0.1);',
+    '  vec3 col = ramp(k);',
+    '  float sheen = smoothstep(0.5, 0.0, abs(fbm(p * 2.2 + r * 2.5 + t) - 0.5));',   // thin bright oily lines
+    '  col += sheen * 0.10 * u_c3;',
+    '  col *= mix(0.62, 1.08, smoothstep(1.15, 0.15, length(uv - 0.5)));',
+    '  gl_FragColor = vec4(col, 1.0);',
+    '}',
+  ].join('\n');
+
+  var gl = null, glUniforms = null;
+
+  function initGL() {
+    var canvas = document.getElementById('bgCanvas');
+    try { gl = canvas.getContext('webgl', { antialias: false, alpha: false }); } catch (e) { gl = null; }
+    if (!gl) { return; }
+    function shader(type, src) {
+      var s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      return gl.getShaderParameter(s, gl.COMPILE_STATUS) ? s : null;
+    }
+    var vs = shader(gl.VERTEX_SHADER, VERT), fs = shader(gl.FRAGMENT_SHADER, FRAG);
+    var prog = vs && fs ? gl.createProgram() : null;
+    if (prog) {
+      gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { prog = null; }
+    }
+    if (!prog) { gl = null; return; }
+    gl.useProgram(prog);
+    var buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW); // one big triangle
+    var loc = gl.getAttribLocation(prog, 'p');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    glUniforms = {
+      res: gl.getUniformLocation(prog, 'u_res'), time: gl.getUniformLocation(prog, 'u_time'),
+      c: [0, 1, 2, 3, 4].map(function (i) { return gl.getUniformLocation(prog, 'u_c' + i); }),
+    };
+    canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); gl = null; document.getElementById('bg').classList.remove('gl'); });
+    document.getElementById('bg').classList.add('gl');
+  }
+
+  var RAMP_ORDER = [0, 1, 3, 2, 4]; // deep, mid, light, secondary mid, secondary deep
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function drawGL(now) {
+    if (!gl) { return; }
+    var canvas = gl.canvas;
+    var w = Math.max(2, Math.round(window.innerWidth * 0.5)), h = Math.max(2, Math.round(window.innerHeight * 0.5)); // half res is plenty for soft colour
+    if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h); }
+    gl.uniform2f(glUniforms.res, w, h);
+    gl.uniform1f(glUniforms.time, (reducedMotion ? 0.15 : 1) * now / 1000);
+    for (var i = 0; i < 5; i++) {
+      var c = bgCurrent[RAMP_ORDER[i]];
+      gl.uniform3f(glUniforms.c[i], c[0] / 255, c[1] / 255, c[2] / 255);
+    }
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
   el.artImg.crossOrigin = 'anonymous'; // lets us read the pixels (the API sends CORS headers for allowed origins)
   el.artImg.onload = function () { sampleArt(el.artImg); };
   el.artImg.onerror = function () {
@@ -316,6 +408,7 @@
   };
   window.__maWidget = { pickPalette: pickPalette, palettes: PALETTES }; // test hook
 
+  initGL();
   render();
   connect();
   requestAnimationFrame(frame);
