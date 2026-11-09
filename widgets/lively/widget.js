@@ -33,6 +33,8 @@
     play: document.getElementById('btnPlay'),
     next: document.getElementById('btnNext'),
     fav: document.getElementById('btnFav'),
+    repeat: document.getElementById('btnRepeat'),
+    bar: document.getElementById('bar'),
   };
 
   var socket = null;
@@ -123,7 +125,7 @@
   }
 
   function renderProgress() {
-    var pos = connected && state && state.connected ? currentPosition() : null;
+    var pos = connected && state && state.connected ? (scrub ? scrub.pos : currentPosition()) : null;
     var dur = state && state.duration_ms;
     var visible = pos != null && dur > 0 && settings.showProgress !== false;
     el.progress.classList.toggle('hidden', !visible);
@@ -213,11 +215,11 @@
   // ---- Hover controls --------------------------------------------------------------------
   function apiLive() { return connected && state && state.connected; }
 
-  function sendCommand(name) {
+  function sendCommand(name, extra) {
     return fetch(apiUrl('/api/command'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ command: name }),
+      body: JSON.stringify(Object.assign({ command: name }, extra || {})),
     }).then(function (r) {
       if (r.ok) { return; }
       return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); });
@@ -225,9 +227,9 @@
   }
 
   /** Runs a command; `optimistic` flips the UI at once and `undo` puts it back if the command fails. */
-  function runCommand(name, optimistic, undo) {
+  function runCommand(name, optimistic, undo, extra) {
     if (optimistic) { optimistic(); renderControls(); }
-    sendCommand(name).catch(function (err) {
+    sendCommand(name, extra).catch(function (err) {
       if (undo) { undo(); renderControls(); }
       showNotice(name + ' failed: ' + (err && err.message ? err.message : 'unknown error'));
     });
@@ -236,7 +238,7 @@
   function renderControls() {
     var live = apiLive();
     el.extra.classList.toggle('offline', !live);
-    if (!live) { return; }
+    if (!live) { el.progress.classList.remove('seekable'); return; }
 
     var supported = state.supported_commands || [];
     function can(names) {
@@ -254,6 +256,13 @@
     el.shuffle.disabled = !can(['shuffle', 'unshuffle']);
     el.shuffle.setAttribute('aria-pressed', state.shuffle ? 'true' : 'false');
     el.shuffle.title = state.shuffle ? 'Shuffle on' : 'Shuffle off';
+
+    var mode = state.repeat === 'all' || state.repeat === 'one' ? state.repeat : 'off';
+    el.repeat.setAttribute('data-mode', mode);
+    el.repeat.setAttribute('aria-pressed', mode === 'off' ? 'false' : 'true');
+    el.repeat.title = 'Repeat ' + mode;
+    el.repeat.disabled = !can(['repeat_off', 'repeat_all', 'repeat_one']);
+    el.progress.classList.toggle('seekable', canSeek());
 
     // `favorite` is absent on older ma-satellite builds (hide the heart) and null while unknown (show it disabled).
     var hasFav = Object.prototype.hasOwnProperty.call(state, 'favorite');
@@ -291,6 +300,54 @@
     var was = state.favorite === true;
     runCommand(was ? 'unfavorite' : 'favorite', function () { state.favorite = !was; }, function () { state.favorite = was; });
   });
+
+  // ---- Repeat and seeking ---------------------------------------------------------------
+  el.repeat.addEventListener('click', function () {
+    var was = state.repeat === 'all' || state.repeat === 'one' ? state.repeat : 'off';
+    var next = was === 'off' ? 'all' : (was === 'all' ? 'one' : 'off'); // off -> all -> one -> off
+    runCommand('repeat_' + next, function () { state.repeat = next; }, function () { state.repeat = was; });
+  });
+
+  function canSeek() {
+    return apiLive() && state.duration_ms > 0 && (state.supported_commands || []).indexOf('seek') >= 0;
+  }
+
+  function positionFromPointer(e) {
+    var rect = el.bar.getBoundingClientRect(); // already accounts for the hover scale of the card
+    var ratio = rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0;
+    return Math.round(Math.max(0, Math.min(1, ratio)) * state.duration_ms);
+  }
+
+  var scrub = null; // {pos} while the pointer is dragging on the bar
+
+  el.bar.addEventListener('pointerdown', function (e) {
+    if (!canSeek() || e.button !== 0) { return; }
+    e.preventDefault();
+    try { el.bar.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+    scrub = { pos: positionFromPointer(e) };
+    el.progress.classList.add('scrubbing');
+    renderProgress();
+  });
+
+  el.bar.addEventListener('pointermove', function (e) {
+    if (scrub) { scrub.pos = positionFromPointer(e); renderProgress(); }
+    else if (canSeek()) { el.bar.title = formatTime(positionFromPointer(e)); } // hover tooltip: the time under the pointer
+  });
+
+  function endScrub(e, commit) {
+    if (!scrub) { return; }
+    var pos = commit ? positionFromPointer(e) : null;
+    scrub = null;
+    el.progress.classList.remove('scrubbing');
+    if (pos == null) { renderProgress(); return; }
+    var before = { pos: state.position_ms, at: state.position_updated_at };
+    runCommand('seek',
+      function () { state.position_ms = pos; state.position_updated_at = Date.now(); },
+      function () { state.position_ms = before.pos; state.position_updated_at = before.at; },
+      { position_ms: pos });
+  }
+  el.bar.addEventListener('pointerup', function (e) { endScrub(e, true); });
+  el.bar.addEventListener('pointercancel', function (e) { endScrub(e, false); });
 
   /** Lively calls this with the system "now playing" info (SMTC, which ma-satellite feeds too). */
   window.livelyCurrentTrack = function (data) {

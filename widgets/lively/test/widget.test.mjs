@@ -36,9 +36,12 @@ try {
   await page.route('http://127.0.0.1:8929/api/artwork*', r => r.fulfill({ contentType: 'image/png', body: art }));
   await page.route('http://127.0.0.1:8929/api/now-playing*', r => { polled.push(r.request().url()); r.fulfill({ status: 500 }); });
   const commands = [];
+  const bodies = [];
   let commandReply = { status: 200, body: '{"status":"ok"}' };
   await page.route('http://127.0.0.1:8929/api/command', r => {
-    commands.push(JSON.parse(r.request().postData()).command);
+    const body = JSON.parse(r.request().postData());
+    commands.push(body.command);
+    bodies.push(body);
     r.fulfill({ status: commandReply.status, contentType: 'text/plain', body: commandReply.body });
   });
   await page.routeWebSocket('ws://127.0.0.1:8929/api/events', ws => { sockets.push(ws); ws.send(JSON.stringify(nowPlaying())); });
@@ -217,6 +220,70 @@ try {
     await page.mouse.move(0, 0);
     await page.waitForFunction(() => getComputedStyle(document.getElementById('extra')).opacity === '0');
     assert.ok(await opacity() === '0');
+  });
+
+  await check('repeat cycles off, all, one and the progress bar seeks by click and drag', async () => {
+    const supported = ['play', 'pause', 'next', 'previous', 'shuffle', 'unshuffle', 'seek', 'repeat_off', 'repeat_all', 'repeat_one'];
+    const push = over => sockets.at(-1).send(JSON.stringify(nowPlaying({ supported_commands: supported, playback: 'paused', ...over })));
+    const mode = () => page.getAttribute('#btnRepeat', 'data-mode');
+    const until = async (cond, what) => { for (let i = 0; i < 60 && !cond(); i++) { await page.waitForTimeout(50); } assert.ok(cond(), 'timed out waiting for ' + what); };
+
+    await page.hover('#card');
+    await page.waitForTimeout(700); // let the card finish growing so positions are stable
+
+    push({ repeat: 'off' });
+    await page.waitForFunction(() => document.getElementById('btnRepeat').dataset.mode === 'off' && !document.getElementById('btnRepeat').disabled);
+    await page.click('#btnRepeat');
+    await until(() => commands.at(-1) === 'repeat_all', 'repeat_all');
+    assert.equal(await mode(), 'all');
+    assert.equal(await page.getAttribute('#btnRepeat', 'aria-pressed'), 'true');
+    push({ repeat: 'all' });
+    await page.waitForFunction(() => document.getElementById('btnRepeat').dataset.mode === 'all');
+    await page.click('#btnRepeat');
+    await until(() => commands.at(-1) === 'repeat_one', 'repeat_one');
+    assert.equal(await mode(), 'one');
+    push({ repeat: 'one' });
+    await page.waitForFunction(() => document.getElementById('btnRepeat').dataset.mode === 'one');
+    await page.click('#btnRepeat');
+    await until(() => commands.at(-1) === 'repeat_off', 'repeat_off');
+    assert.equal(await page.getAttribute('#btnRepeat', 'aria-pressed'), 'false');
+
+    // Seeking: a click on the bar jumps to that point ...
+    push({ repeat: 'off', position_ms: 30000, position_updated_at: Date.now() });
+    await page.waitForFunction(() => document.getElementById('progress').classList.contains('seekable'));
+    await page.waitForTimeout(700);
+    let box = await page.locator('#bar').boundingBox();
+    await page.mouse.click(box.x + box.width * 0.5, box.y + box.height / 2);
+    await until(() => bodies.at(-1).command === 'seek', 'click seek');
+    assert.ok(Math.abs(bodies.at(-1).position_ms - 125500) < 2500, 'click seek ' + bodies.at(-1).position_ms);
+
+    // ... and dragging scrubs: the time follows the pointer and one seek is sent on release.
+    push({ position_ms: 30000, position_updated_at: Date.now() });
+    await page.waitForTimeout(700);
+    box = await page.locator('#bar').boundingBox();
+    const y = box.y + box.height / 2;
+    const before = bodies.length;
+    await page.mouse.move(box.x + box.width * 0.2, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.8, y, { steps: 6 });
+    await page.waitForFunction(() => document.getElementById('elapsed').textContent === '3:20');
+    assert.equal(bodies.length, before, 'no command while dragging');
+    await page.mouse.up();
+    await until(() => bodies.length === before + 1, 'drag seek');
+    assert.equal(bodies.at(-1).command, 'seek');
+    assert.ok(Math.abs(bodies.at(-1).position_ms - 200800) < 2500, 'drag seek ' + bodies.at(-1).position_ms);
+
+    // Without 'seek' in the supported list the bar is not interactive, and repeat is disabled without repeat commands.
+    push({ supported_commands: ['play', 'pause'] });
+    await page.waitForFunction(() => !document.getElementById('progress').classList.contains('seekable') && document.getElementById('btnRepeat').disabled);
+    const n = bodies.length;
+    box = await page.locator('#bar').boundingBox();
+    await page.mouse.click(box.x + box.width * 0.5, box.y + box.height / 2);
+    await page.waitForTimeout(300);
+    assert.equal(bodies.length, n);
+
+    await page.mouse.move(0, 0);
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('extra')).opacity === '0');
   });
 
   await check('livelyPropertyListener restyles the card', async () => {
