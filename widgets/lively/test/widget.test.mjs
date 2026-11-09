@@ -35,6 +35,15 @@ try {
   let sockets = [];
   await page.route('http://127.0.0.1:8929/api/artwork*', r => r.fulfill({ contentType: 'image/png', body: art }));
   await page.route('http://127.0.0.1:8929/api/now-playing*', r => { polled.push(r.request().url()); r.fulfill({ status: 500 }); });
+  const commands = [];
+  const bodies = [];
+  let commandReply = { status: 200, body: '{"status":"ok"}' };
+  await page.route('http://127.0.0.1:8929/api/command', r => {
+    const body = JSON.parse(r.request().postData());
+    commands.push(body.command);
+    bodies.push(body);
+    r.fulfill({ status: commandReply.status, contentType: 'text/plain', body: commandReply.body });
+  });
   await page.routeWebSocket('ws://127.0.0.1:8929/api/events', ws => { sockets.push(ws); ws.send(JSON.stringify(nowPlaying())); });
 
   await page.goto(page_url);
@@ -91,6 +100,190 @@ try {
     await page.waitForFunction(() => document.getElementById('status').textContent.startsWith('Connecting'));
     await page.waitForFunction(() => document.getElementById('title').textContent.includes('Everything'), null, { timeout: 8000 });
     assert.ok(sockets.length > count);
+  });
+
+  await check('snaps album colours to the fixed palette', async () => {
+    const pick = rgbs => page.evaluate(list => {
+      const px = new Uint8ClampedArray(4 * 200);
+      for (let i = 0; i < 200; i++) { const c = list[i % list.length]; px.set([c[0], c[1], c[2], 255], i * 4); }
+      return window.__maWidget.pickPalette(px);
+    }, rgbs);
+    assert.deepEqual(await pick([[30, 95, 214]]), { primary: 7, secondary: -1, analogous: 8 });            // blue -> blue
+    assert.deepEqual(await pick([[107, 106, 42]]), { primary: 2, secondary: -1, analogous: 3 });           // muddy olive -> amber, not mud
+    assert.deepEqual(await pick([[230, 99, 10]]), { primary: 1, secondary: -1, analogous: 2 });            // orange
+    assert.equal((await pick([[143, 127, 166]])).primary, 9);                                 // washed-out purple still -> violet
+    assert.deepEqual(await pick([[128, 128, 128]]), { neutral: true });                      // grey cover -> neutral slate
+    assert.deepEqual(await pick([[10, 10, 10]]), { neutral: true });                         // near-black -> neutral
+    const duo = await pick([[30, 95, 214], [30, 95, 214], [30, 95, 214], [220, 40, 70]]);   // dominant blue, red accent
+    assert.equal(duo.primary, 7);
+    assert.equal(duo.secondary, 0);
+  });
+
+  await check('the background colours come from the palette table', async () => {
+    const allowed = await page.evaluate(() => window.__maWidget.palettes.flat().map(h => {
+      const n = parseInt(h.slice(1), 16); return `rgb(${n >> 16},${(n >> 8) & 255},${n & 255})`;
+    }));
+    await page.waitForFunction(() => document.documentElement.style.getPropertyValue('--bg2') !== '', null, { timeout: 8000 });
+    await page.waitForTimeout(3500); // let the fade settle
+    for (const v of ['--bg1', '--bg2', '--bg3', '--bg4', '--bg5']) {
+      const val = await page.evaluate(n => document.documentElement.style.getPropertyValue(n), v);
+      assert.ok(allowed.includes(val), `${v}=${val} is not a palette colour`);
+    }
+  });
+
+  await check('colour intensity slider is accepted', async () => {
+    await page.evaluate(() => { window.livelyPropertyListener('colorIntensity', 30); window.livelyPropertyListener('colorIntensity', 55); });
+  });
+
+  await check('the flow speed slider scales the flow clock', async () => {
+    if (!(await page.evaluate(() => document.getElementById('bg').classList.contains('gl')))) { return; } // no WebGL here: CSS fallback
+    const rate = async pct => {
+      await page.evaluate(v => window.livelyPropertyListener('flowSpeed', v), pct);
+      const a = await page.evaluate(() => window.__maWidget.flowTime());
+      await page.waitForTimeout(1500);
+      return (await page.evaluate(() => window.__maWidget.flowTime()) - a) / 1.5;
+    };
+    const fast = await rate(100), slow = await rate(20), still = await rate(0);
+    assert.ok(slow < fast * 0.35 && slow > fast * 0.1, `fast ${fast} slow ${slow}`);
+    assert.ok(still < 0.001, `still ${still}`);
+    await page.evaluate(() => window.livelyPropertyListener('flowSpeed', 20));
+  });
+
+  await check('the fluid background can be switched off', async () => {
+    await page.evaluate(() => window.livelyPropertyListener('fluidBackground', false));
+    assert.equal(await page.isVisible('#bg'), false);
+    await page.evaluate(() => window.livelyPropertyListener('fluidBackground', true));
+    assert.equal(await page.isVisible('#bg'), true);
+  });
+
+  await check('hovering the card reveals info and controls that send commands', async () => {
+    const push = over => sockets.at(-1).send(JSON.stringify(nowPlaying({ supported_commands: ['play', 'pause', 'next', 'previous', 'shuffle', 'unshuffle'], ...over })));
+    const last = () => commands.at(-1);
+    const opacity = () => page.evaluate(() => getComputedStyle(document.getElementById('extra')).opacity);
+
+    push({ playback: 'playing', shuffle: false });
+    await page.waitForFunction(() => document.getElementById('meta').textContent === '2000 · Track 1 · Living room');
+    await page.mouse.move(0, 0);
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('extra')).opacity === '0');
+
+    await page.hover('#card');
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('extra')).opacity === '1');
+    assert.equal(await page.isVisible('#btnPlay'), true);
+
+    await page.click('#btnPlay');                                   // playing -> pause
+    assert.equal(last(), 'pause');
+    push({ playback: 'paused', shuffle: false });
+    await page.waitForFunction(() => !document.getElementById('btnPlay').classList.contains('is-playing'));
+    await page.click('#btnPlay');                                   // paused -> play
+    assert.equal(last(), 'play');
+
+    await page.click('#btnNext');
+    assert.equal(last(), 'next');
+    await page.click('#btnPrev');
+    assert.equal(last(), 'previous');
+
+    push({ playback: 'playing', shuffle: false });
+    await page.waitForFunction(() => document.getElementById('btnPlay').classList.contains('is-playing'));
+    await page.click('#btnShuffle');
+    assert.equal(last(), 'shuffle');
+    assert.equal(await page.getAttribute('#btnShuffle', 'aria-pressed'), 'true');   // optimistic
+    await page.click('#btnShuffle');
+    assert.equal(last(), 'unshuffle');
+    assert.equal(await page.getAttribute('#btnShuffle', 'aria-pressed'), 'false');
+
+    // Heart: hidden on builds that do not report `favorite`, disabled while unknown, a toggle otherwise.
+    assert.equal(await page.isVisible('#btnFav'), false);
+    push({ playback: 'playing', favorite: null });
+    await page.waitForFunction(() => document.getElementById('btnFav').disabled && !document.getElementById('btnFav').classList.contains('hidden'));
+    push({ playback: 'playing', favorite: false });
+    await page.waitForFunction(() => !document.getElementById('btnFav').disabled);
+    await page.click('#btnFav');
+    assert.equal(last(), 'favorite');
+    assert.equal(await page.getAttribute('#btnFav', 'aria-pressed'), 'true');
+    await page.click('#btnFav');
+    assert.equal(last(), 'unfavorite');
+    assert.equal(await page.getAttribute('#btnFav', 'aria-pressed'), 'false');
+
+    // Commands the player does not support are disabled.
+    push({ playback: 'playing', favorite: false, supported_commands: ['play', 'pause'] });
+    await page.waitForFunction(() => document.getElementById('btnNext').disabled && !document.getElementById('btnPlay').disabled);
+
+    // A failing command is undone and explained on the status line.
+    push({ playback: 'playing', favorite: false });
+    await page.waitForFunction(() => !document.getElementById('btnFav').disabled);
+    commandReply = { status: 409, body: 'Favourites need the track to be in your Music Assistant queue.' };
+    await page.click('#btnFav');
+    await page.waitForFunction(() => document.getElementById('status').textContent.includes('failed: Favourites need the track'));
+    assert.equal(await page.getAttribute('#btnFav', 'aria-pressed'), 'false');
+    commandReply = { status: 200, body: '{"status":"ok"}' };
+
+    await page.mouse.move(0, 0);
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('extra')).opacity === '0');
+    assert.ok(await opacity() === '0');
+  });
+
+  await check('repeat cycles off, all, one and the progress bar seeks by click and drag', async () => {
+    const supported = ['play', 'pause', 'next', 'previous', 'shuffle', 'unshuffle', 'seek', 'repeat_off', 'repeat_all', 'repeat_one'];
+    const push = over => sockets.at(-1).send(JSON.stringify(nowPlaying({ supported_commands: supported, playback: 'paused', ...over })));
+    const mode = () => page.getAttribute('#btnRepeat', 'data-mode');
+    const until = async (cond, what) => { for (let i = 0; i < 60 && !cond(); i++) { await page.waitForTimeout(50); } assert.ok(cond(), 'timed out waiting for ' + what); };
+
+    await page.hover('#card');
+    await page.waitForTimeout(700); // let the card finish growing so positions are stable
+
+    push({ repeat: 'off' });
+    await page.waitForFunction(() => document.getElementById('btnRepeat').dataset.mode === 'off' && !document.getElementById('btnRepeat').disabled);
+    await page.click('#btnRepeat');
+    await until(() => commands.at(-1) === 'repeat_all', 'repeat_all');
+    assert.equal(await mode(), 'all');
+    assert.equal(await page.getAttribute('#btnRepeat', 'aria-pressed'), 'true');
+    push({ repeat: 'all' });
+    await page.waitForFunction(() => document.getElementById('btnRepeat').dataset.mode === 'all');
+    await page.click('#btnRepeat');
+    await until(() => commands.at(-1) === 'repeat_one', 'repeat_one');
+    assert.equal(await mode(), 'one');
+    push({ repeat: 'one' });
+    await page.waitForFunction(() => document.getElementById('btnRepeat').dataset.mode === 'one');
+    await page.click('#btnRepeat');
+    await until(() => commands.at(-1) === 'repeat_off', 'repeat_off');
+    assert.equal(await page.getAttribute('#btnRepeat', 'aria-pressed'), 'false');
+
+    // Seeking: a click on the bar jumps to that point ...
+    push({ repeat: 'off', position_ms: 30000, position_updated_at: Date.now() });
+    await page.waitForFunction(() => document.getElementById('progress').classList.contains('seekable'));
+    await page.waitForTimeout(700);
+    let box = await page.locator('#bar').boundingBox();
+    await page.mouse.click(box.x + box.width * 0.5, box.y + box.height / 2);
+    await until(() => bodies.at(-1).command === 'seek', 'click seek');
+    assert.ok(Math.abs(bodies.at(-1).position_ms - 125500) < 2500, 'click seek ' + bodies.at(-1).position_ms);
+
+    // ... and dragging scrubs: the time follows the pointer and one seek is sent on release.
+    push({ position_ms: 30000, position_updated_at: Date.now() });
+    await page.waitForTimeout(700);
+    box = await page.locator('#bar').boundingBox();
+    const y = box.y + box.height / 2;
+    const before = bodies.length;
+    await page.mouse.move(box.x + box.width * 0.2, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.8, y, { steps: 6 });
+    await page.waitForFunction(() => document.getElementById('elapsed').textContent === '3:20');
+    assert.equal(bodies.length, before, 'no command while dragging');
+    await page.mouse.up();
+    await until(() => bodies.length === before + 1, 'drag seek');
+    assert.equal(bodies.at(-1).command, 'seek');
+    assert.ok(Math.abs(bodies.at(-1).position_ms - 200800) < 2500, 'drag seek ' + bodies.at(-1).position_ms);
+
+    // Without 'seek' in the supported list the bar is not interactive, and repeat is disabled without repeat commands.
+    push({ supported_commands: ['play', 'pause'] });
+    await page.waitForFunction(() => !document.getElementById('progress').classList.contains('seekable') && document.getElementById('btnRepeat').disabled);
+    const n = bodies.length;
+    box = await page.locator('#bar').boundingBox();
+    await page.mouse.click(box.x + box.width * 0.5, box.y + box.height / 2);
+    await page.waitForTimeout(300);
+    assert.equal(bodies.length, n);
+
+    await page.mouse.move(0, 0);
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('extra')).opacity === '0');
   });
 
   await check('livelyPropertyListener restyles the card', async () => {

@@ -53,6 +53,9 @@ public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.
 
     public SendspinService Service => _service;
 
+    /// <summary>Set once the library services exist; lets the local API (un)favourite the playing track.</summary>
+    public ILocalApiFavorites? Favorites { get; set; }
+
     /// <summary>The system master volume of the output device, which is also MA's volume for this player.</summary>
     public IVolumeControl Volume => _volume;
 

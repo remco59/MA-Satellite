@@ -6,6 +6,7 @@ using MaSatellite.Host.Audio;
 using MaSatellite.Host.Autostart;
 using MaSatellite.Host.Infrastructure;
 using MaSatellite.Host.Library;
+using MaSatellite.Host.LocalApi;
 using MaSatellite.Host.Logging;
 using MaSatellite.Host.NowPlaying;
 using MaSatellite.Host.Orchestration;
@@ -157,6 +158,7 @@ internal sealed class SatelliteShell : IDisposable
             _library = library;
             _libraryController = new LibraryController(library, _settings!);
             _nowPlaying = NowPlayingFactory.Create(_libraryController, _paths, version, loggers);
+            host.Favorites = new LibraryFavorites(_libraryController, _nowPlaying);
             host.StatusChanged += OnStatusChanged;
             var smtc = new SmtcController(loggers.CreateLogger<SmtcController>());
             _smtc = smtc;

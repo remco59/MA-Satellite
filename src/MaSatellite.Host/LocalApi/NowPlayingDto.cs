@@ -26,14 +26,16 @@ public sealed record NowPlayingDto(
     bool InSync,
     bool Shuffle,
     string Repeat,
-    IReadOnlyList<string> SupportedCommands);
+    IReadOnlyList<string> SupportedCommands,
+    bool? Favorite = null);
 
 public static class NowPlayingMapper
 {
     /// <param name="status">Current status.</param>
     /// <param name="serverNowMicros">The server clock now, to extrapolate the playback position.</param>
     /// <param name="unixNowMs">Wall-clock time stamped on the position so clients can extrapolate too.</param>
-    public static NowPlayingDto Map(SatelliteStatus status, long serverNowMicros, long unixNowMs)
+    /// <param name="favorite">Whether the playing track is a favourite; null when unknown.</param>
+    public static NowPlayingDto Map(SatelliteStatus status, long serverNowMicros, long unixNowMs, bool? favorite = null)
     {
         var s = status.Session;
         var md = s.Metadata;
@@ -68,7 +70,8 @@ public static class NowPlayingMapper
             status.InSync,
             s.Controller.Shuffle,
             s.Controller.Repeat.ToString().ToLowerInvariant(),
-            s.Controller.SupportedCommands);
+            s.Controller.SupportedCommands,
+            favorite);
     }
 }
 
