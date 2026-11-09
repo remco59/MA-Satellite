@@ -35,7 +35,7 @@
   var state = null;          // last NowPlaying payload from the API
   var fallback = null;       // last livelyCurrentTrack payload
   var lastArtUrl = null;
-  var diag = ' (v4)';           // why the last connection attempt failed, shown while disconnected
+  var diag = ' (v6)';           // why the last connection attempt failed, shown while disconnected
 
   function formatTime(ms) {
     var total = Math.max(0, Math.floor(ms / 1000));
@@ -94,7 +94,7 @@
       el.title.textContent = 'Nothing playing';
       el.artist.textContent = '';
       el.album.textContent = '';
-      el.status.textContent = connected ? (state && state.connected ? '' : 'Waiting for Music Assistant') : 'Connecting to ma-satellite…';
+      el.status.textContent = connected ? (state && state.connected ? '' : 'Waiting for Music Assistant') : 'Connecting to ma-satellite…' + diag;
       setArt(null);
       el.progress.classList.add('hidden');
       return;
@@ -152,7 +152,7 @@
     // If the handshake neither succeeds nor fails, say so and probe plain HTTP to tell the cases apart.
     setTimeout(function () {
       if (socket !== ws || connected) { return; }
-      diag = ' [v4: handshake pending, readyState ' + ws.readyState + ', origin ' + location.origin + ']';
+      diag = ' [v6: handshake pending, readyState ' + ws.readyState + ', origin ' + location.origin + ']';
       render();
       try {
         fetch(apiUrl('/api/health')).then(function (r) {
@@ -172,7 +172,7 @@
       render();
       scheduleRetry();
     };
-    ws.onerror = function () { if (!connected) { diag = ' [v4: socket error, origin ' + location.origin + ']'; render(); } };
+    ws.onerror = function () { if (!connected) { diag = ' [v6: socket error, origin ' + location.origin + ']'; render(); } };
   }
 
   function scheduleRetry() {

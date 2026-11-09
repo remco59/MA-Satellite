@@ -9,7 +9,7 @@
 html, body {
   margin: 0;
   height: 100%;
-  background: #5b21b6; /* TEMP: vivid marker colour to verify the installed copy; was transparent */
+  background: transparent;
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   color: #f2f5f8;
   overflow: hidden;
