@@ -107,7 +107,9 @@ public sealed class LocalApiServer : IAsyncDisposable
             return false;
         }
 
-        return uri.Host is "localhost" or "127.0.0.1" or "[::1]" or "::1";
+        // Lively's WebView2 serves wallpapers from https://<random>.localhost; *.localhost is loopback-only (RFC 6761).
+        return uri.Host is "localhost" or "127.0.0.1" or "[::1]" or "::1"
+            || uri.Host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool IsAllowedHost(string? host, int port)
