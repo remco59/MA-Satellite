@@ -26,6 +26,13 @@
     total: document.getElementById('total'),
     fill: document.getElementById('fill'),
     status: document.getElementById('status'),
+    extra: document.getElementById('extra'),
+    meta: document.getElementById('meta'),
+    shuffle: document.getElementById('btnShuffle'),
+    prev: document.getElementById('btnPrev'),
+    play: document.getElementById('btnPlay'),
+    next: document.getElementById('btnNext'),
+    fav: document.getElementById('btnFav'),
   };
 
   var socket = null;
@@ -35,6 +42,8 @@
   var state = null;          // last NowPlaying payload from the API
   var fallback = null;       // last livelyCurrentTrack payload
   var lastArtUrl = null;
+  var notice = '';           // short message such as a failed command, shown on the status line for a few seconds
+  var noticeTimer = null;
   var diag = ' (v6)';           // why the last connection attempt failed, shown while disconnected
 
   function formatTime(ms) {
@@ -96,9 +105,10 @@
       el.title.textContent = 'Nothing playing';
       el.artist.textContent = '';
       el.album.textContent = '';
-      el.status.textContent = connected ? (state && state.connected ? '' : 'Waiting for Music Assistant') : 'Connecting to ma-satellite…' + diag;
+      setStatus(connected ? (state && state.connected ? '' : 'Waiting for Music Assistant') : 'Connecting to ma-satellite…' + diag);
       setArt(null);
       el.progress.classList.add('hidden');
+      renderControls();
       return;
     }
 
@@ -106,9 +116,10 @@
     el.title.textContent = source.title;
     el.artist.textContent = source.artist || '';
     el.album.textContent = source.album || '';
-    el.status.textContent = source.status || '';
+    setStatus(source.status || '');
     setArt(source.art);
     renderProgress();
+    renderControls();
   }
 
   function renderProgress() {
@@ -189,6 +200,97 @@
     drawGL(now || 0);
     requestAnimationFrame(frame);
   }
+
+  function setStatus(text) { el.status.textContent = notice || text; }
+
+  function showNotice(text) {
+    notice = text;
+    el.status.textContent = text;
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(function () { notice = ''; render(); }, 4000);
+  }
+
+  // ---- Hover controls --------------------------------------------------------------------
+  function apiLive() { return connected && state && state.connected; }
+
+  function sendCommand(name) {
+    return fetch(apiUrl('/api/command'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command: name }),
+    }).then(function (r) {
+      if (r.ok) { return; }
+      return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); });
+    });
+  }
+
+  /** Runs a command; `optimistic` flips the UI at once and `undo` puts it back if the command fails. */
+  function runCommand(name, optimistic, undo) {
+    if (optimistic) { optimistic(); renderControls(); }
+    sendCommand(name).catch(function (err) {
+      if (undo) { undo(); renderControls(); }
+      showNotice(name + ' failed: ' + (err && err.message ? err.message : 'unknown error'));
+    });
+  }
+
+  function renderControls() {
+    var live = apiLive();
+    el.extra.classList.toggle('offline', !live);
+    if (!live) { return; }
+
+    var supported = state.supported_commands || [];
+    function can(names) {
+      if (!supported.length) { return true; } // unknown list: let the server decide
+      return names.some(function (n) { return supported.indexOf(n) >= 0; });
+    }
+
+    var playing = state.playback === 'playing';
+    el.play.classList.toggle('is-playing', playing);
+    el.play.title = playing ? 'Pause' : 'Play';
+    el.play.setAttribute('aria-label', el.play.title);
+    el.play.disabled = !can(['play', 'pause']);
+    el.prev.disabled = !can(['previous']);
+    el.next.disabled = !can(['next']);
+    el.shuffle.disabled = !can(['shuffle', 'unshuffle']);
+    el.shuffle.setAttribute('aria-pressed', state.shuffle ? 'true' : 'false');
+    el.shuffle.title = state.shuffle ? 'Shuffle on' : 'Shuffle off';
+
+    // `favorite` is absent on older ma-satellite builds (hide the heart) and null while unknown (show it disabled).
+    var hasFav = Object.prototype.hasOwnProperty.call(state, 'favorite');
+    el.fav.classList.toggle('hidden', !hasFav);
+    el.fav.disabled = state.favorite == null;
+    el.fav.setAttribute('aria-pressed', state.favorite === true ? 'true' : 'false');
+    el.fav.title = state.favorite == null ? 'Favourites need the track to be in your Music Assistant queue'
+      : (state.favorite ? 'Remove from favourites' : 'Add to favourites');
+
+    var parts = [];
+    if (state.year) { parts.push(state.year); }
+    if (state.track) { parts.push('Track ' + state.track); }
+    if (state.group) { parts.push(state.group); }
+    el.meta.textContent = parts.join(' · ');
+  }
+
+  // A mouse click must not leave the button focused, or :focus-within would keep the panel open after the pointer leaves.
+  [el.shuffle, el.prev, el.play, el.next, el.fav].forEach(function (b) {
+    b.addEventListener('click', function (e) { if (e.detail > 0) { b.blur(); } });
+  });
+
+  el.play.addEventListener('click', function () {
+    var was = state.playback;
+    runCommand(was === 'playing' ? 'pause' : 'play',
+      function () { state.playback = was === 'playing' ? 'paused' : 'playing'; },
+      function () { state.playback = was; });
+  });
+  el.next.addEventListener('click', function () { runCommand('next'); });
+  el.prev.addEventListener('click', function () { runCommand('previous'); });
+  el.shuffle.addEventListener('click', function () {
+    var was = !!state.shuffle;
+    runCommand(was ? 'unshuffle' : 'shuffle', function () { state.shuffle = !was; }, function () { state.shuffle = was; });
+  });
+  el.fav.addEventListener('click', function () {
+    var was = state.favorite === true;
+    runCommand(was ? 'unfavorite' : 'favorite', function () { state.favorite = !was; }, function () { state.favorite = was; });
+  });
 
   /** Lively calls this with the system "now playing" info (SMTC, which ma-satellite feeds too). */
   window.livelyCurrentTrack = function (data) {

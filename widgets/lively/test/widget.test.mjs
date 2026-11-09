@@ -35,6 +35,12 @@ try {
   let sockets = [];
   await page.route('http://127.0.0.1:8929/api/artwork*', r => r.fulfill({ contentType: 'image/png', body: art }));
   await page.route('http://127.0.0.1:8929/api/now-playing*', r => { polled.push(r.request().url()); r.fulfill({ status: 500 }); });
+  const commands = [];
+  let commandReply = { status: 200, body: '{"status":"ok"}' };
+  await page.route('http://127.0.0.1:8929/api/command', r => {
+    commands.push(JSON.parse(r.request().postData()).command);
+    r.fulfill({ status: commandReply.status, contentType: 'text/plain', body: commandReply.body });
+  });
   await page.routeWebSocket('ws://127.0.0.1:8929/api/events', ws => { sockets.push(ws); ws.send(JSON.stringify(nowPlaying())); });
 
   await page.goto(page_url);
@@ -145,6 +151,72 @@ try {
     assert.equal(await page.isVisible('#bg'), false);
     await page.evaluate(() => window.livelyPropertyListener('fluidBackground', true));
     assert.equal(await page.isVisible('#bg'), true);
+  });
+
+  await check('hovering the card reveals info and controls that send commands', async () => {
+    const push = over => sockets.at(-1).send(JSON.stringify(nowPlaying({ supported_commands: ['play', 'pause', 'next', 'previous', 'shuffle', 'unshuffle'], ...over })));
+    const last = () => commands.at(-1);
+    const opacity = () => page.evaluate(() => getComputedStyle(document.getElementById('extra')).opacity);
+
+    push({ playback: 'playing', shuffle: false });
+    await page.waitForFunction(() => document.getElementById('meta').textContent === '2000 · Track 1 · Living room');
+    await page.mouse.move(0, 0);
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('extra')).opacity === '0');
+
+    await page.hover('#card');
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('extra')).opacity === '1');
+    assert.equal(await page.isVisible('#btnPlay'), true);
+
+    await page.click('#btnPlay');                                   // playing -> pause
+    assert.equal(last(), 'pause');
+    push({ playback: 'paused', shuffle: false });
+    await page.waitForFunction(() => !document.getElementById('btnPlay').classList.contains('is-playing'));
+    await page.click('#btnPlay');                                   // paused -> play
+    assert.equal(last(), 'play');
+
+    await page.click('#btnNext');
+    assert.equal(last(), 'next');
+    await page.click('#btnPrev');
+    assert.equal(last(), 'previous');
+
+    push({ playback: 'playing', shuffle: false });
+    await page.waitForFunction(() => document.getElementById('btnPlay').classList.contains('is-playing'));
+    await page.click('#btnShuffle');
+    assert.equal(last(), 'shuffle');
+    assert.equal(await page.getAttribute('#btnShuffle', 'aria-pressed'), 'true');   // optimistic
+    await page.click('#btnShuffle');
+    assert.equal(last(), 'unshuffle');
+    assert.equal(await page.getAttribute('#btnShuffle', 'aria-pressed'), 'false');
+
+    // Heart: hidden on builds that do not report `favorite`, disabled while unknown, a toggle otherwise.
+    assert.equal(await page.isVisible('#btnFav'), false);
+    push({ playback: 'playing', favorite: null });
+    await page.waitForFunction(() => document.getElementById('btnFav').disabled && !document.getElementById('btnFav').classList.contains('hidden'));
+    push({ playback: 'playing', favorite: false });
+    await page.waitForFunction(() => !document.getElementById('btnFav').disabled);
+    await page.click('#btnFav');
+    assert.equal(last(), 'favorite');
+    assert.equal(await page.getAttribute('#btnFav', 'aria-pressed'), 'true');
+    await page.click('#btnFav');
+    assert.equal(last(), 'unfavorite');
+    assert.equal(await page.getAttribute('#btnFav', 'aria-pressed'), 'false');
+
+    // Commands the player does not support are disabled.
+    push({ playback: 'playing', favorite: false, supported_commands: ['play', 'pause'] });
+    await page.waitForFunction(() => document.getElementById('btnNext').disabled && !document.getElementById('btnPlay').disabled);
+
+    // A failing command is undone and explained on the status line.
+    push({ playback: 'playing', favorite: false });
+    await page.waitForFunction(() => !document.getElementById('btnFav').disabled);
+    commandReply = { status: 409, body: 'Favourites need the track to be in your Music Assistant queue.' };
+    await page.click('#btnFav');
+    await page.waitForFunction(() => document.getElementById('status').textContent.includes('failed: Favourites need the track'));
+    assert.equal(await page.getAttribute('#btnFav', 'aria-pressed'), 'false');
+    commandReply = { status: 200, body: '{"status":"ok"}' };
+
+    await page.mouse.move(0, 0);
+    await page.waitForFunction(() => getComputedStyle(document.getElementById('extra')).opacity === '0');
+    assert.ok(await opacity() === '0');
   });
 
   await check('livelyPropertyListener restyles the card', async () => {
