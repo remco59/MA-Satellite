@@ -207,6 +207,7 @@
       case 'accent': root.style.setProperty('--accent', val); break;
       case 'opacity': root.style.setProperty('--card-opacity', String(val / 100)); break;
       case 'showAlbum': el.album.classList.toggle('hidden', !val); break;
+      case 'colorIntensity': glSat = Math.max(0, Math.min(1, Number(val) / 100)); break;
       case 'fluidBackground': document.getElementById('bg').classList.toggle('off', !val); break;
       case 'showProgress': settings.showProgress = !!val; renderProgress(); break;
     }
@@ -315,7 +316,7 @@
   var VERT = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }';
   var FRAG = [
     'precision highp float;',
-    'uniform vec2 u_res; uniform float u_time;',
+    'uniform vec2 u_res; uniform float u_time; uniform float u_sat;',
     'uniform vec3 u_c0; uniform vec3 u_c1; uniform vec3 u_c2; uniform vec3 u_c3; uniform vec3 u_c4;',
     'float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }',
     'float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);',
@@ -332,20 +333,23 @@
     '  vec2 p = (uv - 0.5) * vec2(u_res.x / u_res.y, 1.0);',
     '  float a = -0.62; p = mat2(cos(a), -sin(a), sin(a), cos(a)) * p;',
     '  p *= vec2(0.75, 1.9);',                       // stretch into diagonal streaks
-    '  float t = u_time * 0.16;',
+    '  float t = u_time * 0.05;',
     '  vec2 q = vec2(fbm(p + vec2(0.0, t)), fbm(p + vec2(5.2, 1.3) - vec2(t * 0.8, 0.0)));',
-    '  vec2 r = vec2(fbm(p + 3.2 * q + vec2(1.7, 9.2) + t * 0.7), fbm(p + 3.2 * q + vec2(8.3, 2.8) - t * 0.55));',
-    '  float f = fbm(p + 3.0 * r);',
+    '  vec2 r = vec2(fbm(p + 2.4 * q + vec2(1.7, 9.2) + t * 0.7), fbm(p + 2.4 * q + vec2(8.3, 2.8) - t * 0.55));',
+    '  float f = fbm(p + 2.4 * r);',
     '  float k = smoothstep(0.12, 0.88, f * 0.85 + (q.x - 0.5) * 0.7 + 0.1);',
     '  vec3 col = ramp(k);',
-    '  float sheen = smoothstep(0.5, 0.0, abs(fbm(p * 2.2 + r * 2.5 + t) - 0.5));',   // thin bright oily lines
+    '  float sheen = smoothstep(0.5, 0.0, abs(fbm(p * 2.2 + r * 2.0 + t) - 0.5));',   // thin bright oily lines
     '  col += sheen * 0.10 * u_c3;',
     '  col *= mix(0.62, 1.08, smoothstep(1.15, 0.15, length(uv - 0.5)));',
+    '  float luma = dot(col, vec3(0.299, 0.587, 0.114));',
+    '  col = mix(vec3(luma), col, u_sat) * 0.94;',               // mute: pull the colour towards grey
     '  gl_FragColor = vec4(col, 1.0);',
     '}',
   ].join('\n');
 
   var gl = null, glUniforms = null;
+  var glSat = 0.55; // colour intensity: 1 = full palette colours, 0 = grey (Lively slider 'colorIntensity')
 
   function initGL() {
     var canvas = document.getElementById('bgCanvas');
@@ -372,7 +376,7 @@
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     glUniforms = {
-      res: gl.getUniformLocation(prog, 'u_res'), time: gl.getUniformLocation(prog, 'u_time'),
+      res: gl.getUniformLocation(prog, 'u_res'), time: gl.getUniformLocation(prog, 'u_time'), sat: gl.getUniformLocation(prog, 'u_sat'),
       c: [0, 1, 2, 3, 4].map(function (i) { return gl.getUniformLocation(prog, 'u_c' + i); }),
     };
     canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); gl = null; document.getElementById('bg').classList.remove('gl'); });
@@ -388,6 +392,7 @@
     var w = Math.max(2, Math.round(window.innerWidth * 0.5)), h = Math.max(2, Math.round(window.innerHeight * 0.5)); // half res is plenty for soft colour
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h); }
     gl.uniform2f(glUniforms.res, w, h);
+    gl.uniform1f(glUniforms.sat, glSat);
     gl.uniform1f(glUniforms.time, (reducedMotion ? 0.15 : 1) * now / 1000);
     for (var i = 0; i < 5; i++) {
       var c = bgCurrent[RAMP_ORDER[i]];

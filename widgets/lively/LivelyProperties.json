@@ -31,5 +31,13 @@
     "type": "checkbox",
     "text": "Fluid background",
     "value": true
+  },
+  "colorIntensity": {
+    "type": "slider",
+    "text": "Background colour intensity",
+    "value": 55,
+    "min": 0,
+    "max": 100,
+    "step": 1
   }
 }

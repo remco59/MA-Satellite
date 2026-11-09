@@ -122,6 +122,10 @@ try {
     }
   });
 
+  await check('colour intensity slider is accepted', async () => {
+    await page.evaluate(() => { window.livelyPropertyListener('colorIntensity', 30); window.livelyPropertyListener('colorIntensity', 55); });
+  });
+
   await check('the fluid background can be switched off', async () => {
     await page.evaluate(() => window.livelyPropertyListener('fluidBackground', false));
     assert.equal(await page.isVisible('#bg'), false);
