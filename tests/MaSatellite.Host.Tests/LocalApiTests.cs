@@ -23,6 +23,8 @@ public class LocalApiTests
 
         public List<ControllerCommand> Commands { get; } = [];
 
+        public ILocalApiFavorites? Favorites { get; set; }
+
         public event Action<SatelliteStatus>? StatusChanged;
 
         public Task SendCommandAsync(ControllerCommand command)
@@ -36,6 +38,45 @@ public class LocalApiTests
             Status = status;
             StatusChanged?.Invoke(status);
         }
+    }
+
+    private sealed class FakeFavorites : ILocalApiFavorites
+    {
+        public bool? State { get; set; }
+
+        public string? FailWith { get; set; }
+
+        public List<bool> Requests { get; } = [];
+
+        public Task<bool?> GetCurrentAsync(CancellationToken ct) => Task.FromResult(State);
+
+        public Task<bool> SetCurrentAsync(bool favorite, CancellationToken ct)
+        {
+            if (FailWith is not null)
+            {
+                throw new InvalidOperationException(FailWith);
+            }
+
+            Requests.Add(favorite);
+            State = favorite;
+            return Task.FromResult(favorite);
+        }
+    }
+
+    private static async Task<JsonElement> WaitForFavoriteAsync(HttpClient http, JsonValueKind expected)
+    {
+        for (var i = 0; i < 50; i++)
+        {
+            using var doc = JsonDocument.Parse(await http.GetStringAsync("/api/now-playing"));
+            if (doc.RootElement.GetProperty("favorite").ValueKind == expected)
+            {
+                return doc.RootElement.GetProperty("favorite").Clone();
+            }
+
+            await Task.Delay(100);
+        }
+
+        throw new Xunit.Sdk.XunitException($"favorite never became {expected}");
     }
 
     private static int FreePort()
@@ -103,6 +144,75 @@ public class LocalApiTests
         Assert.Equal("Living room", r.GetProperty("group").GetString());
         Assert.Contains("next", r.GetProperty("supported_commands").EnumerateArray().Select(e => e.GetString()));
         Assert.True(r.GetProperty("position_updated_at").GetInt64() > 1_700_000_000_000);
+    }
+
+    [Fact]
+    public async Task Favorite_is_null_when_no_provider_is_attached()
+    {
+        var (server, _, http, _) = await StartAsync();
+        await using var _s = server;
+        using var _h = http;
+
+        using var doc = JsonDocument.Parse(await http.GetStringAsync("/api/now-playing"));
+        Assert.Equal(JsonValueKind.Null, doc.RootElement.GetProperty("favorite").ValueKind);
+        Assert.Equal(HttpStatusCode.NotImplemented, (await http.PostAsJsonAsync("/api/command", new { command = "favorite" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Favorite_state_comes_from_the_provider_and_follows_commands()
+    {
+        var (server, source, http, _) = await StartAsync();
+        await using var _s = server;
+        using var _h = http;
+        var favorites = new FakeFavorites { State = false };
+        source.Favorites = favorites;
+
+        // The first snapshot starts the lookup in the background; it lands shortly after.
+        Assert.Equal(JsonValueKind.False, (await WaitForFavoriteAsync(http, JsonValueKind.False)).ValueKind);
+
+        Assert.Equal(HttpStatusCode.OK, (await http.PostAsJsonAsync("/api/command", new { command = "favorite" })).StatusCode);
+        Assert.Equal([true], favorites.Requests);
+        using (var doc = JsonDocument.Parse(await http.GetStringAsync("/api/now-playing")))
+        {
+            Assert.True(doc.RootElement.GetProperty("favorite").GetBoolean());
+        }
+
+        Assert.Equal(HttpStatusCode.OK, (await http.PostAsJsonAsync("/api/command", new { command = "unfavorite" })).StatusCode);
+        Assert.Equal([true, false], favorites.Requests);
+        using (var doc = JsonDocument.Parse(await http.GetStringAsync("/api/now-playing")))
+        {
+            Assert.False(doc.RootElement.GetProperty("favorite").GetBoolean());
+        }
+    }
+
+    [Fact]
+    public async Task Favorite_failure_is_reported_as_conflict_with_the_reason()
+    {
+        var (server, source, http, _) = await StartAsync();
+        await using var _s = server;
+        using var _h = http;
+        source.Favorites = new FakeFavorites { FailWith = "Favourites need the track to be in your Music Assistant queue." };
+
+        var response = await http.PostAsJsonAsync("/api/command", new { command = "favorite" });
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Contains("Music Assistant queue", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Favorite_is_looked_up_again_when_the_track_changes()
+    {
+        var (server, source, http, _) = await StartAsync();
+        await using var _s = server;
+        using var _h = http;
+        var favorites = new FakeFavorites { State = true };
+        source.Favorites = favorites;
+        await WaitForFavoriteAsync(http, JsonValueKind.True);
+
+        favorites.State = false;
+        source.Raise(Playing("Another song"));
+
+        // Unknown straight away, then the new track's value once the (debounced) lookup completes.
+        Assert.Equal(JsonValueKind.False, (await WaitForFavoriteAsync(http, JsonValueKind.False)).ValueKind);
     }
 
     [Fact]
