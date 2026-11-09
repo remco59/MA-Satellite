@@ -39,5 +39,13 @@
     "min": 0,
     "max": 100,
     "step": 1
+  },
+  "flowSpeed": {
+    "type": "slider",
+    "text": "Background flow speed",
+    "value": 20,
+    "min": 0,
+    "max": 100,
+    "step": 1
   }
 }

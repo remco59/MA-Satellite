@@ -207,6 +207,7 @@
       case 'accent': root.style.setProperty('--accent', val); break;
       case 'opacity': root.style.setProperty('--card-opacity', String(val / 100)); break;
       case 'showAlbum': el.album.classList.toggle('hidden', !val); break;
+      case 'flowSpeed': glFlowSpeed = Math.max(0, Math.min(2, Number(val) / 100)); break;
       case 'colorIntensity': glSat = Math.max(0, Math.min(1, Number(val) / 100)); break;
       case 'fluidBackground': document.getElementById('bg').classList.toggle('off', !val); break;
       case 'showProgress': settings.showProgress = !!val; renderProgress(); break;
@@ -349,6 +350,8 @@
   ].join('\n');
 
   var gl = null, glUniforms = null;
+  var glFlowSpeed = 0.2; // 1 = base speed; Lively slider 'flowSpeed' (percent)
+  var glFlowTime = 0, glLastNow = 0;
   var glSat = 0.55; // colour intensity: 1 = full palette colours, 0 = grey (Lively slider 'colorIntensity')
 
   function initGL() {
@@ -393,7 +396,10 @@
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; gl.viewport(0, 0, w, h); }
     gl.uniform2f(glUniforms.res, w, h);
     gl.uniform1f(glUniforms.sat, glSat);
-    gl.uniform1f(glUniforms.time, (reducedMotion ? 0.15 : 1) * now / 1000);
+    var dt = glLastNow ? Math.min(now - glLastNow, 100) : 0; // cap so a pause/resume doesn't jump the flow
+    glLastNow = now;
+    glFlowTime += dt / 1000 * glFlowSpeed * (reducedMotion ? 0.15 : 1);
+    gl.uniform1f(glUniforms.time, glFlowTime);
     for (var i = 0; i < 5; i++) {
       var c = bgCurrent[RAMP_ORDER[i]];
       gl.uniform3f(glUniforms.c[i], c[0] / 255, c[1] / 255, c[2] / 255);
@@ -411,7 +417,7 @@
       applyPalette({ neutral: true });
     }
   };
-  window.__maWidget = { pickPalette: pickPalette, palettes: PALETTES }; // test hook
+  window.__maWidget = { pickPalette: pickPalette, palettes: PALETTES, flowTime: function () { return glFlowTime; } }; // test hook
 
   initGL();
   render();

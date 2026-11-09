@@ -126,6 +126,20 @@ try {
     await page.evaluate(() => { window.livelyPropertyListener('colorIntensity', 30); window.livelyPropertyListener('colorIntensity', 55); });
   });
 
+  await check('the flow speed slider scales the flow clock', async () => {
+    if (!(await page.evaluate(() => document.getElementById('bg').classList.contains('gl')))) { return; } // no WebGL here: CSS fallback
+    const rate = async pct => {
+      await page.evaluate(v => window.livelyPropertyListener('flowSpeed', v), pct);
+      const a = await page.evaluate(() => window.__maWidget.flowTime());
+      await page.waitForTimeout(1500);
+      return (await page.evaluate(() => window.__maWidget.flowTime()) - a) / 1.5;
+    };
+    const fast = await rate(100), slow = await rate(20), still = await rate(0);
+    assert.ok(slow < fast * 0.35 && slow > fast * 0.1, `fast ${fast} slow ${slow}`);
+    assert.ok(still < 0.001, `still ${still}`);
+    await page.evaluate(() => window.livelyPropertyListener('flowSpeed', 20));
+  });
+
   await check('the fluid background can be switched off', async () => {
     await page.evaluate(() => window.livelyPropertyListener('fluidBackground', false));
     assert.equal(await page.isVisible('#bg'), false);
