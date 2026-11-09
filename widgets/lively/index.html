@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>ma-satellite Now Playing</title>
   <link rel="stylesheet" href="style.css" />
+  <script>
+    // Show script errors on the card itself: Lively has no visible console.
+    window.onerror = function (msg, src, line) {
+      var s = document.getElementById('status');
+      if (s) { s.textContent = 'JS error: ' + msg + ' (' + String(src || '').split('/').pop() + ':' + line + ')'; }
+    };
+  </script>
 </head>
 <body>
   <main id="card" class="card idle" aria-live="polite">
@@ -21,9 +28,9 @@
         <div class="bar"><div class="fill" id="fill"></div></div>
         <span id="total">0:00</span>
       </div>
-      <div class="status" id="status">Connecting to ma-satellite…</div>
+      <div class="status" id="status">Page loaded (v4), waiting for widget.js…</div>
     </div>
   </main>
-  <script src="widget.js"></script>
+  <script src="widget.js" onerror="document.getElementById('status').textContent='widget.js failed to load'"></script>
 </body>
 </html>
