@@ -49,7 +49,9 @@
   function setArt(url) {
     if (url === lastArtUrl) { return; }
     lastArtUrl = url;
+    if (!url) { applyPalette({ neutral: true }); }
     if (url) {
+      el.artImg.crossOrigin = 'anonymous';
       el.artImg.src = url;
       el.artImg.hidden = false;
       el.placeholder.style.display = 'none';
@@ -183,6 +185,7 @@
 
   function frame() {
     renderProgress();
+    tweenBackground();
     requestAnimationFrame(frame);
   }
 
@@ -203,9 +206,115 @@
       case 'accent': root.style.setProperty('--accent', val); break;
       case 'opacity': root.style.setProperty('--card-opacity', String(val / 100)); break;
       case 'showAlbum': el.album.classList.toggle('hidden', !val); break;
+      case 'fluidBackground': document.getElementById('bg').classList.toggle('off', !val); break;
       case 'showProgress': settings.showProgress = !!val; renderProgress(); break;
     }
   };
+
+
+  // ---- Fluid background ------------------------------------------------------------------
+  // The album art is only used to pick a colour *family*. The colours shown always come from this
+  // fixed, hand-picked table (one row per 30 degrees of hue), so a muddy or clashing cover can
+  // never turn the background ugly. Each row is [deep, mid, light].
+  var PALETTES = [
+    ['#b3123f', '#e8315b', '#ff7a93'], // 0   rose red
+    ['#c2410c', '#f97316', '#ffb067'], // 30  orange
+    ['#b45309', '#f59e0b', '#fcd34d'], // 60  amber (also catches olive/mustard)
+    ['#4d7c0f', '#7cc43a', '#c6f08a'], // 90  lime
+    ['#046c4e', '#10b981', '#6ee7b7'], // 120 emerald
+    ['#0f766e', '#14b8a6', '#5eead4'], // 150 teal
+    ['#0e7490', '#06b6d4', '#67e8f9'], // 180 cyan
+    ['#1d4ed8', '#3b82f6', '#93c5fd'], // 210 blue
+    ['#3730a3', '#6366f1', '#a5b4fc'], // 240 indigo
+    ['#6d28d9', '#8b5cf6', '#c4b5fd'], // 270 violet
+    ['#a21caf', '#d946ef', '#f0abfc'], // 300 fuchsia
+    ['#be185d', '#ec4899', '#f9a8d4'], // 330 pink
+  ];
+  var NEUTRAL = ['#1f2937', '#475569', '#94a3b8']; // slate, for black/white/grey covers
+
+  function hexToRgb(hex) {
+    return [parseInt(hex.substr(1, 2), 16), parseInt(hex.substr(3, 2), 16), parseInt(hex.substr(5, 2), 16)];
+  }
+
+  /** Choose palette rows for an RGBA pixel array: {primary, secondary} (row indexes) or {neutral:true}. */
+  function pickPalette(px) {
+    var hist = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    var total = 0;
+    var count = px.length / 4;
+    for (var i = 0; i < px.length; i += 4) {
+      if (px[i + 3] < 128) { continue; }
+      var r = px[i] / 255, g = px[i + 1] / 255, b = px[i + 2] / 255;
+      var max = Math.max(r, g, b), d = max - Math.min(r, g, b);
+      var s = max === 0 ? 0 : d / max;
+      if (s < 0.25 || max < 0.2) { continue; } // grey / near-black / washed-out pixels carry no hue
+      var hue;
+      if (max === r) { hue = ((g - b) / d) % 6; } else if (max === g) { hue = (b - r) / d + 2; } else { hue = (r - g) / d + 4; }
+      hue = (hue * 60 + 360) % 360;
+      var weight = s * max; // vivid pixels count more than dull ones
+      hist[Math.round(hue / 30) % 12] += weight;
+      total += weight;
+    }
+    if (total < count * 0.05) { return { neutral: true }; }
+
+    var sm = hist.map(function (v, k) { return v + 0.5 * (hist[(k + 11) % 12] + hist[(k + 1) % 12]); });
+    var primary = 0;
+    for (var k = 1; k < 12; k++) { if (sm[k] > sm[primary]) { primary = k; } }
+    var secondary = -1, best = 0;
+    for (k = 0; k < 12; k++) {
+      var dist = Math.min((k - primary + 12) % 12, (primary - k + 12) % 12);
+      if (dist >= 2 && sm[k] > best) { best = sm[k]; secondary = k; }
+    }
+    if (best < sm[primary] * 0.3) { secondary = -1; } // accent colour too faint to matter
+    return { primary: primary, secondary: secondary };
+  }
+
+  var bgCurrent = [NEUTRAL[0], NEUTRAL[1], NEUTRAL[1], NEUTRAL[2], NEUTRAL[0]].map(hexToRgb);
+  var bgTarget = bgCurrent.slice();
+
+  function applyPalette(pick) {
+    var a = pick.neutral ? NEUTRAL : PALETTES[pick.primary];
+    var b = pick.neutral || pick.secondary < 0 ? a : PALETTES[pick.secondary];
+    bgTarget = [a[0], a[1], b[1], a[2], b[0]].map(hexToRgb);
+  }
+
+  function sampleArt(img) {
+    try {
+      var canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 32;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, 32, 32);
+      applyPalette(pickPalette(ctx.getImageData(0, 0, 32, 32).data));
+    } catch (e) {
+      applyPalette({ neutral: true }); // e.g. a cross-origin image we may not read
+    }
+  }
+
+  /** Ease the displayed colours towards the target so a track change fades instead of jumping. */
+  function tweenBackground() {
+    var root = document.documentElement;
+    for (var i = 0; i < bgCurrent.length; i++) {
+      var cur = bgCurrent[i], tgt = bgTarget[i], moved = false;
+      for (var k = 0; k < 3; k++) {
+        var diff = tgt[k] - cur[k];
+        if (Math.abs(diff) > 0.4) { cur[k] += diff * 0.04; moved = true; } else if (diff !== 0) { cur[k] = tgt[k]; moved = true; }
+      }
+      if (moved) {
+        root.style.setProperty('--bg' + (i + 1), 'rgb(' + Math.round(cur[0]) + ',' + Math.round(cur[1]) + ',' + Math.round(cur[2]) + ')');
+      }
+    }
+  }
+
+  el.artImg.crossOrigin = 'anonymous'; // lets us read the pixels (the API sends CORS headers for allowed origins)
+  el.artImg.onload = function () { sampleArt(el.artImg); };
+  el.artImg.onerror = function () {
+    // If the CORS-enabled request failed, still show the cover (just without colour sampling).
+    if (el.artImg.crossOrigin && lastArtUrl) {
+      el.artImg.removeAttribute('crossorigin');
+      el.artImg.src = lastArtUrl;
+      applyPalette({ neutral: true });
+    }
+  };
+  window.__maWidget = { pickPalette: pickPalette, palettes: PALETTES }; // test hook
 
   render();
   connect();

@@ -1,6 +1,7 @@
 :root {
   --accent: #40d6be;
   --card-opacity: 0.82;
+  --bg1: #1f2937; --bg2: #475569; --bg3: #475569; --bg4: #94a3b8; --bg5: #1f2937;
   color-scheme: dark;
 }
 
@@ -86,3 +87,29 @@ body { display: grid; place-items: center; }
 
 .bar { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
 .fill { height: 100%; width: 0; background: var(--accent); border-radius: 2px; }
+
+/* Fluid background: soft colour blobs drifting slowly, tinted from the album art (see widget.js). */
+.bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: #090b11; }
+.bg.off { display: none; }
+.bg i {
+  position: absolute;
+  width: 90vmax; height: 90vmax;
+  border-radius: 50%;
+  opacity: 0.8;
+  mix-blend-mode: screen;
+  will-change: transform;
+  animation: drift-a 27s ease-in-out infinite alternate;
+}
+.bg i:nth-child(1) { top: -35%; left: -25%; background: radial-gradient(closest-side, var(--bg1), transparent); }
+.bg i:nth-child(2) { top: 15%;  left: 35%;  background: radial-gradient(closest-side, var(--bg2), transparent); animation-name: drift-b; animation-duration: 33s; }
+.bg i:nth-child(3) { top: 45%;  left: -30%; background: radial-gradient(closest-side, var(--bg3), transparent); animation-name: drift-c; animation-duration: 39s; }
+.bg i:nth-child(4) { top: -30%; left: 30%;  background: radial-gradient(closest-side, var(--bg4), transparent); animation-name: drift-b; animation-duration: 29s; animation-direction: alternate-reverse; opacity: 0.55; }
+.bg i:nth-child(5) { top: 30%;  left: 5%;   background: radial-gradient(closest-side, var(--bg5), transparent); animation-name: drift-c; animation-duration: 43s; animation-direction: alternate-reverse; }
+
+@keyframes drift-a { from { transform: translate(-6%, -4%) scale(1); }    to { transform: translate(22%, 26%) scale(1.25); } }
+@keyframes drift-b { from { transform: translate(10%, 18%) scale(1.15); } to { transform: translate(-24%, -12%) scale(0.9); } }
+@keyframes drift-c { from { transform: translate(-14%, 8%) scale(0.95); } to { transform: translate(26%, -20%) scale(1.2); } }
+
+@media (prefers-reduced-motion: reduce) { .bg i { animation: none; } }
+
+.card { position: relative; z-index: 1; }

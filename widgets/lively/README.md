@@ -8,7 +8,7 @@ It talks to the **ma-satellite local API** (`ws://127.0.0.1:8929/api/events`), w
 
 1. In Lively choose **Add wallpaper** → **Open**, and select `widgets/lively/index.html` (or drag the folder onto Lively).
 2. Choose **Display as widget** if you want it on top of your current wallpaper.
-3. Customise via the Lively sliders: API port (default `8929`, change it here if you changed it in ma-satellite), accent colour, opacity, album and progress visibility.
+3. Customise via the Lively sliders: API port (default `8929`, change it here if you changed it in ma-satellite), accent colour, opacity, album and progress visibility, and the fluid background on/off.
 
 ## Testing without Lively
 
@@ -23,3 +23,11 @@ Open `index.html?port=8929` in a browser while ma-satellite is running. `host` a
 | `GET /api/now-playing` | the same JSON as the `state` event, for one-off reads |
 
 The API only listens on `127.0.0.1` and refuses web pages from other origins.
+
+## Fluid background
+
+Behind the card, soft colour blobs drift slowly (inspired by the iOS now-playing look) and fade to the colours of the current cover.
+
+The cover is only used to pick a colour *family*. The widget reads the dominant hue (plus a contrasting accent hue, if the cover has one) and snaps it to a fixed, hand-picked table of 12 palettes in `widget.js` (`PALETTES`). Covers that are grey, black or white use a neutral slate. A muddy or clashing cover therefore can never produce an ugly background: for example an olive cover becomes amber. To change the look, edit that table.
+
+Turn it off in the Lively sliders (**Fluid background**) to get the transparent page back.

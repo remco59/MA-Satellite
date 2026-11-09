@@ -93,6 +93,41 @@ try {
     assert.ok(sockets.length > count);
   });
 
+  await check('snaps album colours to the fixed palette', async () => {
+    const pick = rgbs => page.evaluate(list => {
+      const px = new Uint8ClampedArray(4 * 200);
+      for (let i = 0; i < 200; i++) { const c = list[i % list.length]; px.set([c[0], c[1], c[2], 255], i * 4); }
+      return window.__maWidget.pickPalette(px);
+    }, rgbs);
+    assert.deepEqual(await pick([[30, 95, 214]]), { primary: 7, secondary: -1 });            // blue -> blue
+    assert.deepEqual(await pick([[107, 106, 42]]), { primary: 2, secondary: -1 });           // muddy olive -> amber, not mud
+    assert.deepEqual(await pick([[230, 99, 10]]), { primary: 1, secondary: -1 });            // orange
+    assert.deepEqual(await pick([[128, 128, 128]]), { neutral: true });                      // grey cover -> neutral slate
+    assert.deepEqual(await pick([[10, 10, 10]]), { neutral: true });                         // near-black -> neutral
+    const duo = await pick([[30, 95, 214], [30, 95, 214], [30, 95, 214], [220, 40, 70]]);   // dominant blue, red accent
+    assert.equal(duo.primary, 7);
+    assert.equal(duo.secondary, 0);
+  });
+
+  await check('the background colours come from the palette table', async () => {
+    const allowed = await page.evaluate(() => window.__maWidget.palettes.flat().map(h => {
+      const n = parseInt(h.slice(1), 16); return `rgb(${n >> 16},${(n >> 8) & 255},${n & 255})`;
+    }));
+    await page.waitForFunction(() => document.documentElement.style.getPropertyValue('--bg2') !== '', null, { timeout: 8000 });
+    await page.waitForTimeout(3500); // let the fade settle
+    for (const v of ['--bg1', '--bg2', '--bg3', '--bg4', '--bg5']) {
+      const val = await page.evaluate(n => document.documentElement.style.getPropertyValue(n), v);
+      assert.ok(allowed.includes(val), `${v}=${val} is not a palette colour`);
+    }
+  });
+
+  await check('the fluid background can be switched off', async () => {
+    await page.evaluate(() => window.livelyPropertyListener('fluidBackground', false));
+    assert.equal(await page.isVisible('#bg'), false);
+    await page.evaluate(() => window.livelyPropertyListener('fluidBackground', true));
+    assert.equal(await page.isVisible('#bg'), true);
+  });
+
   await check('livelyPropertyListener restyles the card', async () => {
     await page.evaluate(() => { window.livelyPropertyListener('accent', '#ff8800'); window.livelyPropertyListener('showAlbum', false); });
     assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()), '#ff8800');
