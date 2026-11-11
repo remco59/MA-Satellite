@@ -261,7 +261,7 @@ internal sealed class SatelliteShell : IDisposable
             return null;
         }
 
-        return _miniPlayer ??= new MiniPlayerWindow(_host, () => _libraryController, () => _tray?.GetScreenRect());
+        return _miniPlayer ??= new MiniPlayerWindow(_host, () => _libraryController, () => _tray?.GetScreenRect(), OpenFullApp);
     }
 
     /// <summary>Double-clicking the tray icon opens the full app; the flyout opened by its first click goes away.</summary>

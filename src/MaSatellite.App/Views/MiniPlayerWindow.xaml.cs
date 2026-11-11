@@ -12,6 +12,9 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Graphics;
 using Windows.Storage.Streams;
@@ -28,6 +31,7 @@ internal sealed partial class MiniPlayerWindow : Window
     private readonly SatelliteHost _host;
     private readonly Func<LibraryController?> _library;
     private readonly Func<Rectangle?> _trayRect;
+    private readonly Action _openFullApp;
     private readonly DispatcherQueueTimer _progressTimer;
     private readonly DispatcherQueueTimer _seekDebounce;
     private bool _updating;
@@ -40,11 +44,12 @@ internal sealed partial class MiniPlayerWindow : Window
     private string? _queueTrackKey;
     private int _queueLoadId;
 
-    public MiniPlayerWindow(SatelliteHost host, Func<LibraryController?> library, Func<Rectangle?> trayRect)
+    public MiniPlayerWindow(SatelliteHost host, Func<LibraryController?> library, Func<Rectangle?> trayRect, Action openFullApp)
     {
         _host = host;
         _library = library;
         _trayRect = trayRect;
+        _openFullApp = openFullApp;
         InitializeComponent();
         Title = "ma-satellite";
         AuroraWindowChrome.SetIcon(this);
@@ -182,6 +187,13 @@ internal sealed partial class MiniPlayerWindow : Window
         if (_trayRect() is { } icon && icon.Width > 0)
         {
             x = Math.Clamp(icon.X + (icon.Width / 2) - (width / 2), area.X + margin, area.X + area.Width - width - margin);
+        }
+
+        // Auto-hidden taskbars overlay the bottom edge when they slide into view. Keep the flyout
+        // above the taskbar reveal area instead of letting the taskbar cover the tray icon target.
+        if (GetAutoHideBottomTaskbarTop() is { } taskbarTop)
+        {
+            y = Math.Max(area.Y + margin, Math.Min(y, taskbarTop - height - margin));
         }
 
         AppWindow.MoveAndResize(new RectInt32(x, y, width, height));
@@ -393,6 +405,73 @@ internal sealed partial class MiniPlayerWindow : Window
             ArtworkImage.Source = null;
         }
     }
+
+    private void OnRootTapped(object sender, TappedRoutedEventArgs e)
+    {
+        // Let transport, seek/volume controls, tabs and queue item interactions keep their own clicks.
+        for (var current = e.OriginalSource as DependencyObject; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (current is ButtonBase or Slider or ListViewBase or ScrollBar)
+            {
+                return;
+            }
+
+            if (ReferenceEquals(current, Root))
+            {
+                break;
+            }
+        }
+
+        e.Handled = true;
+        _openFullApp();
+    }
+
+    private static int? GetAutoHideBottomTaskbarTop()
+    {
+        var data = new AppBarData { cbSize = (uint)Marshal.SizeOf<AppBarData>() };
+        var state = SHAppBarMessage(ABM_GETSTATE, ref data).ToUInt64();
+        if ((state & ABS_AUTOHIDE) == 0)
+        {
+            return null;
+        }
+
+        data = new AppBarData { cbSize = (uint)Marshal.SizeOf<AppBarData>() };
+        if (SHAppBarMessage(ABM_GETTASKBARPOS, ref data) == UIntPtr.Zero ||
+            data.uEdge != ABE_BOTTOM || data.rc.Bottom <= data.rc.Top)
+        {
+            return null;
+        }
+
+        return data.rc.Top;
+    }
+
+    private const uint ABM_GETSTATE = 0x00000004;
+    private const uint ABM_GETTASKBARPOS = 0x00000005;
+    private const uint ABS_AUTOHIDE = 0x00000001;
+    private const uint ABE_BOTTOM = 3;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct AppBarData
+    {
+        public uint cbSize;
+        public IntPtr hWnd;
+        public uint uCallbackMessage;
+        public uint uEdge;
+        public NativeRect rc;
+        public IntPtr lParam;
+    }
+
+    [DllImport("shell32.dll", EntryPoint = "SHAppBarMessage")]
+    private static extern UIntPtr SHAppBarMessage(uint dwMessage, ref AppBarData data);
 
     private void OnSystemVolumeChanged() => DispatcherQueue.TryEnqueue(Refresh);
 
