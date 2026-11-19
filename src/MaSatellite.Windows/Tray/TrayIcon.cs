@@ -5,7 +5,7 @@ using static MaSatellite.Windows.Tray.NativeMethods;
 namespace MaSatellite.Windows.Tray;
 
 /// <summary>
-/// A notification-area icon built directly on Shell_NotifyIcon with a hidden message-only window.
+/// A notification-area icon built directly on Shell_NotifyIcon with a hidden top-level message window.
 /// Must be created and used on a thread that pumps messages (the UI thread).
 /// </summary>
 public sealed class TrayIcon : IDisposable
