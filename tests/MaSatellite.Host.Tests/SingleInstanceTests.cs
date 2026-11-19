@@ -24,4 +24,27 @@ public class SingleInstanceTests
 
         Assert.False(secondPrimary);
     }
+    [Fact]
+    public void Second_instance_signals_primary_to_activate()
+    {
+        var name = "MaSatellite.ActivationTest." + Guid.NewGuid().ToString("N");
+        using var first = SingleInstanceGuard.Acquire(name);
+        Assert.True(first.IsPrimary);
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var activation = Task.Run(() => first.WaitForActivation(timeout.Token));
+        var secondPrimary = true;
+        var second = new Thread(() =>
+        {
+            using var instance = SingleInstanceGuard.Acquire(name);
+            secondPrimary = instance.IsPrimary;
+            instance.SignalActivation();
+        });
+
+        second.Start();
+        Assert.True(second.Join(TimeSpan.FromSeconds(5)));
+        Assert.False(secondPrimary);
+        Assert.True(activation.GetAwaiter().GetResult());
+    }
+
 }
