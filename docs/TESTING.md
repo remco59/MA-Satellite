@@ -41,7 +41,7 @@ Layout and motion are XAML-only, so they need a hands-on pass on Windows (CI onl
 - [ ] CI is green and publishes the `ma-satellite-msix` artifact.
 - [ ] Install via `Install-Dev.ps1` (elevated once); the icon appears in the notification area.
 - [ ] Right-click: Open, Library…, Settings…, Start with Windows (checked), Exit. Exit really ends the process.
-- [ ] Start the app twice: the second instance exits and the first keeps running.
+- [ ] Start the app twice: the second instance opens the full library window in the first process; playback continues in the first process.
 - [ ] Sign out and in again: the app starts by itself. Untick *Start with Windows*, sign out and in: it does not.
 - [ ] `%LOCALAPPDATA%\MaSatellite\logs` (or the package-redirected folder) contains a log; `settings.json` persists changes across restarts.
 - [ ] Uninstall via Settings → Apps leaves no tray icon and no startup entry.
@@ -75,6 +75,7 @@ Layout and motion are XAML-only, so they need a hands-on pass on Windows (CI onl
 ### M2 – mini-player and Windows integration
 - [ ] Left-click the tray icon: a small flyout shows artwork, title/artist/album, seek bar, transport and volume; it closes when you click elsewhere. The *Queue* tab lists the queue with the current track highlighted, and clicking a row jumps to it.
 - [ ] Double-click the tray icon: the full app (library window) opens and the flyout does not stay open.
+- [ ] Restart Windows Explorer from Task Manager while playback is running: the tray icon reappears without restarting MA-Satellite or interrupting playback.
 - [ ] Play/pause/next/previous and the seek bar control MA; buttons grey out when MA does not offer them.
 - [ ] Media keys (play/pause/next/previous) control MA.
 - [ ] The Windows volume flyout and the lock screen show the track card with the right info and artwork.
