@@ -7,7 +7,6 @@ namespace MaSatellite.App;
 
 public partial class App : Application
 {
-    private readonly CancellationTokenSource _activationShutdown = new();
     private SingleInstanceGuard? _instance;
     private SatelliteShell? _shell;
 
@@ -38,7 +37,7 @@ public partial class App : Application
     {
         _ = Task.Run(() =>
         {
-            while (instance.WaitForActivation(_activationShutdown.Token))
+            while (instance.WaitForActivation(CancellationToken.None))
             {
                 _shell?.ActivateMainWindow();
             }
