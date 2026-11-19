@@ -50,6 +50,7 @@ internal sealed class SatelliteShell : IDisposable
     private WindowsMasterVolume? _volume;
     private SatelliteHost? _host;
     private readonly IAudioDeviceCatalog _devices = new WasapiDeviceCatalog();
+    private long _nextTrayPresenceCheck;
     private bool _disposed;
 
     public SatelliteShell(Action exit)
@@ -93,6 +94,17 @@ internal sealed class SatelliteShell : IDisposable
         _trayHoverTimer.Start();
 
         StartPlayer(version, settings);
+    }
+
+    /// <summary>Reveals the full Library window when another process launches the app.</summary>
+    public void ActivateMainWindow()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _ui?.TryEnqueue(OpenFullApp);
     }
 
     public void Dispose()
@@ -298,7 +310,28 @@ internal sealed class SatelliteShell : IDisposable
 
     private void CheckTrayHover()
     {
-        if (_disposed || _tray is null || _host is null || _settings is null)
+        if (_disposed)
+        {
+            return;
+        }
+
+        // Explorer can occasionally lose a notification-area entry without terminating
+        // this process. Probe infrequently and re-add the icon if NIM_MODIFY fails.
+        var now = Environment.TickCount64;
+        if (_tray is not null && now >= _nextTrayPresenceCheck)
+        {
+            _nextTrayPresenceCheck = now + 5_000;
+            try
+            {
+                _tray.EnsurePresent();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Could not verify tray icon presence");
+            }
+        }
+
+        if (_tray is null || _host is null || _settings is null)
         {
             return;
         }
