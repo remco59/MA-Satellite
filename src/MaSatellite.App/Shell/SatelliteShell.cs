@@ -51,6 +51,7 @@ internal sealed class SatelliteShell : IDisposable
     private SatelliteHost? _host;
     private readonly IAudioDeviceCatalog _devices = new WasapiDeviceCatalog();
     private bool _disposed;
+    private long _lastTrayRegistrationCheck;
 
     public SatelliteShell(Action exit)
     {
@@ -80,6 +81,7 @@ internal sealed class SatelliteShell : IDisposable
             MenuProvider = BuildMenu,
         };
         _tray.MenuItemInvoked += OnMenuItem;
+        _tray.ActivationRequested += OpenFullApp;
         _tray.Clicked += ToggleMiniPlayer;
         _tray.DoubleClicked += OpenFullApp;
         _tray.Show();
@@ -298,7 +300,24 @@ internal sealed class SatelliteShell : IDisposable
 
     private void CheckTrayHover()
     {
-        if (_disposed || _tray is null || _host is null || _settings is null)
+        if (_disposed || _tray is null)
+        {
+            return;
+        }
+
+        // Explorer can drop an icon without stopping its owning process. Revalidate the registration
+        // periodically as a fallback in addition to handling the TaskbarCreated broadcast immediately.
+        var now = Environment.TickCount64;
+        if (now - _lastTrayRegistrationCheck >= 15_000)
+        {
+            _lastTrayRegistrationCheck = now;
+            if (!_tray.EnsureRegistered())
+            {
+                _logger?.LogWarning("Windows has not accepted the MA-Satellite tray icon registration yet");
+            }
+        }
+
+        if (_host is null || _settings is null)
         {
             return;
         }
