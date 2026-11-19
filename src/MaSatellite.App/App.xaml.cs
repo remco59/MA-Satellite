@@ -18,7 +18,7 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
-        _instance = SingleInstanceGuard.Acquire(@"Local\\MaSatellite.SingleInstance");
+        _instance = SingleInstanceGuard.Acquire(@"Local\MaSatellite.SingleInstance");
         if (!_instance.IsPrimary)
         {
             // Ask the running process to reveal its full UI before this short-lived
