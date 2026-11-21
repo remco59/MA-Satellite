@@ -8,6 +8,7 @@ public sealed class AnnouncementMixer
 {
     private const float DuckGain = 0.24f;
     private const float FadeSeconds = 0.12f;
+    private const int MaxQueuedSeconds = 180;
 
     private readonly object _gate = new();
     private readonly Queue<float[]> _pending = new();
@@ -16,6 +17,7 @@ public sealed class AnnouncementMixer
     private int _sampleRate = 48000;
     private int _channels = 2;
     private float _musicGain = 1f;
+    private long _queuedSamples;
 
     public AudioOutputFormat OutputFormat
     {
@@ -49,6 +51,7 @@ public sealed class AnnouncementMixer
             _current = null;
             _sampleOffset = 0;
             _musicGain = 1f;
+            _queuedSamples = 0;
         }
     }
 
@@ -65,12 +68,16 @@ public sealed class AnnouncementMixer
 
         lock (_gate)
         {
-            if (sampleRate != _sampleRate || channels != _channels)
+            if (sampleRate != _sampleRate || channels != _channels || samples.Length % channels != 0)
             {
-                throw new ArgumentException("Announcement PCM must match the active output format.");
+                throw new ArgumentException("Announcement PCM must match the active output format and contain complete frames.");
             }
 
             var clip = samples.ToArray();
+            if (_queuedSamples + clip.Length > (long)_sampleRate * _channels * MaxQueuedSeconds)
+            {
+                throw new InvalidOperationException($"The announcement queue is limited to {MaxQueuedSeconds} seconds.");
+            }
             var gain = Math.Clamp(volumeLevel, 0, 100) / 100f;
             for (var i = 0; i < clip.Length; i++)
             {
@@ -78,6 +85,7 @@ public sealed class AnnouncementMixer
             }
 
             _pending.Enqueue(clip);
+            _queuedSamples += clip.Length;
         }
     }
 
@@ -109,6 +117,7 @@ public sealed class AnnouncementMixer
                 if (hasAnnouncement)
                 {
                     _sampleOffset += _channels;
+                    _queuedSamples -= _channels;
                     if (_sampleOffset >= _current!.Length)
                     {
                         _current = null;
@@ -128,6 +137,7 @@ public sealed class AnnouncementMixer
             _current = null;
             _sampleOffset = 0;
             _musicGain = 1f;
+            _queuedSamples = 0;
         }
     }
 
