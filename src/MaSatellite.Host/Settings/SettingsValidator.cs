@@ -27,6 +27,7 @@ public static class SettingsValidator
         ValidatePort(errors, settings.ServerPort, "Server port");
         ValidatePort(errors, settings.MaWebPort, "Music Assistant web port");
         ValidatePort(errors, settings.LocalApiPort, "Local API port");
+        ValidatePort(errors, settings.AnnouncementApiPort, "Announcement API port");
 
         if (settings.StaticDelayMs is < 0 or > 5000)
         {
