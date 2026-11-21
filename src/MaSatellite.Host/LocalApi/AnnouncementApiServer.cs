@@ -150,6 +150,12 @@ public sealed class AnnouncementApiServer : IAsyncDisposable
                     return;
                 }
 
+                if (!_source.IsStreamActive)
+                {
+                    await WriteResponseAsync(stream, 409, "Conflict", "A live Sendspin stream must be active for announcement mixing.", cancellationToken).ConfigureAwait(false);
+                    return;
+                }
+
                 var media = new byte[contentLength];
                 await ReadExactlyAsync(stream, media, cancellationToken).ConfigureAwait(false);
                 await _source.PlayAnnouncementAsync(media, contentType, 100, cancellationToken).ConfigureAwait(false);
