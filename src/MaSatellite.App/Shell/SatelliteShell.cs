@@ -81,8 +81,6 @@ internal sealed class SatelliteShell : IDisposable
             MenuProvider = BuildMenu,
         };
         _tray.MenuItemInvoked += OnMenuItem;
-        _tray.ActivationRequested += OpenFullApp;
-        _tray.ActivationRequested += OpenFullApp;
         _tray.Clicked += ToggleMiniPlayer;
         _tray.DoubleClicked += OpenFullApp;
         _tray.Show();
