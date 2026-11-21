@@ -140,8 +140,9 @@ public sealed class TrayIcon : IDisposable
         {
             DestroyWindow(_hwnd);
             _hwnd = IntPtr.Zero;
-            UnregisterClass(WindowClassName, GetModuleHandle(null));
         }
+
+        UnregisterClass(WindowClassName, GetModuleHandle(null));
 
         if (_hIcon != IntPtr.Zero)
         {
