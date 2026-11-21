@@ -4,11 +4,12 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace MaSatellite.Core.Audio;
 
-/// <summary>Decoder → <see cref="PlaybackEngine"/> → output device, with output restart when the device fails.</summary>
+/// <summary>Decoder → playback engine → announcement mixer → output device.</summary>
 public sealed class PlayerPipeline : IDisposable
 {
     private readonly IAudioOutput _output;
     private readonly PlaybackEngine _engine;
+    private readonly AnnouncementMixer? _announcements;
     private readonly ILogger _logger;
     private readonly object _gate = new();
     private IAudioDecoder? _decoder;
@@ -18,10 +19,11 @@ public sealed class PlayerPipeline : IDisposable
     private long _decodeErrors;
     private bool _disposed;
 
-    public PlayerPipeline(IAudioOutput output, PlaybackEngine engine, ILogger? logger = null)
+    public PlayerPipeline(IAudioOutput output, PlaybackEngine engine, ILogger? logger = null, AnnouncementMixer? announcements = null)
     {
         _output = output;
         _engine = engine;
+        _announcements = announcements;
         _logger = logger ?? NullLogger.Instance;
         _output.Failed += OnOutputFailed;
         _engine.InSyncChanged += v => InSyncChanged?.Invoke(v);
@@ -118,6 +120,7 @@ public sealed class PlayerPipeline : IDisposable
         }
 
         _engine.Clear();
+        _announcements?.Clear();
     }
 
     public void Dispose()
@@ -136,6 +139,13 @@ public sealed class PlayerPipeline : IDisposable
 
         _output.Failed -= OnOutputFailed;
         _output.Dispose();
+        _announcements?.Clear();
+    }
+
+    private void Render(Span<float> buffer, long playoutLocalMicros)
+    {
+        _engine.Fill(buffer, playoutLocalMicros);
+        _announcements?.Mix(buffer);
     }
 
     private void EnsureOutputLocked()
@@ -145,7 +155,8 @@ public sealed class PlayerPipeline : IDisposable
             return;
         }
 
-        _outputFormat = _output.Start(_engine.Fill);
+        _outputFormat = _output.Start(Render);
+        _announcements?.SetOutputFormat(_outputFormat);
         _outputRunning = true;
         _logger.LogInformation("Audio output started: {Rate} Hz, {Channels} ch", _outputFormat.SampleRate, _outputFormat.Channels);
     }
