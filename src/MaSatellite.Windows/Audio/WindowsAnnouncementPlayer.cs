@@ -29,7 +29,8 @@ public sealed class WindowsAnnouncementPlayer : IAudioAnnouncementPlayer
         }
 
         await _decodeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
-        var path = Path.Combine(Path.GetTempPath(), $"ma-satellite-announcement-{Guid.NewGuid():N}.audio");
+        var extension = GetFileExtension(media, contentType);
+        var path = Path.Combine(Path.GetTempPath(), $"ma-satellite-announcement-{Guid.NewGuid():N}{extension}");
         try
         {
             await File.WriteAllBytesAsync(path, media, cancellationToken).ConfigureAwait(false);
