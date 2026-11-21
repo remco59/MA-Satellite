@@ -218,6 +218,8 @@ public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.
 
     public string ApiToken => KeyStore.PairingToken();
 
+    public bool IsStreamActive => Status.Session.StreamActive;
+
     public Task PlayAnnouncementAsync(byte[] media, string contentType, int volumeLevel, CancellationToken cancellationToken = default)
     {
         if (_announcementPlayer is null)
