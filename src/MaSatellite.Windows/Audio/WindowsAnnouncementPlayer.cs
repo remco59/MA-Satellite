@@ -12,7 +12,7 @@ public sealed class WindowsAnnouncementPlayer : IAudioAnnouncementPlayer
     private const int MaxDurationSeconds = 120;
     private readonly AnnouncementMixer _mixer;
     private readonly ILogger _logger;
-    private readonly SemaphoreSlim _decodeLock = new(1, 1);
+    private readonly object _decodeGate = new();
 
     public WindowsAnnouncementPlayer(AnnouncementMixer mixer, ILogger? logger = null)
     {
@@ -28,13 +28,18 @@ public sealed class WindowsAnnouncementPlayer : IAudioAnnouncementPlayer
             throw new ArgumentException("Announcement media must be between 1 byte and 30 MB.", nameof(media));
         }
 
-        await _decodeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         var extension = GetFileExtension(media, contentType);
         var path = Path.Combine(Path.GetTempPath(), $"ma-satellite-announcement-{Guid.NewGuid():N}{extension}");
         try
         {
             await File.WriteAllBytesAsync(path, media, cancellationToken).ConfigureAwait(false);
-            await Task.Run(() => DecodeAndQueue(path, volumeLevel), cancellationToken).ConfigureAwait(false);
+            await Task.Run(() =>
+            {
+                lock (_decodeGate)
+                {
+                    DecodeAndQueue(path, volumeLevel);
+                }
+            }, cancellationToken).ConfigureAwait(false);
             _logger.LogInformation("Queued a {ContentType} announcement ({Bytes} bytes)", contentType, media.Length);
         }
         finally
@@ -48,7 +53,6 @@ public sealed class WindowsAnnouncementPlayer : IAudioAnnouncementPlayer
                 _logger.LogDebug(ex, "Could not remove temporary announcement file");
             }
 
-            _decodeLock.Release();
         }
     }
 
