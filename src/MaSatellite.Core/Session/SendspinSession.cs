@@ -224,7 +224,7 @@ public sealed class SendspinSession : ISendspinSession
         return new ClientHello(
             _options.ClientId,
             _options.PlayerName,
-            new DeviceInfo("ma-satellite", "ma-satellite", _options.SoftwareVersion),
+            new DeviceInfo("ma-satellite", "ma-satellite", _options.SoftwareVersion, NetworkIdentity.GetPrimaryMacAddress()),
             1,
             roles,
             new PlayerSupport(_options.SupportedFormats, _options.BufferCapacityBytes, ["volume", "mute"]),
