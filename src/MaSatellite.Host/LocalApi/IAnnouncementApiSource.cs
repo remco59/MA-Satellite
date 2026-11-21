@@ -6,5 +6,6 @@ public interface IAnnouncementApiSource
     string PlayerName { get; }
     string MacAddress { get; }
     string ApiToken { get; }
+    bool IsStreamActive { get; }
     Task PlayAnnouncementAsync(byte[] media, string contentType, int volumeLevel, CancellationToken cancellationToken = default);
 }
