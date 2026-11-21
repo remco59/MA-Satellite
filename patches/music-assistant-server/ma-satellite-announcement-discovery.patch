@@ -1,8 +1,8 @@
 diff --git a/music_assistant/providers/sendspin/provider.py b/music_assistant/providers/sendspin/provider.py
-index 0000000..0000000 100644
 --- a/music_assistant/providers/sendspin/provider.py
 +++ b/music_assistant/providers/sendspin/provider.py
-@@
+@@ -1674,4 +1674,12 @@
+         try:
 -            device_infos = await hass.get_media_player_device_infos(
 -                [mac_address for _, mac_address in mac_players], platform="esphome"
 -            )
