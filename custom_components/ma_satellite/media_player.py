@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
+from typing import Any
 from urllib.parse import urlsplit
 
 import aiohttp
@@ -12,6 +14,7 @@ from homeassistant.components.media_player import (
     MediaPlayerDeviceClass,
     MediaPlayerEntity,
     MediaPlayerEntityFeature,
+    MediaPlayerState,
 )
 from homeassistant.components.media_player.browse_media import (
     async_process_play_media_url,
@@ -22,17 +25,17 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
-    CONF_HOST,
-    CONF_PORT,
     CONF_TOKEN,
     DOMAIN,
     MAX_ANNOUNCEMENT_BYTES,
 )
 
 _LOGGER = logging.getLogger(__name__)
+SCAN_INTERVAL = timedelta(minutes=1)
 
 
 async def async_setup_entry(
@@ -50,19 +53,19 @@ class MaSatelliteAnnouncementPlayer(MediaPlayerEntity):
     _attr_has_entity_name = True
     _attr_device_class = MediaPlayerDeviceClass.SPEAKER
     _attr_supported_features = MediaPlayerEntityFeature.MEDIA_ANNOUNCE
+    _attr_state = MediaPlayerState.IDLE
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         """Initialize the announcement target."""
         self.hass = hass
         self._entry = entry
-        self._base_url = (
-            f"http://{entry.data[CONF_HOST].strip().removeprefix('http://').removeprefix('https://').rstrip('/')}:{entry.data[CONF_PORT]}"
-        )
+        self._base_url = entry.data["base_url"]
         self._token = entry.data[CONF_TOKEN]
         self._mac = entry.data["mac_address"].lower()
         self._attr_unique_id = self._mac
         self._attr_name = "Announcements"
-        self._attr_device_info = dr.DeviceInfo(
+        self._attr_available = True
+        self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self._mac)},
             connections={(dr.CONNECTION_NETWORK_MAC, self._mac)},
             manufacturer="MA-Satellite",
@@ -71,16 +74,26 @@ class MaSatelliteAnnouncementPlayer(MediaPlayerEntity):
             configuration_url=self._base_url,
         )
 
-    @property
-    def available(self) -> bool:
-        """Assume the endpoint is reachable; calls report connectivity errors."""
-        return True
+    async def async_update(self) -> None:
+        """Check whether the configured MA-Satellite endpoint is reachable."""
+        session = async_get_clientsession(self.hass)
+        try:
+            async with session.get(
+                f"{self._base_url}/api/device-info",
+                headers={"Authorization": f"Bearer {self._token}"},
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as response:
+                response.raise_for_status()
+        except (aiohttp.ClientError, TimeoutError):
+            self._attr_available = False
+        else:
+            self._attr_available = True
 
     async def async_play_media(
         self,
         media_type: str,
         media_id: str,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """Fetch an announcement and submit it to MA-Satellite's local audio mixer."""
         if not kwargs.get("announce", False):
@@ -100,7 +113,7 @@ class MaSatelliteAnnouncementPlayer(MediaPlayerEntity):
             raise HomeAssistantError("The announcement must resolve to an HTTP(S) URL.")
 
         session = async_get_clientsession(self.hass)
-        timeout = aiohttp.ClientTimeout(total=60)
+        timeout = aiohttp.ClientTimeout(total=120)
         try:
             async with session.get(media_url, timeout=timeout) as response:
                 response.raise_for_status()
