@@ -91,6 +91,6 @@ public sealed class WindowsAnnouncementPlayer : IAudioAnnouncementPlayer
             throw new InvalidOperationException("The announcement contained no decodable audio.");
         }
 
-        _mixer.Enqueue(CollectionsMarshal.AsSpan(decoded), format.SampleRate, format.Channels, volumeLevel);
+        _mixer.Enqueue(decoded.ToArray(), format.SampleRate, format.Channels, volumeLevel);
     }
 }
