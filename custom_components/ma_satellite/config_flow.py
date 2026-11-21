@@ -20,11 +20,22 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def _base_url(host: str, port: int) -> str:
-    """Build a URL from a host or address entered by the user."""
+    """Build a URL from a hostname or IP address entered by the user."""
     normalized = host.strip().removeprefix("http://").removeprefix("https://").rstrip("/")
     if not normalized or "/" in normalized or "@" in normalized:
         raise ValueError("Enter a hostname or IP address, not a URL path.")
-    return f"http://{normalized}:{port}"
+
+    address = normalized[1:-1] if normalized.startswith("[") and normalized.endswith("]") else normalized
+    try:
+        parsed = ipaddress.ip_address(address)
+    except ValueError:
+        if ":" in normalized:
+            raise ValueError("Do not include a port in the hostname field.")
+        authority = normalized
+    else:
+        authority = f"[{parsed}]" if parsed.version == 6 else str(parsed)
+
+    return f"http://{authority}:{port}"
 
 
 async def _validate_input(
@@ -64,7 +75,9 @@ class MaSatelliteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 info = await _validate_input(self.hass, user_input)
-            except (aiohttp.ClientError, TimeoutError):
+            except aiohttp.ClientResponseError as err:
+                errors["base"] = "invalid_auth" if err.status in (401, 403) else "cannot_connect"
+            except (aiohttp.ClientError, TimeoutError, OSError):
                 errors["base"] = "cannot_connect"
             except (ValueError, KeyError):
                 errors["base"] = "invalid_auth"
@@ -79,6 +92,7 @@ class MaSatelliteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_TOKEN: user_input[CONF_TOKEN].strip(),
                         CONF_NAME: info["name"],
                         "mac_address": info["mac_address"],
+                        "base_url": info["base_url"],
                     },
                 )
 
