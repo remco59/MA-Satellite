@@ -106,6 +106,9 @@
             <NumberBox x:Name="ListenPortBox" Header="Sendspin listen port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Hidden"/>
             <ToggleSwitch x:Name="ApiSwitch" Header="Local API for desktop widgets (127.0.0.1 only)"/>
             <NumberBox x:Name="ApiPortBox" Header="Local API port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Hidden"/>
+            <ToggleSwitch x:Name="AnnouncementApiSwitch" Header="Home Assistant announcements over the LAN"/>
+            <NumberBox x:Name="AnnouncementApiPortBox" Header="Announcement API port" Minimum="1" Maximum="65535" SpinButtonPlacementMode="Hidden"/>
+            <TextBlock Text="Requires the Home Assistant integration and the pairing token. The endpoint accepts private-network connections only." Style="{StaticResource AuroraSubtitleStyle}" TextWrapping="Wrap"/>
             <TextBlock Text="LIVE DIAGNOSTICS" Style="{StaticResource AuroraSectionLabelStyle}"/>
             <TextBlock x:Name="DiagnosticsLine" Style="{StaticResource AuroraSubtitleStyle}" TextWrapping="Wrap"/>
           </StackPanel>
