@@ -32,6 +32,10 @@ public sealed class LocalApiServer : IAsyncDisposable
     private readonly List<EventClient> _clients = [];
     private Task? _acceptLoop;
     private Task? _ticker;
+    private readonly object _favoriteGate = new();
+    private string? _favoriteKey;                 // the track the cached favourite state belongs to
+    private bool? _favorite;                      // cached; null = unknown
+    private CancellationTokenSource? _favoriteRefresh;
 
     public LocalApiServer(ILocalApiSource source, int port, ILogger? logger = null)
     {
@@ -56,6 +60,11 @@ public sealed class LocalApiServer : IAsyncDisposable
     {
         _source.StatusChanged -= OnStatusChanged;
         await _cts.CancelAsync().ConfigureAwait(false);
+        lock (_favoriteGate)
+        {
+            SafeCancel(_favoriteRefresh);
+        }
+
         EventClient[] clients;
         lock (_clientsGate)
         {
@@ -107,7 +116,9 @@ public sealed class LocalApiServer : IAsyncDisposable
             return false;
         }
 
-        return uri.Host is "localhost" or "127.0.0.1" or "[::1]" or "::1";
+        // Lively's WebView2 serves wallpapers from https://<random>.localhost; *.localhost is loopback-only (RFC 6761).
+        return uri.Host is "localhost" or "127.0.0.1" or "[::1]" or "::1"
+            || uri.Host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static bool IsAllowedHost(string? host, int port)
@@ -214,8 +225,96 @@ public sealed class LocalApiServer : IAsyncDisposable
         }
     }
 
-    private NowPlayingDto SnapshotDto() =>
-        NowPlayingMapper.Map(_source.Status, _source.ServerNowMicros, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
+    private NowPlayingDto SnapshotDto()
+    {
+        EnsureFavoriteFresh(0);
+        bool? favorite;
+        lock (_favoriteGate)
+        {
+            favorite = _favorite;
+        }
+
+        return NowPlayingMapper.Map(_source.Status, _source.ServerNowMicros, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), favorite);
+    }
+
+    private static string? FavoriteKey(SatelliteStatus status)
+    {
+        var md = status.Session.Metadata;
+        return status.Connection == ConnectionState.Connected && !string.IsNullOrEmpty(md.Title)
+            ? string.Join('\u001f', md.Title, md.Artist, md.Album)
+            : null;
+    }
+
+    /// <summary>
+    /// When the playing track differs from the one the cached favourite belongs to, forget it and look it up again in the
+    /// background (it needs Music Assistant, so it never blocks the response). Clients get another state event when it lands.
+    /// </summary>
+    private void EnsureFavoriteFresh(int delayMs)
+    {
+        var key = FavoriteKey(_source.Status);
+        CancellationTokenSource cts;
+        lock (_favoriteGate)
+        {
+            if (key == _favoriteKey)
+            {
+                return;
+            }
+
+            _favoriteKey = key;
+            _favorite = null;
+            SafeCancel(_favoriteRefresh);
+            if (key is null || _source.Favorites is null)
+            {
+                return;
+            }
+
+            cts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+            _favoriteRefresh = cts;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (delayMs > 0)
+                {
+                    await Task.Delay(delayMs, cts.Token).ConfigureAwait(false); // the queue lags a moment behind a track change
+                }
+
+                var favorite = await _source.Favorites!.GetCurrentAsync(cts.Token).ConfigureAwait(false);
+                lock (_favoriteGate)
+                {
+                    if (cts.IsCancellationRequested || key != _favoriteKey)
+                    {
+                        return;
+                    }
+
+                    _favorite = favorite;
+                }
+
+                Broadcast("state");
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+            {
+            }
+            finally
+            {
+                cts.Dispose();
+            }
+        });
+    }
+
+    private static void SafeCancel(CancellationTokenSource? cts)
+    {
+        try
+        {
+            cts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The refresh already finished and released its token source.
+        }
+    }
 
     private async Task WriteArtworkAsync(HttpListenerResponse response)
     {
@@ -269,6 +368,30 @@ public sealed class LocalApiServer : IAsyncDisposable
                 break;
             case "play" or "pause" or "stop" or "next" or "previous" or "seek" or "seek_relative" or "shuffle" or "unshuffle" or "repeat_off" or "repeat_one" or "repeat_all":
                 await _source.SendCommandAsync(new ControllerCommand(command.Command, null, null, command.PositionMs, command.OffsetMs)).ConfigureAwait(false);
+                break;
+            case "favorite" or "unfavorite":
+                if (_source.Favorites is not { } favorites)
+                {
+                    await WriteTextAsync(response, 501, "Favourites are not available").ConfigureAwait(false);
+                    return;
+                }
+
+                try
+                {
+                    var now = await favorites.SetCurrentAsync(command.Command == "favorite", _cts.Token).ConfigureAwait(false);
+                    lock (_favoriteGate)
+                    {
+                        _favoriteKey = FavoriteKey(_source.Status);
+                        _favorite = now;
+                    }
+                }
+                catch (InvalidOperationException ex)
+                {
+                    await WriteTextAsync(response, 409, ex.Message).ConfigureAwait(false);
+                    return;
+                }
+
+                Broadcast("state");
                 break;
             default:
                 await WriteTextAsync(response, 400, "Unknown command").ConfigureAwait(false);
@@ -335,7 +458,11 @@ public sealed class LocalApiServer : IAsyncDisposable
         return JsonSerializer.Serialize(new ApiEvent(type, data), Json);
     }
 
-    private void OnStatusChanged(SatelliteStatus status) => Broadcast("state");
+    private void OnStatusChanged(SatelliteStatus status)
+    {
+        EnsureFavoriteFresh(600);
+        Broadcast("state");
+    }
 
     private async Task TickLoopAsync()
     {

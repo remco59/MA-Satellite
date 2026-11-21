@@ -1,6 +1,7 @@
 :root {
   --accent: #40d6be;
   --card-opacity: 0.82;
+  --bg1: #1f2937; --bg2: #475569; --bg3: #475569; --bg4: #94a3b8; --bg5: #1f2937;
   color-scheme: dark;
 }
 
@@ -20,35 +21,90 @@ body { display: grid; place-items: center; }
 .card {
   display: grid;
   grid-template-columns: 112px 1fr;
-  gap: 16px;
+  column-gap: 18px;
   width: min(440px, calc(100vw - 24px));
-  padding: 16px;
-  border-radius: 16px;
-  background: rgba(18, 24, 36, var(--card-opacity));
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(18px);
-  transition: opacity 0.4s ease;
+  padding: 18px;
+  border-radius: 30px;
+  /* Liquid glass: a faint white tint over a strongly blurred + saturated copy of what is behind the card. */
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, calc(var(--card-opacity) * 0.24)), rgba(255, 255, 255, calc(var(--card-opacity) * 0.07))),
+    rgba(12, 14, 24, calc(var(--card-opacity) * 0.16));
+  -webkit-backdrop-filter: blur(30px) saturate(135%) brightness(1.06);
+  backdrop-filter: blur(30px) saturate(135%) brightness(1.06);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.55),   /* top specular edge */
+    inset 1px 0 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 0 34px rgba(255, 255, 255, 0.07),     /* soft inner glow */
+    0 22px 48px rgba(0, 0, 0, 0.30),
+    0 3px 10px rgba(0, 0, 0, 0.18);
+  transform-origin: center;
+  transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s ease;
 }
+
+/* On hover the whole card swells a little and lifts, as the info and controls slide out. */
+.card:hover, .card:focus-within {
+  transform: scale(1.08);
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.55),
+    inset 1px 0 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 0 34px rgba(255, 255, 255, 0.07),
+    0 30px 64px rgba(0, 0, 0, 0.36),
+    0 4px 14px rgba(0, 0, 0, 0.2);
+}
+.card.idle:hover { transform: none; }
+@media (prefers-reduced-motion: reduce) { .card:hover, .card:focus-within { transform: none; } }
+
+/* Sheen: a bright highlight pooling at the top-left and a faint diagonal glint, like light bending through glass. */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(120% 90% at 12% -10%, rgba(255, 255, 255, 0.34), transparent 48%),
+    linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.10) 50%, transparent 62%);
+  pointer-events: none;
+}
+
+/* Rim light: a 1px gradient border, bright at the top-left and bottom-right corners. */
+.card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.06) 38%, rgba(255, 255, 255, 0.06) 62%, rgba(255, 255, 255, 0.45));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  pointer-events: none;
+}
+
+.card > .art, .card > .info, .card > .extra { position: relative; z-index: 1; }
 
 .card.idle { opacity: 0.7; }
 
 .art {
   width: 112px;
   height: 112px;
-  border-radius: 10px;
+  border-radius: 20px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.10);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28), 0 8px 20px rgba(0, 0, 0, 0.28);
   display: grid;
   place-items: center;
 }
 
 .art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.art img[hidden] { display: none; }
 .art svg { width: 44px; height: 44px; fill: rgba(255, 255, 255, 0.35); }
 
 .info { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 2px; }
 
 .title {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
   font-size: 17px;
   font-weight: 600;
   line-height: 1.25;
@@ -66,8 +122,8 @@ body { display: grid; place-items: center; }
 }
 
 .artist { opacity: 0.9; }
-.album { opacity: 0.6; }
-.status { opacity: 0.5; font-size: 11px; margin-top: 4px; }
+.album { opacity: 0.78; }
+.status { opacity: 0.65; font-size: 11px; margin-top: 4px; white-space: normal; overflow-wrap: anywhere; }
 .status:empty { display: none; }
 
 .progress {
@@ -83,5 +139,104 @@ body { display: grid; place-items: center; }
 
 .progress.hidden, .album.hidden { display: none; }
 
-.bar { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
-.fill { height: 100%; width: 0; background: var(--accent); border-radius: 2px; }
+.bar {
+  position: relative;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.24);
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  transition: height 0.15s ease;
+}
+/* Seeking: a taller invisible hit area, and the bar thickens under the pointer. */
+.progress.seekable .bar { cursor: pointer; touch-action: none; }
+.progress.seekable .bar::before { content: ''; position: absolute; left: 0; right: 0; top: -10px; bottom: -10px; }
+.progress.seekable .bar:hover, .progress.scrubbing .bar { height: 8px; }
+.fill { height: 100%; width: 0; background: var(--accent); border-radius: 3px; box-shadow: 0 0 10px var(--accent); }
+
+/* Fluid background: soft colour blobs drifting slowly, tinted from the album art (see widget.js). */
+.bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: #090b11; }
+.bg.off { display: none; }
+.bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: none; }
+.bg.gl canvas { display: block; }
+.bg.gl i { display: none; } /* CSS blobs are only the fallback when WebGL is unavailable */
+.bg i {
+  position: absolute;
+  width: 90vmax; height: 90vmax;
+  border-radius: 50%;
+  opacity: 0.8;
+  mix-blend-mode: screen;
+  will-change: transform;
+  animation: drift-a 27s ease-in-out infinite alternate;
+}
+.bg i:nth-child(1) { top: -35%; left: -25%; background: radial-gradient(closest-side, var(--bg1), transparent); }
+.bg i:nth-child(2) { top: 15%;  left: 35%;  background: radial-gradient(closest-side, var(--bg2), transparent); animation-name: drift-b; animation-duration: 33s; }
+.bg i:nth-child(3) { top: 45%;  left: -30%; background: radial-gradient(closest-side, var(--bg3), transparent); animation-name: drift-c; animation-duration: 39s; }
+.bg i:nth-child(4) { top: -30%; left: 30%;  background: radial-gradient(closest-side, var(--bg4), transparent); animation-name: drift-b; animation-duration: 29s; animation-direction: alternate-reverse; opacity: 0.55; }
+.bg i:nth-child(5) { top: 30%;  left: 5%;   background: radial-gradient(closest-side, var(--bg5), transparent); animation-name: drift-c; animation-duration: 43s; animation-direction: alternate-reverse; }
+
+@keyframes drift-a { from { transform: translate(-6%, -4%) scale(1); }    to { transform: translate(22%, 26%) scale(1.25); } }
+@keyframes drift-b { from { transform: translate(10%, 18%) scale(1.15); } to { transform: translate(-24%, -12%) scale(0.9); } }
+@keyframes drift-c { from { transform: translate(-14%, 8%) scale(0.95); } to { transform: translate(26%, -20%) scale(1.2); } }
+
+@media (prefers-reduced-motion: reduce) { .bg i { animation: none; } }
+
+.card { position: relative; z-index: 1; }
+
+/* Hover panel: more info and the playback controls slide out under the track. */
+.extra {
+  grid-column: 1 / -1;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.45s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
+}
+.extra-inner { padding-top: 14px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.card:hover .extra, .card:focus-within .extra { max-height: 150px; opacity: 1; }
+.card.idle .extra, .extra.offline { display: none; }
+
+.meta { font-size: 12px; opacity: 0.78; text-align: center; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+.meta:empty { display: none; }
+
+.controls { display: flex; align-items: center; justify-content: center; gap: 10px; }
+
+.ctl {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 2px 8px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease, color 0.2s ease;
+}
+.ctl svg { width: 20px; height: 20px; fill: currentColor; grid-area: 1 / 1; }
+.ctl.big { width: 52px; height: 52px; background: rgba(255, 255, 255, 0.28); }
+.ctl.big svg { width: 26px; height: 26px; }
+.ctl:hover:not(:disabled) { background: rgba(255, 255, 255, 0.26); transform: scale(1.06); }
+.ctl.big:hover:not(:disabled) { background: rgba(255, 255, 255, 0.38); }
+.ctl:active:not(:disabled) { transform: scale(0.93); }
+.ctl:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.8); outline-offset: 2px; }
+.ctl:disabled { opacity: 0.35; cursor: default; }
+.ctl.hidden { display: none; }
+
+#btnShuffle[aria-pressed="true"] { color: var(--accent); background: rgba(255, 255, 255, 0.24); }
+
+/* Play/pause and heart each hold two icons; show the one that fits the state. */
+.ctl .i-pause, .ctl .i-heart-on { display: none; }
+#btnPlay.is-playing .i-play { display: none; }
+#btnPlay.is-playing .i-pause { display: block; }
+#btnFav[aria-pressed="true"] { color: #ff6b8b; }
+#btnFav[aria-pressed="true"] .i-heart { display: none; }
+#btnFav[aria-pressed="true"] .i-heart-on { display: block; }
+
+/* Repeat: off = dim, all = accent, one = accent with the "1" icon. */
+.ctl .i-repeat-one { display: none; }
+#btnRepeat[aria-pressed="true"] { color: var(--accent); background: rgba(255, 255, 255, 0.24); }
+#btnRepeat[data-mode="one"] .i-repeat { display: none; }
+#btnRepeat[data-mode="one"] .i-repeat-one { display: block; }

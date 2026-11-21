@@ -15,5 +15,8 @@ public interface ILocalApiSource
 
     event Action<SatelliteStatus>? StatusChanged;
 
+    /// <summary>Favourites for the playing track, when Music Assistant is available to provide them.</summary>
+    ILocalApiFavorites? Favorites => null;
+
     Task SendCommandAsync(ControllerCommand command);
 }
