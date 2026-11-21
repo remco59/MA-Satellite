@@ -66,22 +66,30 @@ public sealed class AnnouncementMixer
             throw new ArgumentException("Announcement audio is empty.", nameof(samples));
         }
 
+        if (channels <= 0 || samples.Length % channels != 0)
+        {
+            throw new ArgumentException("Announcement PCM must contain complete frames.", nameof(samples));
+        }
+
+        // Prepare the clip outside the render lock so a long decoded announcement cannot
+        // hold up the WASAPI callback while copying/scaling its samples.
+        var clip = samples.ToArray();
+        var gain = Math.Clamp(volumeLevel, 0, 100) / 100f;
+        for (var i = 0; i < clip.Length; i++)
+        {
+            clip[i] *= gain;
+        }
+
         lock (_gate)
         {
-            if (sampleRate != _sampleRate || channels != _channels || samples.Length % channels != 0)
+            if (sampleRate != _sampleRate || channels != _channels)
             {
-                throw new ArgumentException("Announcement PCM must match the active output format and contain complete frames.");
+                throw new ArgumentException("Announcement PCM must match the active output format.");
             }
 
-            var clip = samples.ToArray();
             if (_queuedSamples + clip.Length > (long)_sampleRate * _channels * MaxQueuedSeconds)
             {
                 throw new InvalidOperationException($"The announcement queue is limited to {MaxQueuedSeconds} seconds.");
-            }
-            var gain = Math.Clamp(volumeLevel, 0, 100) / 100f;
-            for (var i = 0; i < clip.Length; i++)
-            {
-                clip[i] *= gain;
             }
 
             _pending.Enqueue(clip);
