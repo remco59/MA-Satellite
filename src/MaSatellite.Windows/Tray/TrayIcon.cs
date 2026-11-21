@@ -14,6 +14,7 @@ public sealed class TrayIcon : IDisposable
     private const uint CallbackMessage = WM_APP + 1;
     private const uint IconId = 1;
     private const string WindowClassName = "MaSatellite.TrayWindow";
+    private const string WindowTitle = "ma-satellite tray";
 
     private readonly string _iconPath;
     private readonly WndProc _wndProc; // kept alive for the lifetime of the window
