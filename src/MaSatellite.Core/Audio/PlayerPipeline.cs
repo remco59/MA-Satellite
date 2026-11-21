@@ -15,6 +15,7 @@ public sealed class PlayerPipeline : IDisposable
     private IAudioDecoder? _decoder;
     private StreamPlayerFormat? _format;
     private bool _outputRunning;
+    private volatile bool _announcementOutputReady;
     private AudioOutputFormat _outputFormat;
     private long _decodeErrors;
     private bool _disposed;
@@ -145,7 +146,10 @@ public sealed class PlayerPipeline : IDisposable
     private void Render(Span<float> buffer, long playoutLocalMicros)
     {
         _engine.Fill(buffer, playoutLocalMicros);
-        _announcements?.Mix(buffer);
+        if (_announcementOutputReady)
+        {
+            _announcements?.Mix(buffer);
+        }
     }
 
     private void EnsureOutputLocked()
@@ -155,8 +159,10 @@ public sealed class PlayerPipeline : IDisposable
             return;
         }
 
+        _announcementOutputReady = false;
         _outputFormat = _output.Start(Render);
         _announcements?.SetOutputFormat(_outputFormat);
+        _announcementOutputReady = _announcements is not null;
         _outputRunning = true;
         _logger.LogInformation("Audio output started: {Rate} Hz, {Channels} ch", _outputFormat.SampleRate, _outputFormat.Channels);
     }
@@ -168,6 +174,7 @@ public sealed class PlayerPipeline : IDisposable
             return;
         }
 
+        _announcementOutputReady = false;
         _outputRunning = false;
         try
         {
