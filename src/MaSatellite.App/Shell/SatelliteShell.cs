@@ -82,6 +82,7 @@ internal sealed class SatelliteShell : IDisposable
         };
         _tray.MenuItemInvoked += OnMenuItem;
         _tray.ActivationRequested += OpenFullApp;
+        _tray.ActivationRequested += OpenFullApp;
         _tray.Clicked += ToggleMiniPlayer;
         _tray.DoubleClicked += OpenFullApp;
         _tray.Show();
@@ -311,9 +312,16 @@ internal sealed class SatelliteShell : IDisposable
         if (now - _lastTrayRegistrationCheck >= 15_000)
         {
             _lastTrayRegistrationCheck = now;
-            if (!_tray.EnsureRegistered())
+            try
             {
-                _logger?.LogWarning("Windows has not accepted the MA-Satellite tray icon registration yet");
+                if (!_tray.EnsureRegistered())
+                {
+                    _logger?.LogWarning("Windows has not accepted the MA-Satellite tray icon registration yet");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Could not verify tray icon registration");
             }
         }
 
