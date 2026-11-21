@@ -94,7 +94,6 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "UnregisterClassW", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
-    public static extern bool UnregisterClass(string className, IntPtr instance);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "LoadImageW", SetLastError = true)]
     public static extern IntPtr LoadImage(IntPtr instance, string name, uint type, int cx, int cy, uint load);
