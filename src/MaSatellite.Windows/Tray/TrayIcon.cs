@@ -14,8 +14,6 @@ public sealed class TrayIcon : IDisposable
     private const uint CallbackMessage = WM_APP + 1;
     private const uint IconId = 1;
     private const string WindowClassName = "MaSatellite.TrayWindow";
-    private const string WindowTitle = "ma-satellite tray";
-    private static readonly uint ActivatePrimaryMessage = RegisterWindowMessage("MaSatellite.ActivatePrimary");
 
     private readonly string _iconPath;
     private readonly WndProc _wndProc; // kept alive for the lifetime of the window
@@ -45,24 +43,6 @@ public sealed class TrayIcon : IDisposable
 
     /// <summary>Double-click on the icon. The first click of the pair has already raised <see cref="Clicked"/>.</summary>
     public event Action? DoubleClicked;
-
-    /// <summary>Raised on the UI thread when another launch asks the primary instance to open its full app.</summary>
-    public event Action? ActivationRequested;
-
-    /// <summary>
-    /// Asks the running instance to activate its full app window.
-    /// The caller should retry briefly because the primary instance can still be creating its tray window.
-    /// </summary>
-    public static bool RequestPrimaryActivation()
-    {
-        if (ActivatePrimaryMessage == 0)
-        {
-            return false;
-        }
-
-        var window = FindWindow(WindowClassName, WindowTitle);
-        return window != IntPtr.Zero && PostMessage(window, ActivatePrimaryMessage, IntPtr.Zero, IntPtr.Zero);
-    }
 
     public void Show()
     {
@@ -159,6 +139,7 @@ public sealed class TrayIcon : IDisposable
         {
             DestroyWindow(_hwnd);
             _hwnd = IntPtr.Zero;
+            UnregisterClass(WindowClassName, GetModuleHandle(null));
         }
 
         if (_hIcon != IntPtr.Zero)
@@ -218,12 +199,6 @@ public sealed class TrayIcon : IDisposable
 
     private IntPtr WindowProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
     {
-        if (msg == ActivatePrimaryMessage)
-        {
-            ActivationRequested?.Invoke();
-            return IntPtr.Zero;
-        }
-
         if (msg == CallbackMessage)
         {
             switch ((uint)(lParam.ToInt64() & 0xFFFF))
