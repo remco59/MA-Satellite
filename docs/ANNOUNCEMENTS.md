@@ -17,10 +17,16 @@ The LAN endpoint accepts private-network clients only and requires the MA-Satell
 2. Allow inbound TCP 8930 on the Windows **Private** network profile. Do not expose this port to the public internet.
 3. Copy the `custom_components/ma_satellite` folder into the Home Assistant `custom_components` directory, restart Home Assistant, then add **MA Satellite** from **Settings → Devices & services → Add integration**.
 4. Enter the Windows PC hostname/IP, port 8930, and the pairing token from **MA-Satellite → Settings → Security & pairing**.
-5. Apply `patches/music-assistant-server/ma-satellite-announcement-discovery.patch` to the Music Assistant server source and restart the server. This patch adds discovery for the custom HA integration while retaining the existing ESPHome discovery path.
-6. In Music Assistant, reload the Sendspin provider or restart the server. The Windows Sendspin player should expose announcement support once the MA-Satellite entity appears in Home Assistant.
+5. Apply the small discovery patch to the Music Assistant server source. From a checkout of [music-assistant/server](https://github.com/music-assistant/server), run:
 
-The server-side patch is required until equivalent support is included in the Music Assistant release you run. Without it, Music Assistant's Sendspin provider only searches the ESPHome integration domain and will not find the custom MA-Satellite entity.
+   ```bash
+   git apply /path/to/MA-Satellite/patches/music-assistant-server/ma-satellite-announcement-discovery.patch
+   ```
+
+   Then rebuild/redeploy your Music Assistant server from that patched source. Do not edit a running container's files directly; those changes will be lost on restart.
+6. In Music Assistant, reload the Sendspin provider or restart the patched server. The Windows Sendspin player should expose announcement support once the MA-Satellite entity appears in Home Assistant.
+
+The server-side patch is required until equivalent discovery is included in the Music Assistant release you run. Without it, Music Assistant's Sendspin provider only searches the ESPHome integration domain and will not find the custom MA-Satellite entity.
 
 ## Behaviour
 
