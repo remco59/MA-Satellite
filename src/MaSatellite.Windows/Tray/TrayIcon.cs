@@ -5,18 +5,16 @@ using static MaSatellite.Windows.Tray.NativeMethods;
 namespace MaSatellite.Windows.Tray;
 
 /// <summary>
-/// A notification-area icon built directly on Shell_NotifyIcon.
-/// Its hidden top-level window must live on a thread that pumps messages (the UI thread).
-/// It is deliberately not a message-only window: Windows broadcasts TaskbarCreated only to top-level windows.
+/// A notification-area icon built directly on Shell_NotifyIcon with a hidden top-level message window.
+/// Must be created and used on a thread that pumps messages (the UI thread).
 /// </summary>
 public sealed class TrayIcon : IDisposable
 {
     private const uint CallbackMessage = WM_APP + 1;
     private const uint IconId = 1;
-    private const string WindowClassName = "MaSatellite.TrayWindow";
-    private const string WindowTitle = "ma-satellite tray";
 
     private readonly string _iconPath;
+    private readonly string _className = "MaSatellite.TrayWindow." + Guid.NewGuid().ToString("N");
     private readonly WndProc _wndProc; // kept alive for the lifetime of the window
     private readonly uint _taskbarCreatedMessage;
     private IntPtr _hwnd;
@@ -49,58 +47,56 @@ public sealed class TrayIcon : IDisposable
     {
         ThrowIfDisposed();
         EnsureWindow();
-
-        var icon = LoadImage(IntPtr.Zero, _iconPath, IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE);
-        if (icon == IntPtr.Zero)
+        if (_hIcon == IntPtr.Zero)
         {
-            throw new InvalidOperationException(
-                $"Could not load the tray icon from '{_iconPath}'.",
-                new System.ComponentModel.Win32Exception());
+            _hIcon = LoadImage(IntPtr.Zero, _iconPath, IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE);
         }
 
-        if (_hIcon != IntPtr.Zero)
+        if (_hIcon == IntPtr.Zero)
         {
-            DestroyIcon(_hIcon);
+            throw new InvalidOperationException("Could not load the tray icon.", new System.ComponentModel.Win32Exception());
         }
 
-        _hIcon = icon;
-        EnsureRegistered();
+        AddIcon();
     }
 
     public void SetTooltip(string tooltip)
     {
         _tooltip = tooltip.Length > 127 ? tooltip[..127] : tooltip;
-        if (_hwnd != IntPtr.Zero && _hIcon != IntPtr.Zero)
+        if (_added)
         {
-            EnsureRegistered();
+            var data = NewData(NIF_TIP);
+            if (!Shell_NotifyIcon(NIM_MODIFY, ref data))
+            {
+                _added = false;
+            }
         }
     }
 
     /// <summary>
-    /// Verifies the shell still has this icon. NIM_MODIFY fails when Explorer has dropped the registration;
-    /// in that case the icon is added again. Call periodically on the UI thread.
+    /// Verifies that Explorer still has this icon and re-adds it if the notification
+    /// area dropped it. Call periodically on the UI thread.
     /// </summary>
-    public bool EnsureRegistered()
+    public void EnsurePresent()
     {
         ThrowIfDisposed();
         if (_hwnd == IntPtr.Zero || _hIcon == IntPtr.Zero)
         {
-            return false;
+            return;
         }
 
         if (_added)
         {
-            var data = NewData(NIF_TIP);
+            var data = NewData(NIF_MESSAGE | NIF_ICON | NIF_TIP);
             if (Shell_NotifyIcon(NIM_MODIFY, ref data))
             {
-                return true;
+                return;
             }
 
             _added = false;
         }
 
         AddIcon();
-        return _added;
     }
 
     /// <summary>The cursor and tray-icon bounds use the same physical screen coordinates.</summary>
@@ -138,11 +134,11 @@ public sealed class TrayIcon : IDisposable
 
         if (_hwnd != IntPtr.Zero)
         {
-            DestroyWindow(_hwnd);
+            var hwnd = _hwnd;
             _hwnd = IntPtr.Zero;
+            DestroyWindow(hwnd);
+            UnregisterClass(_className, GetModuleHandle(null));
         }
-
-        UnregisterClass(WindowClassName, GetModuleHandle(null));
 
         if (_hIcon != IntPtr.Zero)
         {
@@ -164,16 +160,17 @@ public sealed class TrayIcon : IDisposable
             cbSize = (uint)Marshal.SizeOf<WNDCLASSEX>(),
             lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProc),
             hInstance = hInstance,
-            lpszClassName = WindowClassName,
+            lpszClassName = _className,
         };
         if (RegisterClassEx(ref wc) == 0)
         {
             throw new InvalidOperationException("Could not register tray window class.", new System.ComponentModel.Win32Exception());
         }
 
-        // Use an invisible top-level window rather than HWND_MESSAGE. TaskbarCreated is a broadcast,
-        // and Windows explicitly does not send broadcasts to message-only windows.
-        _hwnd = CreateWindowEx(0, WindowClassName, WindowTitle, 0, 0, 0, 0, 0, IntPtr.Zero, IntPtr.Zero, hInstance, IntPtr.Zero);
+        // TaskbarCreated is broadcast to top-level windows, not HWND_MESSAGE windows.
+        // Keep this top-level window hidden (no WS_VISIBLE style) so it can receive
+        // Explorer's restart notification without appearing in the taskbar.
+        _hwnd = CreateWindowEx(0, _className, "ma-satellite tray", 0, 0, 0, 0, 0, IntPtr.Zero, IntPtr.Zero, hInstance, IntPtr.Zero);
         if (_hwnd == IntPtr.Zero)
         {
             throw new InvalidOperationException("Could not create tray window.", new System.ComponentModel.Win32Exception());
@@ -182,8 +179,23 @@ public sealed class TrayIcon : IDisposable
 
     private void AddIcon()
     {
+        if (_hwnd == IntPtr.Zero || _hIcon == IntPtr.Zero || _disposed)
+        {
+            _added = false;
+            return;
+        }
+
         var data = NewData(NIF_MESSAGE | NIF_ICON | NIF_TIP);
         _added = Shell_NotifyIcon(NIM_ADD, ref data);
+        if (_added)
+        {
+            return;
+        }
+
+        // NIM_ADD can fail when the shell still has the previous registration
+        // for this window/id pair. In that case, update the existing entry.
+        data = NewData(NIF_MESSAGE | NIF_ICON | NIF_TIP);
+        _added = Shell_NotifyIcon(NIM_MODIFY, ref data);
     }
 
     private NOTIFYICONDATA NewData(uint flags) => new()
@@ -229,9 +241,9 @@ public sealed class TrayIcon : IDisposable
 
         if (msg == _taskbarCreatedMessage && !_disposed)
         {
-            // Explorer restarted (or the taskbar was recreated). Its notification-area registrations are gone.
+            // Explorer recreated the taskbar and discarded its notification-area icons.
             _added = false;
-            EnsureRegistered();
+            AddIcon();
             return IntPtr.Zero;
         }
 
