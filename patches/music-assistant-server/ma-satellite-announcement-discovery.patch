@@ -1,0 +1,20 @@
+diff --git a/music_assistant/providers/sendspin/provider.py b/music_assistant/providers/sendspin/provider.py
+index 0000000..0000000 100644
+--- a/music_assistant/providers/sendspin/provider.py
++++ b/music_assistant/providers/sendspin/provider.py
+@@
+-            device_infos = await hass.get_media_player_device_infos(
+-                [mac_address for _, mac_address in mac_players], platform="esphome"
+-            )
++            mac_addresses = [mac_address for _, mac_address in mac_players]
++            # MA-Satellite registers its Home Assistant announcement entity under
++            # the ma_satellite integration domain. Keep ESPHome support unchanged,
++            # and also discover the native Windows player's announce endpoint.
++            device_infos = await hass.get_media_player_device_infos(
++                mac_addresses, platform="esphome"
++            )
++            device_infos.update(
++                await hass.get_media_player_device_infos(
++                    mac_addresses, platform="ma_satellite"
++                )
++            )
