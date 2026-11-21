@@ -50,7 +50,8 @@ public sealed class SendspinService : IAsyncDisposable
         IServiceAdvertiser? advertiser = null,
         ILastServerStore? lastServerStore = null,
         ILoggerFactory? loggerFactory = null,
-        ISendspinKeyStore? keyStore = null)
+        ISendspinKeyStore? keyStore = null,
+        AnnouncementMixer? announcementMixer = null)
     {
         _keys = keyStore ?? new InMemoryKeyStore();
         _output = output;
@@ -62,7 +63,7 @@ public sealed class SendspinService : IAsyncDisposable
         _logger = _loggers.CreateLogger<SendspinService>();
         _clock = new ClockSync(_localClock);
         _engine = new PlaybackEngine(_clock, _loggers.CreateLogger<PlaybackEngine>());
-        _pipeline = new PlayerPipeline(output, _engine, _loggers.CreateLogger<PlayerPipeline>());
+        _pipeline = new PlayerPipeline(output, _engine, _loggers.CreateLogger<PlayerPipeline>(), announcementMixer);
         _pipeline.InSyncChanged += v =>
         {
             _inSync = v;
