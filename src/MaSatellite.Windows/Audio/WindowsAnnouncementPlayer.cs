@@ -52,6 +52,49 @@ public sealed class WindowsAnnouncementPlayer : IAudioAnnouncementPlayer
         }
     }
 
+    private static string GetFileExtension(byte[] media, string contentType)
+    {
+        var mime = contentType.Split(';', 2)[0].Trim().ToLowerInvariant();
+        var byType = mime switch
+        {
+            "audio/mpeg" or "audio/mp3" => ".mp3",
+            "audio/wav" or "audio/wave" or "audio/x-wav" or "audio/vnd.wave" => ".wav",
+            "audio/mp4" or "audio/x-m4a" => ".m4a",
+            "audio/aac" or "audio/x-aac" => ".aac",
+            "audio/flac" or "audio/x-flac" => ".flac",
+            "audio/ogg" or "audio/opus" => ".ogg",
+            "audio/webm" => ".webm",
+            "audio/x-ms-wma" or "audio/wma" => ".wma",
+            _ => string.Empty,
+        };
+        if (byType.Length > 0)
+        {
+            return byType;
+        }
+
+        if (media.Length >= 12 && media.AsSpan(0, 4).SequenceEqual("RIFF"u8) && media.AsSpan(8, 4).SequenceEqual("WAVE"u8))
+        {
+            return ".wav";
+        }
+
+        if (media.Length >= 4 && media.AsSpan(0, 4).SequenceEqual("fLaC"u8))
+        {
+            return ".flac";
+        }
+
+        if (media.Length >= 4 && media.AsSpan(0, 4).SequenceEqual("OggS"u8))
+        {
+            return ".ogg";
+        }
+
+        if (media.Length >= 8 && media.AsSpan(4, 4).SequenceEqual("ftyp"u8))
+        {
+            return ".m4a";
+        }
+
+        return ".mp3";
+    }
+
     private void DecodeAndQueue(string path, int volumeLevel)
     {
         var format = _mixer.OutputFormat;
