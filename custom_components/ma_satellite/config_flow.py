@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ipaddress
-import logging
 from typing import Any
 
 import aiohttp
@@ -15,9 +14,6 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import CONF_HOST, CONF_PORT, CONF_TOKEN, DEFAULT_PORT, DOMAIN
-
-_LOGGER = logging.getLogger(__name__)
-
 
 def _base_url(host: str, port: int) -> str:
     """Build a URL from a hostname or IP address entered by the user."""
