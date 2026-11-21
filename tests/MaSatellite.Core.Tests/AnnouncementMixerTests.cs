@@ -31,8 +31,8 @@ public sealed class AnnouncementMixerTests
     {
         var mixer = new AnnouncementMixer();
         mixer.SetOutputFormat(new AudioOutputFormat(10, 1));
-        mixer.Enqueue(Enumerable.Repeat(0.1f, 900).ToArray(), 10, 1);
         mixer.Enqueue(Enumerable.Repeat(0.2f, 900).ToArray(), 10, 1);
+        mixer.Enqueue(Enumerable.Repeat(0.1f, 900).ToArray(), 10, 1);
 
         Assert.Throws<InvalidOperationException>(() =>
             mixer.Enqueue([0.3f], 10, 1));
