@@ -304,8 +304,8 @@ internal sealed class SatelliteShell : IDisposable
             return;
         }
 
-        // Explorer can drop an icon without stopping its owning process. Revalidate the registration
-        // periodically as a fallback in addition to handling the TaskbarCreated broadcast immediately.
+        // Explorer can drop an icon without stopping its owning process. Revalidate periodically
+        // as a fallback to the immediate TaskbarCreated broadcast handled by TrayIcon.
         var now = Environment.TickCount64;
         if (now - _lastTrayRegistrationCheck >= 15_000)
         {
