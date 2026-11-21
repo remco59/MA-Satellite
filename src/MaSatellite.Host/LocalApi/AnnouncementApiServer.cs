@@ -30,7 +30,8 @@ public sealed class AnnouncementApiServer : IAsyncDisposable
         _source = source;
         _port = port;
         _logger = logger ?? NullLogger<AnnouncementApiServer>.Instance;
-        _listener = new TcpListener(IPAddress.Any, port);
+        _listener = new TcpListener(IPAddress.IPv6Any, port);
+        _listener.Server.DualMode = true;
     }
 
     public void Start()
