@@ -6,13 +6,14 @@ using MaSatellite.Core.Time;
 using MaSatellite.Core.Security;
 using MaSatellite.Core.Volume;
 using MaSatellite.Host.LocalApi;
+using MaSatellite.Host.Audio;
 using MaSatellite.Host.Settings;
 using Microsoft.Extensions.Logging;
 
 namespace MaSatellite.Host.Orchestration;
 
 /// <summary>Everything non-UI that makes the player run: the Sendspin service wired to settings, volume and output.</summary>
-public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.ILocalApiSource
+public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.ILocalApiSource, IAnnouncementApiSource
 {
     private readonly SettingsStore _settings;
     private readonly SendspinService _service;
@@ -22,6 +23,8 @@ public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.
     private readonly ILogger<SatelliteHost> _logger;
     private readonly ILoggerFactory _loggers;
     private LocalApiServer? _api;
+    private AnnouncementApiServer? _announcementApi;
+    private readonly IAudioAnnouncementPlayer? _announcementPlayer;
     private readonly SemaphoreSlim _applyLock = new(1, 1);
     private AppSettings _applied;
     private bool _started;
@@ -36,7 +39,9 @@ public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.
         ILoggerFactory loggers,
         string softwareVersion,
         ILocalClock? clock = null,
-        ISendspinKeyStore? keyStore = null)
+        ISendspinKeyStore? keyStore = null,
+        AnnouncementMixer? announcementMixer = null,
+        IAudioAnnouncementPlayer? announcementPlayer = null)
     {
         _settings = settings;
         _setOutputDevice = setOutputDevice;
@@ -45,7 +50,8 @@ public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.
         _logger = loggers.CreateLogger<SatelliteHost>();
         _loggers = loggers;
         _applied = settings.Current;
-        _service = new SendspinService(output, volume, clock, advertiser, lastServerStore, loggers, keyStore);
+        _announcementPlayer = announcementPlayer;
+        _service = new SendspinService(output, volume, clock, advertiser, lastServerStore, loggers, keyStore, announcementMixer);
         _service.PairingCompleted += () => PairingChanged?.Invoke();
         _service.StaticDelayChanged += OnServerChangedStaticDelay;
         _service.StatusChanged += s => StatusChanged?.Invoke(s);
@@ -81,6 +87,7 @@ public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.
         _setOutputDevice(s.OutputDeviceId);
         await _service.StartAsync(SettingsMapper.ToSendspinOptions(s, _softwareVersion), SettingsMapper.ToConnectionOptions(s)).ConfigureAwait(false);
         await ApplyLocalApiAsync(s).ConfigureAwait(false);
+        await ApplyAnnouncementApiAsync(s).ConfigureAwait(false);
         _settings.Changed += OnSettingsChanged;
     }
 
@@ -88,6 +95,7 @@ public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.
     {
         _settings.Changed -= OnSettingsChanged;
         await StopLocalApiAsync().ConfigureAwait(false);
+        await StopAnnouncementApiAsync().ConfigureAwait(false);
         await _service.StopAsync().ConfigureAwait(false);
         _started = false;
     }
@@ -126,6 +134,11 @@ public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.
             if (before.LocalApiEnabled != updated.LocalApiEnabled || before.LocalApiPort != updated.LocalApiPort)
             {
                 await ApplyLocalApiAsync(updated).ConfigureAwait(false);
+            }
+
+            if (before.AnnouncementApiEnabled != updated.AnnouncementApiEnabled || before.AnnouncementApiPort != updated.AnnouncementApiPort)
+            {
+                await ApplyAnnouncementApiAsync(updated).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
@@ -167,6 +180,52 @@ public sealed class SatelliteHost : IAsyncDisposable, MaSatellite.Host.LocalApi.
         {
             await api.DisposeAsync().ConfigureAwait(false);
         }
+    }
+
+    private async Task ApplyAnnouncementApiAsync(AppSettings s)
+    {
+        await StopAnnouncementApiAsync().ConfigureAwait(false);
+        if (!s.AnnouncementApiEnabled)
+        {
+            return;
+        }
+
+        try
+        {
+            var api = new AnnouncementApiServer(this, s.AnnouncementApiPort, _loggers.CreateLogger<AnnouncementApiServer>());
+            api.Start();
+            _announcementApi = api;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Announcement API could not start on port {Port}", s.AnnouncementApiPort);
+        }
+    }
+
+    private async Task StopAnnouncementApiAsync()
+    {
+        var api = _announcementApi;
+        _announcementApi = null;
+        if (api is not null)
+        {
+            await api.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    public string PlayerName => _settings.Current.PlayerName;
+
+    public string MacAddress => NetworkIdentity.GetPrimaryMacAddress();
+
+    public string ApiToken => KeyStore.PairingToken();
+
+    public Task PlayAnnouncementAsync(byte[] media, string contentType, int volumeLevel, CancellationToken cancellationToken = default)
+    {
+        if (_announcementPlayer is null)
+        {
+            throw new InvalidOperationException("Announcement playback is not available on this host.");
+        }
+
+        return _announcementPlayer.PlayAsync(media, contentType, volumeLevel, cancellationToken);
     }
 
     private void OnServerChangedStaticDelay(int delayMs)
