@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 
 import aiohttp
 
-from homeassistant import media_source
+from homeassistant.components import media_source
 from homeassistant.components.media_player import (
     MediaPlayerDeviceClass,
     MediaPlayerEntity,
