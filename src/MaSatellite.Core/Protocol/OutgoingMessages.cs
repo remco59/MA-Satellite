@@ -11,7 +11,7 @@ public static class Roles
     public const string Artwork = "artwork@v1";
 }
 
-public sealed record DeviceInfo(string? ProductName, string? Manufacturer, string? SoftwareVersion);
+public sealed record DeviceInfo(string? ProductName, string? Manufacturer, string? SoftwareVersion, string? MacAddress = null);
 
 public sealed record AudioFormatSpec(string Codec, int Channels, int SampleRate, int BitDepth);
 

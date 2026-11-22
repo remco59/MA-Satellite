@@ -19,6 +19,7 @@ public sealed record AppSettings
     public const int DefaultServerPort = 8927;
     public const int DefaultMaWebPort = 8095;
     public const int DefaultLocalApiPort = 8929;
+    public const int DefaultAnnouncementApiPort = 8930;
 
     /// <summary>Stable id sent to the server so it remembers groups and settings.</summary>
     public string ClientId { get; init; } = Guid.NewGuid().ToString("D");
@@ -56,4 +57,9 @@ public sealed record AppSettings
     public bool LocalApiEnabled { get; init; } = true;
 
     public int LocalApiPort { get; init; } = DefaultLocalApiPort;
+
+    /// <summary>Expose an authenticated LAN endpoint for Home Assistant announcements.</summary>
+    public bool AnnouncementApiEnabled { get; init; }
+
+    public int AnnouncementApiPort { get; init; } = DefaultAnnouncementApiPort;
 }

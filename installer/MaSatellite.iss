@@ -35,7 +35,7 @@ WizardStyle=modern
 CloseApplications=no
 
 [Tasks]
-Name: "firewall"; Description: "Allow Music Assistant to connect in (TCP 8928, private networks only)"; Check: IsAdminInstallMode
+Name: "firewall"; Description: "Allow Music Assistant and Home Assistant to connect in (TCP 8928 and 8930, private networks only)"; Check: IsAdminInstallMode
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -49,12 +49,15 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: 
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"; ValueName: "MaSatellite"; Flags: dontcreatekey uninsdeletevalue
 
 [Run]
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""ma-satellite"""; Flags: runhidden; Tasks: firewall
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""ma-satellite"" dir=in action=allow program=""{app}\{#AppExe}"" protocol=TCP localport=8928 profile=private"; Flags: runhidden; Tasks: firewall
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""ma-satellite-sendspin"""; Flags: runhidden; Tasks: firewall
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""ma-satellite-announcements"""; Flags: runhidden; Tasks: firewall
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""ma-satellite-sendspin"" dir=in action=allow program=""{app}\{#AppExe}"" protocol=TCP localport=8928 profile=private"; Flags: runhidden; Tasks: firewall
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""ma-satellite-announcements"" dir=in action=allow program=""{app}\{#AppExe}"" protocol=TCP localport=8930 profile=private"; Flags: runhidden; Tasks: firewall
 Filename: "{app}\{#AppExe}"; Description: "Start ma-satellite"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""ma-satellite"""; Flags: runhidden; RunOnceId: "RemoveFirewallRule"
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""ma-satellite-sendspin"""; Flags: runhidden; RunOnceId: "RemoveSendspinFirewallRule"
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""ma-satellite-announcements"""; Flags: runhidden; RunOnceId: "RemoveAnnouncementFirewallRule"
 
 [Code]
 procedure StopRunningApp;
