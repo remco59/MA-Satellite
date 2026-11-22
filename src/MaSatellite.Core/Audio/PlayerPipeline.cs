@@ -144,6 +144,7 @@ public sealed class PlayerPipeline : IDisposable
     private async Task RestartOutputAsync()
     {
         var attempt = 0;
+        var handledVersion = Volatile.Read(ref _outputFailureVersion);
         try
         {
             while (attempt < 10)
@@ -174,8 +175,8 @@ public sealed class PlayerPipeline : IDisposable
                     }
                 }
 
-                // If another endpoint change arrived during restart, process the newest
-                // endpoint too; otherwise the output is ready.
+                handledVersion = version;
+                // If another endpoint change arrived during restart, process the newest endpoint too.
                 if (version == Volatile.Read(ref _outputFailureVersion))
                     return;
             }
@@ -185,15 +186,9 @@ public sealed class PlayerPipeline : IDisposable
             Interlocked.Exchange(ref _restartScheduled, 0);
             // Close the race where a notification arrived just as this worker was exiting.
             if (!_disposed && _decoder is not null &&
-                Volatile.Read(ref _outputFailureVersion) > 0 &&
+                Volatile.Read(ref _outputFailureVersion) != handledVersion &&
                 Interlocked.CompareExchange(ref _restartScheduled, 1, 0) == 0)
-            {
-                var handledVersion = Volatile.Read(ref _outputFailureVersion);
-                if (handledVersion != 0 && !_outputRunning)
-                    _ = Task.Run(RestartOutputAsync);
-                else
-                    Interlocked.Exchange(ref _restartScheduled, 0);
-            }
+                _ = Task.Run(RestartOutputAsync);
         }
     }
 }
