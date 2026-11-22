@@ -7,6 +7,7 @@ namespace MaSatellite.Core.Audio;
 /// <summary>Decoder → playback engine → announcement mixer → output device.</summary>
 public sealed class PlayerPipeline : IDisposable
 {
+    private static readonly TimeSpan OutputChangeDebounce = TimeSpan.FromMilliseconds(250);
     private readonly IAudioOutput _output;
     private readonly PlaybackEngine _engine;
     private readonly AnnouncementMixer? _announcements;
@@ -18,6 +19,8 @@ public sealed class PlayerPipeline : IDisposable
     private volatile bool _announcementOutputReady;
     private AudioOutputFormat _outputFormat;
     private long _decodeErrors;
+    private long _outputFailureVersion;
+    private int _restartScheduled;
     private bool _disposed;
 
     public PlayerPipeline(IAudioOutput output, PlaybackEngine engine, ILogger? logger = null, AnnouncementMixer? announcements = null)
@@ -169,11 +172,8 @@ public sealed class PlayerPipeline : IDisposable
 
     private void StopOutputLocked()
     {
-        if (!_outputRunning)
-        {
-            return;
-        }
-
+        // Stop is deliberately idempotent: a previous stop can time out while the WASAPI
+        // render thread is still unwinding. Retry it before attempting to start a new client.
         _announcementOutputReady = false;
         _outputRunning = false;
         try
@@ -188,12 +188,32 @@ public sealed class PlayerPipeline : IDisposable
 
     private void OnOutputFailed(object? sender, Exception? error)
     {
-        _logger.LogWarning(error, "Audio output failed; restarting");
-        _ = Task.Run(async () =>
+        Interlocked.Increment(ref _outputFailureVersion);
+        _logger.LogWarning(error, "Audio output failed or the Windows output device changed");
+        if (Interlocked.CompareExchange(ref _restartScheduled, 1, 0) == 0)
         {
-            for (var attempt = 0; attempt < 10; attempt++)
+            _ = Task.Run(RestartOutputAsync);
+        }
+    }
+
+    private async Task RestartOutputAsync()
+    {
+        var attempt = 0;
+        var handledVersion = Volatile.Read(ref _outputFailureVersion);
+        try
+        {
+            while (attempt < 10)
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(500 * (attempt + 1))).ConfigureAwait(false);
+                // Windows can emit several endpoint notifications for one user action.
+                // Wait until the notifications settle, then perform one restart.
+                var version = Volatile.Read(ref _outputFailureVersion);
+                await Task.Delay(OutputChangeDebounce).ConfigureAwait(false);
+                if (version != Volatile.Read(ref _outputFailureVersion))
+                {
+                    continue;
+                }
+
+                var restartFailed = false;
                 lock (_gate)
                 {
                     if (_disposed || _decoder is null)
@@ -205,20 +225,51 @@ public sealed class PlayerPipeline : IDisposable
                     {
                         StopOutputLocked();
                         EnsureOutputLocked();
-                        if (_decoder is { } d)
+                        if (_decoder is { } decoder)
                         {
-                            _engine.Configure(d.Format, _outputFormat.SampleRate, _outputFormat.Channels);
+                            _engine.Configure(decoder.Format, _outputFormat.SampleRate, _outputFormat.Channels);
                         }
-
-                        return;
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Audio output restart attempt {Attempt} failed", attempt + 1);
+                        attempt++;
+                        restartFailed = true;
+                        _logger.LogWarning(ex, "Audio output restart attempt {Attempt} failed", attempt);
                         OutputError?.Invoke(ex);
                     }
                 }
+
+                if (restartFailed)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(500 * attempt)).ConfigureAwait(false);
+                    continue;
+                }
+
+                handledVersion = version;
+                // If another endpoint change arrived during restart, process the newest endpoint too.
+                if (version == Volatile.Read(ref _outputFailureVersion))
+                {
+                    return;
+                }
             }
-        });
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _restartScheduled, 0);
+
+            // Close the race where a notification arrived just as this worker was exiting.
+            bool hasActiveStream;
+            lock (_gate)
+            {
+                hasActiveStream = !_disposed && _decoder is not null;
+            }
+
+            if (hasActiveStream &&
+                Volatile.Read(ref _outputFailureVersion) != handledVersion &&
+                Interlocked.CompareExchange(ref _restartScheduled, 1, 0) == 0)
+            {
+                _ = Task.Run(RestartOutputAsync);
+            }
+        }
     }
 }
