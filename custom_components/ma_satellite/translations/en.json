@@ -1,0 +1,22 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect MA-Satellite",
+        "description": "Enter the Windows PC address, announcement port, and pairing token from MA-Satellite Settings.",
+        "data": {
+          "host": "PC hostname or IP address",
+          "port": "Announcement API port",
+          "token": "MA-Satellite pairing token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not reach MA-Satellite. Check the address, port, and Windows firewall.",
+      "invalid_auth": "The pairing token or device identity was not accepted."
+    },
+    "abort": {
+      "already_configured": "This MA-Satellite player is already configured."
+    }
+  }
+}

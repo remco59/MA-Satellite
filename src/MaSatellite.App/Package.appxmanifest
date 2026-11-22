@@ -57,6 +57,7 @@
     <desktop2:Extension Category="windows.firewallRules">
       <desktop2:FirewallRules Executable="MaSatellite.App.exe">
         <desktop2:Rule Direction="in" IPProtocol="TCP" LocalPortMin="8928" LocalPortMax="8928" Profile="private" />
+        <desktop2:Rule Direction="in" IPProtocol="TCP" LocalPortMin="8930" LocalPortMax="8930" Profile="private" />
       </desktop2:FirewallRules>
     </desktop2:Extension>
   </Extensions>

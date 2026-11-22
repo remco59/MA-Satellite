@@ -1,4 +1,5 @@
 using MaSatellite.App.Views;
+using MaSatellite.Core.Audio;
 using MaSatellite.Core.Discovery;
 using MaSatellite.Core.Session;
 using MaSatellite.Core.Time;
@@ -151,6 +152,8 @@ internal sealed class SatelliteShell : IDisposable
             var volume = new WindowsMasterVolume(settings.OutputDeviceId, loggers.CreateLogger<WindowsMasterVolume>());
             _volume = volume;
             var secrets = new DpapiSecretStore(_paths, loggers.CreateLogger<DpapiSecretStore>());
+            var announcementMixer = new AnnouncementMixer();
+            var announcementPlayer = new WindowsAnnouncementPlayer(announcementMixer, loggers.CreateLogger<WindowsAnnouncementPlayer>());
             var host = new SatelliteHost(
                 _settings!,
                 output,
@@ -164,7 +167,9 @@ internal sealed class SatelliteShell : IDisposable
                 new FileLastServerStore(_paths),
                 loggers,
                 version,
-                keyStore: new SecretKeyStore(secrets));
+                keyStore: new SecretKeyStore(secrets),
+                announcementMixer: announcementMixer,
+                announcementPlayer: announcementPlayer);
             _host = host;
             var library = new MaLibraryService(_settings!, secrets, loggers.CreateLogger<MaLibraryService>());
             _library = library;

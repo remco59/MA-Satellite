@@ -4,13 +4,14 @@
 
 Built with **.NET 8**, **WinUI 3**, and **WASAPI**. The **Aurora 3.0** interface brings a library, personalized home screen, Discover, an immersive Now Playing page and persistent playback controls to the desktop; a compact mini-player is also available from the system tray.
 
-> **Release status:** This README describes the code on `main`. The latest [published release](https://github.com/remco59/MA-Satellite/releases/latest) may be behind `main` while newer UI changes are being packaged. Check the release version and notes before expecting every feature below in a downloaded installer. Successful [CI builds](https://github.com/remco59/MA-Satellite/actions/workflows/ci.yml) also publish build artifacts.
+> **Release status:** This README describes the code in this branch. The latest [published release](https://github.com/remco59/MA-Satellite/releases/latest) may lag behind it. Check the release version and notes before expecting every feature below in a downloaded installer. Successful [CI builds](https://github.com/remco59/MA-Satellite/actions/workflows/ci.yml) also publish build artifacts.
 
 ## Features
 
 | Area | What it does |
 | --- | --- |
 | **Music Assistant player** | Exposes your Windows PC as a Sendspin playback target, with clock-synchronized PCM audio over WASAPI. |
+| **Native announcements** | Mixes Home Assistant announcements over the live Sendspin stream, ducks music during speech, then fades back to the original music level. Requires the Home Assistant companion integration and the Music Assistant server discovery patch in `docs/ANNOUNCEMENTS.md`. |
 | **Desktop library** | Browse albums, artists, tracks, and playlists; search Music Assistant and its providers; open albums and playlists. |
 | **Library views and sorting** | Switch between grid and list layouts for albums, artists, tracks, and playlists. Sort by name, date added, last played, or play count; albums also offer release year. Unsupported server-side sorts fall back to default order. |
 | **Personalized Home** | A personal greeting with a contextual subtitle, listening modes (Focus, Relax, Party, Discover) that play one of your own matching playlists, a featured playlist area, then shelves: Picked for you, Recently played, Continue listening, your most played playlists, albums and top artists, new albums and radio. Shelves without data are hidden, and shelves scroll with chevron buttons only. All recommendations use Music Assistant data, not fabricated content. |
@@ -97,8 +98,9 @@ The **Security & pairing** section shows a pairing token, paired servers, and an
 | TCP **8927** | Music Assistant Sendspin server endpoint in **Connect** mode | Outgoing to your MA server |
 | TCP **8095** | Music Assistant web/API connection for the library | Outgoing to your MA server; configurable |
 | TCP **8929** | Local now-playing API and Lively widget | **127.0.0.1 only**; configurable |
+| TCP **8930** | Home Assistant announcement endpoint | Private LAN only, bearer-token authenticated; disabled by default and configurable |
 
-Ports shown are defaults. You can change the player listening port and local API port under **Advanced · Network & diagnostics**. The local API intentionally rejects requests from untrusted origins/hosts.
+Ports shown are defaults. You can change the player listening port and local API ports under **Advanced · Network & diagnostics**. The desktop-widget API intentionally binds to loopback; the optional announcement API only accepts private-network clients and requires the MA-Satellite pairing token.
 
 ## Lively Wallpaper now-playing widget
 
@@ -122,6 +124,7 @@ See the [widget guide](widgets/lively/README.md) for configuration and the HTTP/
 | **Music Assistant lists the PC twice** | Encrypted Sendspin identifies the player by its key. Remove any obsolete legacy player entry in Music Assistant. |
 | **Audio is out of sync when grouped** | Adjust **Static delay**; Bluetooth devices can have substantial output latency. |
 | **Port 8928 is already in use** | Choose another listening port in **Advanced · Network & diagnostics**, then update the network/firewall configuration. |
+| **Announcements pause music or are not offered** | Install the `custom_components/ma_satellite` Home Assistant integration, enable the announcement endpoint in MA-Satellite, allow TCP 8930 on the Private firewall profile, and apply the Music Assistant server patch in [docs/ANNOUNCEMENTS.md](docs/ANNOUNCEMENTS.md). |
 
 ### Logs and settings
 
@@ -175,6 +178,7 @@ Uninstall **ma-satellite** from **Windows Settings → Apps**. The EXE uninstall
 
 ## Documentation
 
+- [Native announcement ducking and Home Assistant setup](docs/ANNOUNCEMENTS.md)
 - [Testing, manual checklists and troubleshooting](docs/TESTING.md)
 - [Implementation details and protocol decisions](docs/NOTES.md)
 - [Original milestones and architecture plan](docs/PLAN.md)

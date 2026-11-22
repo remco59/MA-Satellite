@@ -36,7 +36,7 @@ The plan assumes plain `client/hello` JSON over WebSocket. The Sendspin spec on 
 - **Local API.** `HttpListener` on `127.0.0.1` only, no admin rights needed; refuses foreign `Origin` and `Host` headers; `POST /api/command` needs `application/json` (forces a CORS preflight that foreign origins fail).
 - **Secrets.** The MA token and the Sendspin keys are encrypted with DPAPI (current user) in `secrets/` and never logged.
 - **Two ways to install.** The MSIX is the original packaging; `installer/MaSatellite.iss` (Inno Setup) wraps an *unpackaged*, self-contained build (`dotnet publish -p:Unpackaged=true`, see `scripts/Build-Installer.ps1`). The app detects package identity at runtime (`PackageIdentity.IsPackaged`): packaged uses the manifest's `StartupTask`, unpackaged writes `HKCU\...\Run` (and respects Task Manager's *Startup apps* switch via `StartupApproved\Run`). Everything else (tray, SMTC through `MediaPlayer`, DPAPI, `%LOCALAPPDATA%\MaSatellite`) behaves the same. CI installs the `.exe` silently, starts it, checks the log and Run entry, uninstalls and checks cleanup (`scripts/Test-Installer.ps1`).
-- **Firewall.** The MSIX declares an inbound rule for TCP 8928 on *private* networks only; the `.exe` installer adds the same rule (`netsh`, program-scoped) when installed for all users (admin), and removes it on uninstall; on public networks use *Connect* mode.
+- **Firewall.** The MSIX and optional all-users `.exe` firewall task declare program-scoped inbound rules for TCP 8928 (Sendspin) and 8930 (Home Assistant announcements) on *private* networks only. Port 8930 is only listened on when its setting is enabled; both rules are removed on uninstall. Do not expose either port on public networks.
 
 ## Known gaps / next steps
 

@@ -71,6 +71,8 @@ public sealed partial class SettingsWindow : Window
         MaPortBox.Value = s.MaWebPort;
         ApiSwitch.IsOn = s.LocalApiEnabled;
         ApiPortBox.Value = s.LocalApiPort;
+        AnnouncementApiSwitch.IsOn = s.AnnouncementApiEnabled;
+        AnnouncementApiPortBox.Value = s.AnnouncementApiPort;
         ProtocolBox.SelectedIndex = s.ProtocolMode switch
         {
             SendspinProtocolMode.Encrypted => 1,
@@ -141,6 +143,8 @@ public sealed partial class SettingsWindow : Window
             MaWebPort = ToInt(MaPortBox.Value, AppSettings.DefaultMaWebPort),
             LocalApiEnabled = ApiSwitch.IsOn,
             LocalApiPort = ToInt(ApiPortBox.Value, AppSettings.DefaultLocalApiPort),
+            AnnouncementApiEnabled = AnnouncementApiSwitch.IsOn,
+            AnnouncementApiPort = ToInt(AnnouncementApiPortBox.Value, AppSettings.DefaultAnnouncementApiPort),
             ProtocolMode = ProtocolBox.SelectedIndex switch
             {
                 1 => SendspinProtocolMode.Encrypted,

@@ -317,7 +317,7 @@ public sealed class SecureSendspinSession : ISendspinSession
 
         return new ClientHelloV2(
             MessageCodecV2.TruncateUtf8(_options.PlayerName, 64),
-            new DeviceInfo("ma-satellite", "ma-satellite", MessageCodecV2.TruncateUtf8(_options.SoftwareVersion, 64)),
+            new DeviceInfo("ma-satellite", "ma-satellite", MessageCodecV2.TruncateUtf8(_options.SoftwareVersion, 64), NetworkIdentity.GetPrimaryMacAddress()),
             roles,
             new PlayerSupport(_options.SupportedFormats, _options.BufferCapacityBytes, []),
             new Dictionary<string, PairMethodDescriptor> { ["pairing_psk"] = new(["device"]) },
