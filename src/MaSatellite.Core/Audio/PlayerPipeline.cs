@@ -31,6 +31,8 @@ public sealed class PlayerPipeline : IDisposable
     }
 
     public event Action<bool>? InSyncChanged;
+
+    /// <summary>Raised when the output could not be (re)started; the stream continues to be buffered meanwhile.</summary>
     public event Action<Exception>? OutputError;
 
     public int StaticDelayMs
@@ -40,18 +42,32 @@ public sealed class PlayerPipeline : IDisposable
     }
 
     public PlaybackStats Stats => _engine.Stats;
+
     public long DecodeErrors => Interlocked.Read(ref _decodeErrors);
 
     public bool StreamActive
     {
-        get { lock (_gate) { return _decoder is not null; } }
+        get
+        {
+            lock (_gate)
+            {
+                return _decoder is not null;
+            }
+        }
     }
 
     public AudioOutputFormat? OutputFormat
     {
-        get { lock (_gate) { return _outputRunning ? _outputFormat : null; } }
+        get
+        {
+            lock (_gate)
+            {
+                return _outputRunning ? _outputFormat : null;
+            }
+        }
     }
 
+    /// <summary>Starts (or reconfigures) playback for a new stream format. Throws <see cref="AudioDecodeException"/> for unsupported formats.</summary>
     public void StartStream(StreamPlayerFormat format)
     {
         var decoder = AudioDecoderFactory.Create(format);
@@ -68,8 +84,15 @@ public sealed class PlayerPipeline : IDisposable
     public void OnAudioChunk(long serverTimestampMicros, ReadOnlyMemory<byte> data)
     {
         IAudioDecoder? decoder;
-        lock (_gate) { decoder = _decoder; }
-        if (decoder is null || data.IsEmpty) return;
+        lock (_gate)
+        {
+            decoder = _decoder;
+        }
+
+        if (decoder is null || data.IsEmpty)
+        {
+            return;
+        }
 
         try
         {
@@ -80,7 +103,9 @@ public sealed class PlayerPipeline : IDisposable
         {
             var n = Interlocked.Increment(ref _decodeErrors);
             if (n <= 5 || n % 100 == 0)
+            {
                 _logger.LogWarning(ex, "Dropped an undecodable audio chunk ({Count} so far)", n);
+            }
         }
     }
 
@@ -94,6 +119,7 @@ public sealed class PlayerPipeline : IDisposable
             _format = null;
             StopOutputLocked();
         }
+
         _engine.Clear();
     }
 
@@ -101,18 +127,27 @@ public sealed class PlayerPipeline : IDisposable
     {
         lock (_gate)
         {
-            if (_disposed) return;
+            if (_disposed)
+            {
+                return;
+            }
+
             _disposed = true;
             _decoder = null;
             StopOutputLocked();
         }
+
         _output.Failed -= OnOutputFailed;
         _output.Dispose();
     }
 
     private void EnsureOutputLocked()
     {
-        if (_outputRunning) return;
+        if (_outputRunning)
+        {
+            return;
+        }
+
         _outputFormat = _output.Start(_engine.Fill);
         _outputRunning = true;
         _logger.LogInformation("Audio output started: {Rate} Hz, {Channels} ch", _outputFormat.SampleRate, _outputFormat.Channels);
@@ -138,7 +173,9 @@ public sealed class PlayerPipeline : IDisposable
         Interlocked.Increment(ref _outputFailureVersion);
         _logger.LogWarning(error, "Audio output failed or the Windows output device changed");
         if (Interlocked.CompareExchange(ref _restartScheduled, 1, 0) == 0)
+        {
             _ = Task.Run(RestartOutputAsync);
+        }
     }
 
     private async Task RestartOutputAsync()
@@ -154,41 +191,67 @@ public sealed class PlayerPipeline : IDisposable
                 var version = Volatile.Read(ref _outputFailureVersion);
                 await Task.Delay(OutputChangeDebounce).ConfigureAwait(false);
                 if (version != Volatile.Read(ref _outputFailureVersion))
+                {
                     continue;
+                }
 
+                var restartFailed = false;
                 lock (_gate)
                 {
-                    if (_disposed || _decoder is null) return;
+                    if (_disposed || _decoder is null)
+                    {
+                        return;
+                    }
+
                     try
                     {
                         StopOutputLocked();
                         EnsureOutputLocked();
                         if (_decoder is { } decoder)
+                        {
                             _engine.Configure(decoder.Format, _outputFormat.SampleRate, _outputFormat.Channels);
+                        }
                     }
                     catch (Exception ex)
                     {
                         attempt++;
+                        restartFailed = true;
                         _logger.LogWarning(ex, "Audio output restart attempt {Attempt} failed", attempt);
                         OutputError?.Invoke(ex);
-                        continue;
                     }
+                }
+
+                if (restartFailed)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(500 * attempt)).ConfigureAwait(false);
+                    continue;
                 }
 
                 handledVersion = version;
                 // If another endpoint change arrived during restart, process the newest endpoint too.
                 if (version == Volatile.Read(ref _outputFailureVersion))
+                {
                     return;
+                }
             }
         }
         finally
         {
             Interlocked.Exchange(ref _restartScheduled, 0);
+
             // Close the race where a notification arrived just as this worker was exiting.
-            if (!_disposed && _decoder is not null &&
+            bool hasActiveStream;
+            lock (_gate)
+            {
+                hasActiveStream = !_disposed && _decoder is not null;
+            }
+
+            if (hasActiveStream &&
                 Volatile.Read(ref _outputFailureVersion) != handledVersion &&
                 Interlocked.CompareExchange(ref _restartScheduled, 1, 0) == 0)
+            {
                 _ = Task.Run(RestartOutputAsync);
+            }
         }
     }
 }
