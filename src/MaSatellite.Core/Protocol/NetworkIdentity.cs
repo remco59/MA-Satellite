@@ -27,7 +27,7 @@ public static class NetworkIdentity
 
             return candidate is null
                 ? string.Empty
-                : string.Join(":", candidate.Address.Select(b => b.ToString("X2")));
+                : string.Join(":", candidate.Address.Select(b => b.ToString("x2")));
         }
         catch (NetworkInformationException)
         {
