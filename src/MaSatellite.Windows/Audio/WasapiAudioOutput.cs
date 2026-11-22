@@ -48,10 +48,15 @@ public sealed class WasapiAudioOutput : IAudioOutput, IMMNotificationClient
                 return;
             }
 
-            _deviceId = value;
             bool running;
             lock (_gate)
             {
+                if (_deviceId == value)
+                {
+                    return;
+                }
+
+                _deviceId = value;
                 running = _thread is not null;
             }
 
@@ -92,10 +97,15 @@ public sealed class WasapiAudioOutput : IAudioOutput, IMMNotificationClient
             ready.Wait(TimeSpan.FromSeconds(5));
             if (startError is not null)
             {
-                _thread.Join(1000);
-                _thread = null;
-                stop.Dispose();
-                _stop = null;
+                // The render thread owns the WASAPI objects and must finish disposing them
+                // before another client can be created for this endpoint.
+                if (_thread.Join(5000))
+                {
+                    _thread = null;
+                    stop.Dispose();
+                    _stop = null;
+                }
+
                 throw new InvalidOperationException("Could not start audio output: " + startError.Message, startError);
             }
 
@@ -118,8 +128,6 @@ public sealed class WasapiAudioOutput : IAudioOutput, IMMNotificationClient
         {
             thread = _thread;
             stop = _stop;
-            _thread = null;
-            _stop = null;
         }
 
         if (thread is null)
@@ -128,7 +136,22 @@ public sealed class WasapiAudioOutput : IAudioOutput, IMMNotificationClient
         }
 
         stop?.Set();
-        thread.Join(2000);
+        if (!thread.Join(TimeSpan.FromSeconds(5)))
+        {
+            // Keep the thread and stop handle registered. A subsequent recovery attempt
+            // can signal/wait again, and Start() cannot race a still-live WASAPI client.
+            throw new TimeoutException("The WASAPI render thread did not stop within five seconds.");
+        }
+
+        lock (_gate)
+        {
+            if (ReferenceEquals(_thread, thread))
+            {
+                _thread = null;
+                _stop = null;
+            }
+        }
+
         stop?.Dispose();
     }
 
@@ -233,7 +256,14 @@ public sealed class WasapiAudioOutput : IAudioOutput, IMMNotificationClient
 
     void IMMNotificationClient.OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
     {
-        if (flow == DataFlow.Render && role == Role.Multimedia && _deviceId is null && _thread is not null)
+        bool shouldRestart;
+        lock (_gate)
+        {
+            shouldRestart = flow == DataFlow.Render && role == Role.Multimedia &&
+                _deviceId is null && _thread is not null;
+        }
+
+        if (shouldRestart)
         {
             Failed?.Invoke(this, null);
         }
@@ -241,7 +271,14 @@ public sealed class WasapiAudioOutput : IAudioOutput, IMMNotificationClient
 
     void IMMNotificationClient.OnDeviceStateChanged(string deviceId, DeviceState newState)
     {
-        if (deviceId == _deviceId && newState != DeviceState.Active && _thread is not null)
+        bool shouldRestart;
+        lock (_gate)
+        {
+            shouldRestart = deviceId == _deviceId &&
+                newState != DeviceState.Active && _thread is not null;
+        }
+
+        if (shouldRestart)
         {
             Failed?.Invoke(this, null);
         }
@@ -253,7 +290,13 @@ public sealed class WasapiAudioOutput : IAudioOutput, IMMNotificationClient
 
     void IMMNotificationClient.OnDeviceRemoved(string deviceId)
     {
-        if (deviceId == _deviceId && _thread is not null)
+        bool shouldRestart;
+        lock (_gate)
+        {
+            shouldRestart = deviceId == _deviceId && _thread is not null;
+        }
+
+        if (shouldRestart)
         {
             Failed?.Invoke(this, null);
         }
