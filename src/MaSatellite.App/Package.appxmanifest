@@ -8,7 +8,7 @@
   IgnorableNamespaces="uap uap5 desktop2 rescap">
 
   <!-- Publisher must match the subject of the signing certificate (see scripts/New-DevCertificate.ps1). -->
-  <Identity Name="MaSatellite" Publisher="CN=MaSatellite Dev" Version="1.0.0.0" />
+  <Identity Name="MaSatellite" Publisher="CN=MaSatellite Dev" Version="1.1.0.0" />
 
   <Properties>
     <DisplayName>ma-satellite</DisplayName>
@@ -57,7 +57,6 @@
     <desktop2:Extension Category="windows.firewallRules">
       <desktop2:FirewallRules Executable="MaSatellite.App.exe">
         <desktop2:Rule Direction="in" IPProtocol="TCP" LocalPortMin="8928" LocalPortMax="8928" Profile="private" />
-        <desktop2:Rule Direction="in" IPProtocol="TCP" LocalPortMin="8930" LocalPortMax="8930" Profile="private" />
       </desktop2:FirewallRules>
     </desktop2:Extension>
   </Extensions>
