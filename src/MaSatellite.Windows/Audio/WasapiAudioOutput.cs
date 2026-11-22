@@ -43,11 +43,6 @@ public sealed class WasapiAudioOutput : IAudioOutput, IMMNotificationClient
         get => _deviceId;
         set
         {
-            if (_deviceId == value)
-            {
-                return;
-            }
-
             bool running;
             lock (_gate)
             {
