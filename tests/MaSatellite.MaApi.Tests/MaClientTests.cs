@@ -485,7 +485,8 @@ public class MaClientTests
         await client.RemovePlaylistTracksAsync(playlist, [1, 4], ["library://track/1", "library://track/4"]);
 
         var create = server.Received.Single(r => r.Command == "music/playlists/create_playlist").Args;
-        Assert.Equal("library", create.GetProperty("provider_instance_or_domain").GetString());
+        Assert.Equal("New list", create.GetProperty("name").GetString());
+        Assert.False(create.TryGetProperty("provider_instance_or_domain", out _));
         var remove = server.Received.Single(r => r.Command == "music/playlists/remove_playlist_tracks").Args;
         Assert.Equal([1, 4], remove.GetProperty("positions_to_remove").EnumerateArray().Select(x => x.GetInt32()).ToArray());
         Assert.Equal(["library://track/1", "library://track/4"], remove.GetProperty("uris").EnumerateArray().Select(x => x.GetString()!).ToArray());
