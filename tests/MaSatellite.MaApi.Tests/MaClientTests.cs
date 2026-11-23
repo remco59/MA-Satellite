@@ -394,7 +394,7 @@ public class MaClientTests
         Assert.False(results.PodcastEpisodes![0].FullyPlayed);
         Assert.Equal(55000, Assert.Single(results.Audiobooks!).ResumePositionMs);
         var args = server.Received.Single(r => r.Command == "music/search").Args;
-        Assert.Equal(["podcast_provider", "books"], args.GetProperty("providers").EnumerateArray().Select(x => x.GetString()).ToArray());
+        Assert.Equal(["podcast_provider", "books"], args.GetProperty("providers").EnumerateArray().Select(x => x.GetString()!).ToArray());
     }
 
     [Fact]
@@ -442,7 +442,7 @@ public class MaClientTests
         Assert.Equal(1732.5, expiry);
         var group = server.Received.Single(r => r.Command == "players/cmd/set_members").Args;
         Assert.Equal("living_room", group.GetProperty("target_player").GetString());
-        Assert.Equal(["desk", "kitchen"], group.GetProperty("player_ids_to_add").EnumerateArray().Select(x => x.GetString()).ToArray());
+        Assert.Equal(["desk", "kitchen"], group.GetProperty("player_ids_to_add").EnumerateArray().Select(x => x.GetString()!).ToArray());
         var autoplay = server.Received.Single(r => r.Command == "player_queues/autoplay").Args;
         Assert.True(autoplay.GetProperty("autoplay_enabled").GetBoolean());
         var queueConfig = server.Received.Single(r => r.Command == "config/player_queues/save").Args.GetProperty("values");
@@ -488,7 +488,7 @@ public class MaClientTests
         Assert.Equal("library", create.GetProperty("provider_instance_or_domain").GetString());
         var remove = server.Received.Single(r => r.Command == "music/playlists/remove_playlist_tracks").Args;
         Assert.Equal([1, 4], remove.GetProperty("positions_to_remove").EnumerateArray().Select(x => x.GetInt32()).ToArray());
-        Assert.Equal(["library://track/1", "library://track/4"], remove.GetProperty("uris").EnumerateArray().Select(x => x.GetString()).ToArray());
+        Assert.Equal(["library://track/1", "library://track/4"], remove.GetProperty("uris").EnumerateArray().Select(x => x.GetString()!).ToArray());
     }
 
     [Fact]
