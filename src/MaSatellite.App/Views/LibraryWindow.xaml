@@ -393,6 +393,7 @@
           <ToggleButton x:Name="ChipPlaylists" Tag="Playlist" Content="Playlists" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
           <ToggleButton x:Name="ChipRadio" Tag="Radio" Content="Radio" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
           <ToggleButton x:Name="ChipPodcasts" Tag="Podcast" Content="Podcasts" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
+          <ToggleButton x:Name="ChipPodcastEpisodes" Tag="PodcastEpisode" Content="Podcast episodes" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
           <ToggleButton x:Name="ChipAudiobooks" Tag="Audiobook" Content="Audiobooks" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
           <ToggleButton x:Name="ChipGenres" Tag="Genre" Content="Genres" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
           <Button x:Name="ProviderFilterButton" Click="OnProviderFilterClick" Style="{StaticResource AuroraButtonStyle}"

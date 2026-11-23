@@ -424,7 +424,7 @@ public sealed partial class LibraryWindow : Window
         }
     }
 
-    private IEnumerable<ToggleButton> SearchChipButtons => [ChipAll, ChipTracks, ChipArtists, ChipAlbums, ChipPlaylists, ChipRadio, ChipPodcasts, ChipAudiobooks, ChipGenres];
+    private IEnumerable<ToggleButton> SearchChipButtons => [ChipAll, ChipTracks, ChipArtists, ChipAlbums, ChipPlaylists, ChipRadio, ChipPodcasts, ChipPodcastEpisodes, ChipAudiobooks, ChipGenres];
 
     private async void OnBack(object sender, RoutedEventArgs e) => await GoBackAsync();
 
@@ -1097,6 +1097,7 @@ public sealed partial class LibraryWindow : Window
                 rows = results.InDisplayOrder.Select(i => ListRow.From(i, showType: true)).ToList();
                 ChipRadio.Content = $"Radio ({results.Radios.Count})";
                 ChipPodcasts.Content = $"Podcasts ({results.Podcasts?.Count ?? 0})";
+                ChipPodcastEpisodes.Content = $"Podcast episodes ({results.PodcastEpisodes?.Count ?? 0})";
                 ChipAudiobooks.Content = $"Audiobooks ({results.Audiobooks?.Count ?? 0})";
                 ChipGenres.Content = $"Genres ({results.Genres?.Count ?? 0})";
                 ChipAlbums.Content = $"Albums ({results.Albums.Count})";
