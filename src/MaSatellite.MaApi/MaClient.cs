@@ -300,16 +300,16 @@ public sealed class MaClient : IAsyncDisposable
             ["values"] = values,
         }, cancellationToken: ct);
 
-    public Task<long?> SetSleepTimerAsync(string playerId, int? seconds, string? mode = null, CancellationToken ct = default) =>
+    public Task<double?> SetSleepTimerAsync(string playerId, int? seconds, string? mode = null, CancellationToken ct = default) =>
         SetSleepTimerCoreAsync(playerId, seconds, mode, ct);
 
-    private async Task<long?> SetSleepTimerCoreAsync(string playerId, int? seconds, string? mode, CancellationToken ct)
+    private async Task<double?> SetSleepTimerCoreAsync(string playerId, int? seconds, string? mode, CancellationToken ct)
     {
         var args = new Dictionary<string, object?> { ["player_id"] = playerId };
         if (seconds.HasValue) args["seconds"] = Math.Clamp(seconds.Value, 1, 86400);
         if (!string.IsNullOrWhiteSpace(mode)) args["mode"] = mode;
         var result = await _connection.SendCommandAsync("players/sleep_timer/set", args, cancellationToken: ct).ConfigureAwait(false);
-        return result.ValueKind == JsonValueKind.Number ? (long?)result.GetInt64() : null;
+        return result.ValueKind == JsonValueKind.Number ? (double?)result.GetDouble() : null;
     }
 
     public Task ClearSleepTimerAsync(string playerId, CancellationToken ct = default) =>
