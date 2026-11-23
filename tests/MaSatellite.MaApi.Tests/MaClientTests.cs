@@ -482,12 +482,13 @@ public class MaClientTests
         Assert.Equal("New list", (await client.CreatePlaylistAsync("New list"))!.Name);
         Assert.Equal("Imported", (await client.ImportPlaylistAsync("#EXTM3U\n"))!.Name);
         Assert.Equal("#EXTM3U\n", await client.ExportPlaylistAsync(playlist));
-        await client.RemovePlaylistTracksAsync(playlist, [1, 4]);
+        await client.RemovePlaylistTracksAsync(playlist, [1, 4], ["library://track/1", "library://track/4"]);
 
         var create = server.Received.Single(r => r.Command == "music/playlists/create_playlist").Args;
         Assert.Equal("library", create.GetProperty("provider_instance_or_domain").GetString());
         var remove = server.Received.Single(r => r.Command == "music/playlists/remove_playlist_tracks").Args;
         Assert.Equal([1, 4], remove.GetProperty("positions_to_remove").EnumerateArray().Select(x => x.GetInt32()).ToArray());
+        Assert.Equal(["library://track/1", "library://track/4"], remove.GetProperty("uris").EnumerateArray().Select(x => x.GetString()).ToArray());
     }
 
     [Fact]
