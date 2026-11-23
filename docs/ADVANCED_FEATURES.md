@@ -35,7 +35,7 @@ In-progress and resume metadata come from the server. Resume behaviour and avail
 
 ## Provider-aware search
 
-Search includes tracks, artists, albums, playlists, radio, podcasts, podcast episodes, audiobooks and genres. Select **Providers** in the search filter row and enter comma-separated Music Assistant provider instance IDs. Leave the provider field empty to search every provider included by Music Assistant.
+Search includes tracks, artists, albums, playlists, radio, podcasts, podcast episodes, audiobooks and genres. Separate filter chips are available for podcast shows and podcast episodes. Select **Providers** in the search filter row and enter comma-separated Music Assistant provider instance IDs. Leave the provider field empty to search every provider included by Music Assistant.
 
 ## Playlist management
 
