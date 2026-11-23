@@ -26,6 +26,8 @@ public sealed class AdvancedFeaturesWindow : Window
     private readonly CheckBox _autoplay = new() { Content = "Autoplay" };
     private readonly CheckBox _smartShuffle = new() { Content = "Smart Shuffle" };
     private readonly CheckBox _crossfade = new() { Content = "Crossfade" };
+    private readonly ComboBox _autoplayMode = new() { Width = 220, PlaceholderText = "Autoplay mode" };
+    private readonly ComboBox _autoplayPlaylist = new() { Width = 250, PlaceholderText = "Autoplay playlist" };
     private readonly ComboBox _crossfadeMode = new() { Width = 220, PlaceholderText = "Crossfade mode" };
 
     private readonly TextBox _sleepMinutes = new() { Width = 100, Text = "30", PlaceholderText = "Minutes" };
@@ -67,7 +69,7 @@ public sealed class AdvancedFeaturesWindow : Window
 
     private UIElement BuildContent()
     {
-        var root = new StackPanel { Padding = new Thickness(24), Spacing = 10 };
+        var root = new StackPanel { Margin = new Thickness(24), Spacing = 10 };
         root.Children.Add(new TextBlock
         {
             Text = "Music Assistant features",
@@ -109,6 +111,17 @@ public sealed class AdvancedFeaturesWindow : Window
         checks.Children.Add(_smartShuffle);
         checks.Children.Add(_crossfade);
         playback.Children.Add(checks);
+        var autoplayRow = Horizontal();
+        _autoplayMode.Items.Add(new ComboBoxItem { Content = "Automatic", Tag = "auto" });
+        _autoplayMode.Items.Add(new ComboBoxItem { Content = "Similar tracks", Tag = "similar" });
+        _autoplayMode.Items.Add(new ComboBoxItem { Content = "Similar artists", Tag = "similar_artists" });
+        _autoplayMode.Items.Add(new ComboBoxItem { Content = "Library mix", Tag = "library" });
+        _autoplayMode.Items.Add(new ComboBoxItem { Content = "Selected playlist", Tag = "playlist" });
+        _autoplayMode.SelectedIndex = 0;
+        autoplayRow.Children.Add(new TextBlock { Text = "Continue with", VerticalAlignment = VerticalAlignment.Center });
+        autoplayRow.Children.Add(_autoplayMode);
+        autoplayRow.Children.Add(_autoplayPlaylist);
+        playback.Children.Add(autoplayRow);
         var crossfadeRow = Horizontal();
         _crossfadeMode.Items.Add(new ComboBoxItem { Content = "Smart Crossfade", Tag = "smart_crossfade" });
         _crossfadeMode.Items.Add(new ComboBoxItem { Content = "Standard Crossfade", Tag = "standard_crossfade" });
@@ -305,7 +318,8 @@ public sealed class AdvancedFeaturesWindow : Window
         try
         {
             if (_queuePlayer.SelectedItem is not MaPlayer player) throw new MaException("Choose a player first.");
-            var queues = await (await _library.GetClientAsync()).GetQueuesAsync();
+            var client = await _library.GetClientAsync();
+            var queues = await client.GetQueuesAsync();
             var queue = queues.FirstOrDefault(q => q.QueueId == player.PlayerId);
             if (queue is null)
             {
@@ -320,7 +334,8 @@ public sealed class AdvancedFeaturesWindow : Window
             _autoplay.IsChecked = queue.Autoplay;
             _smartShuffle.IsChecked = queue.SmartShuffleActive;
             _crossfade.IsChecked = queue.CrossfadeEnabled;
-            _status.Text = $"Queue: {queue.ItemCount} item(s), shuffle {(queue.Shuffle ? "on" : "off")}, repeat {queue.Repeat}. Smart Shuffle is only effective while Shuffle is on.";
+            _crossfadeMode.SelectedIndex = queue.SmartFadesActive ? 0 : 1;
+            _status.Text = $"Queue: {queue.ItemCount} item(s), shuffle {(queue.Shuffle ? "on" : "off")}, repeat {queue.Repeat}. Smart Shuffle is configured separately and only active while Shuffle is on.";
         }
         catch (Exception ex) { SetStatus(ex); }
     }
@@ -331,11 +346,19 @@ public sealed class AdvancedFeaturesWindow : Window
         {
             if (_queuePlayer.SelectedItem is not MaPlayer player) throw new MaException("Choose a player first.");
             var client = await _library.GetClientAsync();
+            var autoplayMode = (_autoplayMode.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "auto";
             var values = new Dictionary<string, object?>
             {
-                ["smart_shuffle_enabled"] = _smartShuffle.IsChecked == true,
-                ["crossfade_mode"] = (_crossfadeMode.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "smart_crossfade"
+                ["smart_shuffle_enabled"] = _smartShuffle.IsChecked == true ? "enabled" : "disabled",
+                ["crossfade_mode"] = (_crossfadeMode.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "smart_crossfade",
+                ["autoplay_mode"] = autoplayMode
             };
+            if (autoplayMode == "playlist")
+            {
+                if (_autoplayPlaylist.SelectedItem is not MaItem selectedPlaylist)
+                    throw new MaException("Choose the playlist to use for Autoplay.");
+                values["autoplay_playlist"] = selectedPlaylist.Uri;
+            }
             await client.SaveQueueSettingsAsync(player.PlayerId, values);
             await client.SetQueueAutoplayAsync(player.PlayerId, _autoplay.IsChecked == true);
             await client.SetQueueCrossfadeAsync(player.PlayerId, _crossfade.IsChecked == true);
@@ -462,6 +485,7 @@ public sealed class AdvancedFeaturesWindow : Window
         {
             var client = await _library.GetClientAsync();
             var playlists = await client.GetLibraryAsync(MaMediaType.Playlist, limit: 250, sortField: "name");
+            _autoplayPlaylist.ItemsSource = playlists;
             _playlistPicker.ItemsSource = playlists;
             if (_playlistPicker.SelectedIndex < 0 && playlists.Count > 0) _playlistPicker.SelectedIndex = 0;
             _status.Text = $"Loaded {playlists.Count} playlist(s).";
@@ -511,10 +535,21 @@ public sealed class AdvancedFeaturesWindow : Window
         try
         {
             if (_playlistPicker.SelectedItem is not MaItem playlist) throw new MaException("Choose a playlist first.");
-            var selected = _playlistTracks.SelectedItems.Cast<MaItem>().ToHashSet();
+            var selected = _playlistTracks.SelectedItems.Cast<MaItem>().ToList();
             if (selected.Count == 0) throw new MaException("Select one or more playlist tracks to remove.");
-            var positions = Enumerable.Range(0, _currentPlaylistTracks.Count)
-                .Where(i => selected.Contains(_currentPlaylistTracks[i])).ToList();
+            var remaining = new List<MaItem>(_currentPlaylistTracks);
+            var positions = new List<int>();
+            foreach (var item in selected)
+            {
+                var index = remaining.FindIndex(candidate => ReferenceEquals(candidate, item));
+                if (index < 0) index = remaining.FindIndex(candidate => candidate == item);
+                if (index >= 0)
+                {
+                    positions.Add(index);
+                    remaining.RemoveAt(index);
+                }
+            }
+            if (positions.Count == 0) throw new MaException("The selected tracks could not be matched to playlist positions.");
             await (await _library.GetClientAsync()).RemovePlaylistTracksAsync(playlist, positions);
             await LoadPlaylistTracksAsync();
             _status.Text = $"Removed {positions.Count} track(s) from {playlist.Name}.";
