@@ -328,10 +328,10 @@ public sealed class MaClient : IAsyncDisposable
     public async Task<MaItem?> CreatePlaylistAsync(string name, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("A playlist name is required.", nameof(name));
+        // Omitting the provider selects Music Assistant's built-in playlist provider.
         var result = await _connection.SendCommandAsync("music/playlists/create_playlist", new Dictionary<string, object?>
         {
             ["name"] = name.Trim(),
-            ["provider_instance_or_domain"] = "library",
         }, cancellationToken: ct).ConfigureAwait(false);
         return result.ValueKind == JsonValueKind.Object ? MaItemParser.ParseItem(result, _baseUrl) : null;
     }
