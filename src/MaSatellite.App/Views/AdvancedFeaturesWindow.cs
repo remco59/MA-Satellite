@@ -35,6 +35,7 @@ public sealed class AdvancedFeaturesWindow : Window
     private readonly ComboBox _mediaKind = new() { Width = 220 };
     private readonly ListView _mediaItems = new() { Height = 190, DisplayMemberPath = nameof(MaItem.Name) };
     private readonly TextBlock _mediaDetails = new() { TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap, Opacity = 0.8 };
+    private readonly ComboBox _playbackSpeed = new() { Width = 150, PlaceholderText = "Playback speed" };
 
     private readonly TextBox _searchQuery = new() { Width = 260, PlaceholderText = "Search tracks, podcasts, audiobooks…" };
     private readonly TextBox _searchProviders = new() { Width = 230, PlaceholderText = "Provider IDs (comma separated)" };
@@ -64,6 +65,11 @@ public sealed class AdvancedFeaturesWindow : Window
         _library = library;
         Title = "MA-Satellite · Music Assistant features";
         Content = BuildContent();
+        _groupLeader.SelectionChanged += (_, _) =>
+        {
+            if (_groupLeader.SelectedItem is MaPlayer leader)
+                _groupMembers.ItemsSource = _players.Where(p => p.PlayerId != leader.PlayerId).ToList();
+        };
         Activated += OnActivated;
     }
 
@@ -154,6 +160,21 @@ public sealed class AdvancedFeaturesWindow : Window
         mediaRow.Children.Add(Button("Play selected", async () => await PlaySelectedMediaAsync()));
         library.Children.Add(mediaRow);
         library.Children.Add(_mediaItems);
+        var speedRow = Horizontal();
+        _playbackSpeed.Items.Add(new ComboBoxItem { Content = "0.5×", Tag = 0.5d });
+        _playbackSpeed.Items.Add(new ComboBoxItem { Content = "0.75×", Tag = 0.75d });
+        _playbackSpeed.Items.Add(new ComboBoxItem { Content = "1.0×", Tag = 1.0d });
+        _playbackSpeed.Items.Add(new ComboBoxItem { Content = "1.25×", Tag = 1.25d });
+        _playbackSpeed.Items.Add(new ComboBoxItem { Content = "1.5×", Tag = 1.5d });
+        _playbackSpeed.Items.Add(new ComboBoxItem { Content = "1.75×", Tag = 1.75d });
+        _playbackSpeed.Items.Add(new ComboBoxItem { Content = "2.0×", Tag = 2.0d });
+        _playbackSpeed.Items.Add(new ComboBoxItem { Content = "2.5×", Tag = 2.5d });
+        _playbackSpeed.Items.Add(new ComboBoxItem { Content = "3.0×", Tag = 3.0d });
+        _playbackSpeed.SelectedIndex = 2;
+        speedRow.Children.Add(new TextBlock { Text = "Audiobook / podcast speed", VerticalAlignment = VerticalAlignment.Center });
+        speedRow.Children.Add(_playbackSpeed);
+        speedRow.Children.Add(Button("Apply to playing item", async () => await SetPlaybackSpeedAsync()));
+        library.Children.Add(speedRow);
         library.Children.Add(_mediaDetails);
         root.Children.Add(library);
 
@@ -364,6 +385,20 @@ public sealed class AdvancedFeaturesWindow : Window
             await client.SetQueueCrossfadeAsync(player.PlayerId, _crossfade.IsChecked == true);
             await LoadQueueSettingsAsync();
             _status.Text = $"Queue settings saved for {player.Name}.";
+        }
+        catch (Exception ex) { SetStatus(ex); }
+    }
+
+    private async Task SetPlaybackSpeedAsync()
+    {
+        try
+        {
+            if (_queuePlayer.SelectedItem is not MaPlayer player)
+                throw new MaException("Choose a player in Intelligent playback first.");
+            if (_playbackSpeed.SelectedItem is not ComboBoxItem { Tag: double speed })
+                throw new MaException("Choose a playback speed.");
+            await (await _library.GetClientAsync()).SetPlaybackSpeedAsync(player.PlayerId, speed);
+            _status.Text = $"Requested {speed:0.##}× playback on {player.Name}. Music Assistant only supports variable speed for audiobooks and podcast episodes.";
         }
         catch (Exception ex) { SetStatus(ex); }
     }
