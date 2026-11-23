@@ -225,6 +225,35 @@
                 <FontIcon Glyph="&#xE93E;" FontSize="16"/><TextBlock Grid.Column="1" Tag="label" Text="Radio" VerticalAlignment="Center"/>
               </Grid>
             </Button>
+            <TextBlock Tag="label" Text="SPOKEN WORD" Margin="14,20,0,6" Style="{StaticResource AuroraSectionLabelStyle}"/>
+            <Button x:Name="NavAudiobooks" Tag="audiobook" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                    ToolTipService.ToolTip="Audiobooks" AutomationProperties.Name="Audiobooks">
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE8D4;" FontSize="16"/><TextBlock Grid.Column="1" Tag="label" Text="Audiobooks" VerticalAlignment="Center"/>
+              </Grid>
+            </Button>
+            <Button x:Name="NavPodcasts" Tag="podcast" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                    ToolTipService.ToolTip="Podcasts" AutomationProperties.Name="Podcasts">
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE91C;" FontSize="16"/><TextBlock Grid.Column="1" Tag="label" Text="Podcasts" VerticalAlignment="Center"/>
+              </Grid>
+            </Button>
+            <Button x:Name="NavInProgress" Tag="in_progress" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                    ToolTipService.ToolTip="Continue listening" AutomationProperties.Name="Continue listening">
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE768;" FontSize="16"/><TextBlock Grid.Column="1" Tag="label" Text="Continue listening" VerticalAlignment="Center"/>
+              </Grid>
+            </Button>
+            <Button x:Name="NavGenres" Tag="genre" Click="OnNavigate" Style="{StaticResource AuroraNavButtonStyle}"
+                    ToolTipService.ToolTip="Genres" AutomationProperties.Name="Genres">
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <FontIcon Glyph="&#xE8D6;" FontSize="16"/><TextBlock Grid.Column="1" Tag="label" Text="Genres" VerticalAlignment="Center"/>
+              </Grid>
+            </Button>
           </StackPanel>
         </ScrollViewer>
 
@@ -237,13 +266,6 @@
                          Foreground="{StaticResource AuroraMuted}" FontSize="12" TextTrimming="CharacterEllipsis"/>
             </StackPanel>
           </Border>
-          <Button Click="OnOpenAdvancedFeatures" Style="{StaticResource AuroraNavButtonStyle}"
-                  ToolTipService.ToolTip="More Music Assistant features" AutomationProperties.Name="Open advanced features">
-            <Grid ColumnSpacing="14">
-              <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-              <FontIcon Glyph="&#xE9CE;" FontSize="16"/><TextBlock Grid.Column="1" Tag="label" Text="More features" VerticalAlignment="Center"/>
-            </Grid>
-          </Button>
           <Button Click="OnOpenSettings" Style="{StaticResource AuroraNavButtonStyle}"
                   ToolTipService.ToolTip="Settings" AutomationProperties.Name="Open settings">
             <Grid ColumnSpacing="14">
@@ -353,7 +375,16 @@
             </Button>
           </StackPanel>
         </Grid>
-        <!-- Search: result-type filter. -->
+        <StackPanel x:Name="PlaylistActions" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
+          <Button Click="OnCreatePlaylist" Style="{StaticResource AuroraPrimaryButtonStyle}" CornerRadius="20" MinHeight="38">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <FontIcon Glyph="&#xE710;" FontSize="13"/><TextBlock Text="New playlist" VerticalAlignment="Center"/>
+            </StackPanel>
+          </Button>
+          <Button Click="OnImportPlaylist" Style="{StaticResource AuroraButtonStyle}" Background="{StaticResource AuroraGlass}"
+                  CornerRadius="{StaticResource AuroraRadiusL}" MinHeight="38" Content="Import M3U / M3U8"/>
+        </StackPanel>
+        <!-- Search: result-type filter and provider scope. -->
         <StackPanel x:Name="SearchChips" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
           <ToggleButton x:Name="ChipAll" Tag="all" Content="All" IsChecked="True" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
           <ToggleButton x:Name="ChipTracks" Tag="Track" Content="Tracks" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
@@ -361,6 +392,12 @@
           <ToggleButton x:Name="ChipAlbums" Tag="Album" Content="Albums" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
           <ToggleButton x:Name="ChipPlaylists" Tag="Playlist" Content="Playlists" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
           <ToggleButton x:Name="ChipRadio" Tag="Radio" Content="Radio" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
+          <ToggleButton x:Name="ChipPodcasts" Tag="Podcast" Content="Podcasts" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
+          <ToggleButton x:Name="ChipAudiobooks" Tag="Audiobook" Content="Audiobooks" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
+          <ToggleButton x:Name="ChipGenres" Tag="Genre" Content="Genres" Click="OnChipClick" Style="{StaticResource AuroraChipStyle}"/>
+          <Button x:Name="ProviderFilterButton" Click="OnProviderFilterClick" Style="{StaticResource AuroraButtonStyle}"
+                  Background="{StaticResource AuroraGlass}" CornerRadius="{StaticResource AuroraRadiusL}" MinHeight="34"
+                  Content="Providers" ToolTipService.ToolTip="Limit search to selected Music Assistant provider IDs"/>
         </StackPanel>
       </StackPanel>
 

@@ -86,6 +86,12 @@ public sealed partial class NowPlayingPage : UserControl
 
     public event EventHandler<FrameworkElement>? DeviceRequested;
 
+    public event EventHandler<FrameworkElement>? QueueSettingsRequested;
+
+    public event EventHandler<FrameworkElement>? SleepTimerRequested;
+
+    public event EventHandler<FrameworkElement>? PlaybackSpeedRequested;
+
     /// <summary>Queue index to start playing.</summary>
     public event EventHandler<int>? PlayIndexRequested;
 
@@ -311,6 +317,12 @@ public sealed partial class NowPlayingPage : UserControl
     private void OnDeviceClick(object sender, RoutedEventArgs e) => DeviceRequested?.Invoke(this, (FrameworkElement)sender);
 
     private void OnTransferClick(object sender, RoutedEventArgs e) => TransferRequested?.Invoke(this, (FrameworkElement)sender);
+
+    private void OnQueueSettingsClick(object sender, RoutedEventArgs e) => QueueSettingsRequested?.Invoke(this, (FrameworkElement)sender);
+
+    private void OnSleepClick(object sender, RoutedEventArgs e) => SleepTimerRequested?.Invoke(this, (FrameworkElement)sender);
+
+    private void OnSpeedClick(object sender, RoutedEventArgs e) => PlaybackSpeedRequested?.Invoke(this, (FrameworkElement)sender);
 
     private void OnSeekChanged(object sender, RangeBaseValueChangedEventArgs e)
     {

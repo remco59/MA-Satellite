@@ -27,7 +27,6 @@ public sealed partial class LibraryWindow : Window
     private readonly LibraryController _controller;
     private readonly SatelliteHost _host;
     private readonly Action _openSettings;
-    private readonly Action _openAdvancedFeatures;
     private readonly DispatcherQueueTimer _queueRefresh;
     private readonly NavigationHistory<NavState> _nav = new(new NavState("home"));
     private PlayTarget? _selectedTarget;
@@ -49,6 +48,7 @@ public sealed partial class LibraryWindow : Window
     private readonly Dictionary<string, bool> _libraryGridViews = new()
     {
         ["album"] = true, ["artist"] = true, ["track"] = false, ["playlist"] = true, ["radio"] = true, ["liked"] = false,
+        ["audiobook"] = true, ["podcast"] = true, ["genre"] = true, ["in_progress"] = false,
     };
     private readonly Dictionary<string, string> _librarySorts = new();
     private string? _configuredSortTab;
@@ -81,12 +81,11 @@ public sealed partial class LibraryWindow : Window
     private Brush? _tintedBrush;
     private IReadOnlyList<MaItem> _discoverAlbums = [];
 
-    internal LibraryWindow(LibraryController controller, NowPlayingController nowPlaying, SatelliteHost host, Action openSettings, Action openAdvancedFeatures)
+    internal LibraryWindow(LibraryController controller, NowPlayingController nowPlaying, SatelliteHost host, Action openSettings)
     {
         _controller = controller;
         _host = host;
         _openSettings = openSettings;
-        _openAdvancedFeatures = openAdvancedFeatures;
         InitializeComponent();
         WireNowPage(nowPlaying);
         // Every shelf uses the shared card template; the "Recently played" row uses the compact size.
@@ -247,6 +246,11 @@ public sealed partial class LibraryWindow : Window
         }
 
         flyout.Items.Add(new MenuFlyoutSeparator());
+        flyout.Items.Add(MenuItem("Group speakers…", OpenGroupPlayersAsync));
+        if (_selectedTarget is not null)
+        {
+            flyout.Items.Add(MenuItem("Ungroup current player", UngroupCurrentPlayerAsync));
+        }
         flyout.Items.Add(MenuItem("Refresh players", LoadTargetsAsync));
         flyout.ShowAt(anchor);
     }
@@ -295,6 +299,9 @@ public sealed partial class LibraryWindow : Window
         };
         NowPage.TransferRequested += (_, anchor) => ShowTransferFlyout(anchor);
         NowPage.DeviceRequested += (_, anchor) => ShowTargetFlyout(anchor);
+        NowPage.QueueSettingsRequested += (_, _) => _ = OpenQueueSettingsAsync();
+        NowPage.SleepTimerRequested += (_, anchor) => ShowSleepTimerFlyout(anchor);
+        NowPage.PlaybackSpeedRequested += (_, _) => _ = OpenPlaybackSpeedDialogAsync();
         NowPage.PlayIndexRequested += async (_, index) =>
         {
             if (SelectedTarget is { } target)
@@ -417,7 +424,7 @@ public sealed partial class LibraryWindow : Window
         }
     }
 
-    private IEnumerable<ToggleButton> SearchChipButtons => [ChipAll, ChipTracks, ChipArtists, ChipAlbums, ChipPlaylists, ChipRadio];
+    private IEnumerable<ToggleButton> SearchChipButtons => [ChipAll, ChipTracks, ChipArtists, ChipAlbums, ChipPlaylists, ChipRadio, ChipPodcasts, ChipAudiobooks, ChipGenres];
 
     private async void OnBack(object sender, RoutedEventArgs e) => await GoBackAsync();
 
@@ -606,7 +613,7 @@ public sealed partial class LibraryWindow : Window
         var regular = (Style)Application.Current.Resources["AuroraNavButtonStyle"];
         // Library categories keep their sidebar item lit while an album or playlist is open inside them.
         var section = _tab == "liked" ? "album" : _tab;
-        foreach (var button in new[] { NavHome, NavDiscover, NavSearch, NavPlaylist, NavAlbum, NavArtist, NavTrack, NavRadio, NavNow, NavQueue })
+        foreach (var button in new[] { NavHome, NavDiscover, NavSearch, NavPlaylist, NavAlbum, NavArtist, NavTrack, NavRadio, NavAudiobooks, NavPodcasts, NavInProgress, NavGenres, NavNow, NavQueue })
         {
             var tag = (string?)button.Tag;
             // Queue opens the Now playing page on its Up Next tab, so only Now playing is lit there.
@@ -619,7 +626,8 @@ public sealed partial class LibraryWindow : Window
         ForwardButton.IsEnabled = _nav.CanGoForward;
     }
 
-    private bool IsLibraryRoot => _openedItem is null && _tab is "album" or "artist" or "track" or "playlist" or "radio" or "liked";
+    private bool IsLibraryRoot => _openedItem is null && _tab is "album" or "artist" or "track" or "playlist" or "radio" or "liked"
+        or "audiobook" or "podcast" or "genre" or "in_progress";
 
     private bool IsGridView => IsLibraryRoot && _libraryGridViews.GetValueOrDefault(_tab);
 
@@ -628,8 +636,9 @@ public sealed partial class LibraryWindow : Window
     private void UpdateLibraryControls()
     {
         LibraryToolbar.Visibility = IsLibraryRoot ? Visibility.Visible : Visibility.Collapsed;
-        // Radio has its own sidebar entry; the other categories get tabs so they are one click apart.
-        LibraryTabs.Visibility = IsLibraryRoot && _tab != "radio" ? Visibility.Visible : Visibility.Collapsed;
+        var standardLibrary = _tab is "playlist" or "album" or "artist" or "track" or "liked";
+        LibraryTabs.Visibility = IsLibraryRoot && standardLibrary ? Visibility.Visible : Visibility.Collapsed;
+        PlaylistActions.Visibility = IsLibraryRoot && _tab == "playlist" ? Visibility.Visible : Visibility.Collapsed;
         foreach (var tab in new[] { TabPlaylists, TabAlbums, TabArtists, TabTracks, TabLiked })
         {
             tab.IsChecked = (string)tab.Tag == _tab;
@@ -891,6 +900,10 @@ public sealed partial class LibraryWindow : Window
                 "artist" => "Loading artists…",
                 "track" => "Loading tracks…",
                 "radio" => "Loading radio stations…",
+                "audiobook" => "Loading audiobooks…",
+                "podcast" => "Loading podcasts…",
+                "genre" => "Loading genres…",
+                "in_progress" => "Loading your unfinished listening…",
                 _ => "Loading albums…",
             };
             LoadingState.Visibility = Visibility.Visible;
@@ -927,6 +940,10 @@ public sealed partial class LibraryWindow : Window
             "playlist" => "Your library",
             "track" => "Your library",
             "radio" => "Radio",
+            "audiobook" => "Audiobooks",
+            "podcast" => "Podcasts",
+            "genre" => "Genres",
+            "in_progress" => "Continue listening",
             _ => "Your library",
         };
         ContentDescription.Text = _tab switch
@@ -934,7 +951,11 @@ public sealed partial class LibraryWindow : Window
             "discover" => "Personalised for your listening habits.",
             "search" => string.IsNullOrWhiteSpace(_lastQuery)
                 ? "Find music across your library and providers."
-                : $"Results for “{_lastQuery}”",
+                : $"Results for “{_lastQuery}”" + (_providerFilterIds.Count == 0 ? string.Empty : $" · filtered to {_providerFilterIds.Count} provider(s)"),
+            "audiobook" => "Listen to your audiobook library.",
+            "podcast" => "Browse shows and open one to see its episodes.",
+            "genre" => "Explore the genres available in your Music Assistant library.",
+            "in_progress" => "Pick up where you left off across supported spoken-word media.",
             _ => string.Empty,
         };
         try
@@ -954,11 +975,15 @@ public sealed partial class LibraryWindow : Window
             {
                 var client = await _controller.Service.GetClientAsync();
                 // Fetch richer metadata and child rows concurrently to avoid serial page loads.
-                // A track has its own detail view but no child list.
+                // A track has its own detail view but no child list. Podcast shows expose episodes via
+                // a dedicated endpoint rather than the generic children endpoint.
                 var metadataTask = client.GetItemDetailsAsync(parent);
-                detailChildren = parent.Type == MaMediaType.Track
-                    ? []
-                    : await client.GetChildrenAsync(parent);
+                detailChildren = parent.Type switch
+                {
+                    MaMediaType.Track => [],
+                    MaMediaType.Podcast => await client.GetPodcastEpisodesAsync(parent),
+                    _ => await client.GetChildrenAsync(parent),
+                };
                 detailItem = parent;
                 try
                 {
@@ -1067,18 +1092,40 @@ public sealed partial class LibraryWindow : Window
             else if (_tab == "search")
             {
                 var client = await _controller.Service.GetClientAsync();
-                var results = await client.SearchAsync(_lastQuery);
+                var results = await client.SearchAsync(_lastQuery, 50,
+                    providers: _providerFilterIds.Count == 0 ? null : _providerFilterIds);
                 rows = results.InDisplayOrder.Select(i => ListRow.From(i, showType: true)).ToList();
                 ChipRadio.Content = $"Radio ({results.Radios.Count})";
+                ChipPodcasts.Content = $"Podcasts ({results.Podcasts?.Count ?? 0})";
+                ChipAudiobooks.Content = $"Audiobooks ({results.Audiobooks?.Count ?? 0})";
+                ChipGenres.Content = $"Genres ({results.Genres?.Count ?? 0})";
                 ChipAlbums.Content = $"Albums ({results.Albums.Count})";
                 ChipArtists.Content = $"Artists ({results.Artists.Count})";
                 ChipTracks.Content = $"Tracks ({results.Tracks.Count})";
                 ChipPlaylists.Content = $"Playlists ({results.Playlists.Count})";
                 empty = string.IsNullOrEmpty(_lastQuery) ? "Type a search above." : "No results.";
             }
+            else if (_tab == "in_progress")
+            {
+                var client = await _controller.Service.GetClientAsync();
+                var items = await client.GetInProgressItemsAsync(100);
+                rows = items.Select(i => ListRow.From(i, showType: true)).ToList();
+                empty = "Nothing in progress. Audiobooks and podcasts with a saved resume position will appear here.";
+                ContentDescription.Text = $"{rows.Count} unfinished item(s)";
+            }
             else
             {
-                var type = _tab switch { "artist" => MaMediaType.Artist, "playlist" => MaMediaType.Playlist, "track" => MaMediaType.Track, "radio" => MaMediaType.Radio, _ => MaMediaType.Album };
+                var type = _tab switch
+                {
+                    "artist" => MaMediaType.Artist,
+                    "playlist" => MaMediaType.Playlist,
+                    "track" => MaMediaType.Track,
+                    "radio" => MaMediaType.Radio,
+                    "audiobook" => MaMediaType.Audiobook,
+                    "podcast" => MaMediaType.Podcast,
+                    "genre" => MaMediaType.Genre,
+                    _ => MaMediaType.Album
+                };
                 var client = await _controller.Service.GetClientAsync();
                 var (sortField, sortDirection) = LibrarySortArguments(CurrentSort);
                 IReadOnlyList<MaItem> items;
@@ -1105,7 +1152,11 @@ public sealed partial class LibraryWindow : Window
                 empty = "Your library has no items of this kind.";
                 if (!sortFallback)
                 {
-                    var noun = _tab switch { "artist" => "artist", "playlist" => "playlist", "track" => "track", "radio" => "station", _ => "album" };
+                    var noun = _tab switch
+                    {
+                        "artist" => "artist", "playlist" => "playlist", "track" => "track", "radio" => "station",
+                        "audiobook" => "audiobook", "podcast" => "podcast", "genre" => "genre", _ => "album"
+                    };
                     var count = rows.Count >= 300 ? "300+" : rows.Count.ToString();
                     ContentDescription.Text = $"{count} {noun}{(rows.Count == 1 ? "" : "s")}";
                 }
@@ -1362,7 +1413,13 @@ public sealed partial class LibraryWindow : Window
 
         DetailSection.Visibility = item.Type == MaMediaType.Track
             ? Visibility.Collapsed : Visibility.Visible;
-        DetailSectionTitle.Text = item.Type == MaMediaType.Artist ? "Albums" : "Tracks";
+        DetailSectionTitle.Text = item.Type switch
+        {
+            MaMediaType.Artist or MaMediaType.Genre => "Albums",
+            MaMediaType.Podcast => "Episodes",
+            MaMediaType.Audiobook => "Chapters",
+            _ => "Tracks"
+        };
     }
 
     private static string FormatDetailDuration(long seconds)
@@ -1412,7 +1469,8 @@ public sealed partial class LibraryWindow : Window
 
         // Clicking opens a detail page for every media type. The cover play button
         // and the row menu still offer immediate playback without navigating.
-        if (item.Type is MaMediaType.Album or MaMediaType.Artist or MaMediaType.Playlist or MaMediaType.Track)
+        if (item.Type is MaMediaType.Album or MaMediaType.Artist or MaMediaType.Playlist or MaMediaType.Track
+            or MaMediaType.Podcast or MaMediaType.Genre)
         {
             await GoToAsync(new NavState(_tab, item, QueryFor(_tab)));
         }
@@ -1442,6 +1500,16 @@ public sealed partial class LibraryWindow : Window
         flyout.Items.Add(MenuItem("Play now", () => PlayAsync(item, MaQueueOption.Replace)));
         flyout.Items.Add(MenuItem("Play next", () => PlayAsync(item, MaQueueOption.Next)));
         flyout.Items.Add(MenuItem("Add to queue", () => PlayAsync(item, MaQueueOption.Add)));
+        if (item.Type == MaMediaType.Playlist)
+        {
+            flyout.Items.Add(new MenuFlyoutSeparator());
+            flyout.Items.Add(MenuItem("Copy playlist as M3U8", () => ExportPlaylistToClipboardAsync(item)));
+        }
+        if (_openedItem is { Type: MaMediaType.Playlist } playlist && item.Type == MaMediaType.Track)
+        {
+            flyout.Items.Add(new MenuFlyoutSeparator());
+            flyout.Items.Add(MenuItem("Remove from this playlist", () => RemoveFromPlaylistAsync(playlist, item)));
+        }
         flyout.ShowAt(action.Anchor);
     }
 
@@ -2166,8 +2234,6 @@ public sealed partial class LibraryWindow : Window
     }
 
     private void OnOpenSettings(object sender, RoutedEventArgs e) => _openSettings();
-
-    private void OnOpenAdvancedFeatures(object sender, RoutedEventArgs e) => _openAdvancedFeatures();
 
     /// <summary>A listening mode plays the playlist it was matched to, on the selected player.</summary>
     private async void OnModeClick(object sender, RoutedEventArgs e)
