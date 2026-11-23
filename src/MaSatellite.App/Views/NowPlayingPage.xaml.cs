@@ -159,6 +159,8 @@ public sealed partial class NowPlayingPage : UserControl
 
     internal void SetTint(Brush? tint) => HeroCard.Background = tint ?? R("AuroraHeroGradient");
 
+    internal void SetPlaybackSpeed(double speed) => SpeedButton.Content = $"{speed:0.##}×";
+
     internal void SetTransport(TransportState t)
     {
         PrevButton.IsEnabled = t.CanPrevious;
