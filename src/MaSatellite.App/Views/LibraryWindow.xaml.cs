@@ -300,7 +300,7 @@ public sealed partial class LibraryWindow : Window
         NowPage.TransferRequested += (_, anchor) => ShowTransferFlyout(anchor);
         NowPage.DeviceRequested += (_, anchor) => ShowTargetFlyout(anchor);
         NowPage.QueueSettingsRequested += (_, _) => _ = OpenQueueSettingsAsync();
-        NowPage.SleepTimerRequested += (_, anchor) => ShowSleepTimerFlyout(anchor);
+        NowPage.SleepTimerRequested += (_, _) => _ = OpenSleepTimerDialogAsync();
         NowPage.PlaybackSpeedRequested += (_, _) => _ = OpenPlaybackSpeedDialogAsync();
         NowPage.PlayIndexRequested += async (_, index) =>
         {
@@ -1498,6 +1498,12 @@ public sealed partial class LibraryWindow : Window
         }
 
         var flyout = new MenuFlyout();
+        if (item.Type == MaMediaType.Track)
+        {
+            flyout.Items.Add(MenuItem("Track details", () =>
+                GoToAsync(new NavState(_tab, item, QueryFor(_tab)))));
+            flyout.Items.Add(new MenuFlyoutSeparator());
+        }
         flyout.Items.Add(MenuItem("Play now", () => PlayAsync(item, MaQueueOption.Replace)));
         flyout.Items.Add(MenuItem("Play next", () => PlayAsync(item, MaQueueOption.Next)));
         flyout.Items.Add(MenuItem("Add to queue", () => PlayAsync(item, MaQueueOption.Add)));

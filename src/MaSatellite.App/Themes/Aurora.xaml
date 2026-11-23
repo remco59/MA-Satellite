@@ -286,6 +286,66 @@
     </Setter>
   </Style>
 
+  <!-- Wide toggle rows used for selecting speakers and other grouped items in native dialogs. -->
+  <Style x:Key="AuroraSelectionToggleStyle" TargetType="ToggleButton">
+    <Setter Property="Background" Value="{StaticResource AuroraSurface}"/>
+    <Setter Property="Foreground" Value="{StaticResource AuroraMuted}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource AuroraBorder}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource AuroraRadiusM}"/>
+    <Setter Property="Padding" Value="14,10"/>
+    <Setter Property="MinHeight" Value="42"/>
+    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ToggleButton">
+          <Grid>
+            <Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"/>
+            <ContentPresenter x:Name="ContentPresenter" Content="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}"
+                              Padding="{TemplateBinding Padding}" HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalContentAlignment="Center"/>
+            <VisualStateManager.VisualStateGroups>
+              <VisualStateGroup x:Name="CommonStates">
+                <VisualState x:Name="Normal"/>
+                <VisualState x:Name="PointerOver">
+                  <VisualState.Setters><Setter Target="Surface.Background" Value="{StaticResource AuroraSurfaceRaised}"/></VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Pressed">
+                  <VisualState.Setters><Setter Target="Surface.Background" Value="{StaticResource AuroraSelected}"/></VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Disabled">
+                  <VisualState.Setters><Setter Target="Surface.Opacity" Value="0.38"/></VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Checked">
+                  <VisualState.Setters>
+                    <Setter Target="Surface.Background" Value="{StaticResource AuroraSelected}"/>
+                    <Setter Target="Surface.BorderBrush" Value="{StaticResource AuroraAccent}"/>
+                    <Setter Target="ContentPresenter.Foreground" Value="{StaticResource AuroraText}"/>
+                  </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="CheckedPointerOver">
+                  <VisualState.Setters>
+                    <Setter Target="Surface.Background" Value="{StaticResource AuroraSelected}"/>
+                    <Setter Target="Surface.BorderBrush" Value="{StaticResource AuroraAccent}"/>
+                    <Setter Target="ContentPresenter.Foreground" Value="{StaticResource AuroraText}"/>
+                  </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="CheckedPressed">
+                  <VisualState.Setters>
+                    <Setter Target="Surface.Background" Value="{StaticResource AuroraSelected}"/>
+                    <Setter Target="Surface.BorderBrush" Value="{StaticResource AuroraAccent}"/>
+                    <Setter Target="ContentPresenter.Foreground" Value="{StaticResource AuroraText}"/>
+                  </VisualState.Setters>
+                </VisualState>
+              </VisualStateGroup>
+            </VisualStateManager.VisualStateGroups>
+          </Grid>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <!--
     Item containers for card grids and lists: no built-in selection or hover chrome. Each card draws its own
     hover state, so the container only needs to host content and keep keyboard focus.

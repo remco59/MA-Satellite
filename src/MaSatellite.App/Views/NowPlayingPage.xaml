@@ -40,7 +40,7 @@
     <DataTemplate x:Key="QueueRowPlayed" x:DataType="local:QueueRow">
       <Grid Padding="4,5" ColumnSpacing="12" MinHeight="54" Opacity="0.5">
         <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
         <Grid Width="40" Height="40">
           <Rectangle RadiusX="8" RadiusY="8" Fill="{StaticResource AuroraSurfaceRaised}"/>
@@ -52,6 +52,10 @@
           <TextBlock Text="{x:Bind Artist}" Style="{StaticResource AuroraSubtitleStyle}" FontSize="12" TextTrimming="CharacterEllipsis" MaxLines="1"/>
         </StackPanel>
         <TextBlock Grid.Column="2" Text="{x:Bind DurationLabel}" Foreground="{StaticResource AuroraMuted}" FontSize="12" VerticalAlignment="Center"/>
+        <Button Grid.Column="3" Click="OnRowMenuClick" Style="{StaticResource AuroraIconButtonStyle}" VerticalAlignment="Center"
+                ToolTipService.ToolTip="More options" AutomationProperties.Name="More options for this played track">
+          <FontIcon Glyph="&#xE712;" FontSize="16"/>
+        </Button>
       </Grid>
     </DataTemplate>
     <DataTemplate x:Key="QueueRowNarrow" x:DataType="local:QueueRow">
@@ -115,8 +119,6 @@
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <TextBlock Text="NOW PLAYING" Style="{StaticResource AuroraSectionLabelStyle}" Foreground="{StaticResource AuroraTextOnArt}" VerticalAlignment="Center"/>
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
-                <Button x:Name="SpeedButton" Content="1×" Visibility="Collapsed" Click="OnSpeedClick" Style="{StaticResource AuroraIconButtonStyle}"
-                        ToolTipService.ToolTip="Playback speed for audiobooks and podcast episodes" AutomationProperties.Name="Playback speed"/>
                 <Button x:Name="FavoriteButton" Click="OnFavoriteClick" Style="{StaticResource AuroraIconButtonStyle}"
                         ToolTipService.ToolTip="Add to favourites" AutomationProperties.Name="Favourite">
                   <FontIcon x:Name="FavoriteIcon" Glyph="&#xEB51;" FontSize="16"/>
@@ -224,7 +226,6 @@
           <Grid ColumnSpacing="10">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
-              <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel VerticalAlignment="Center" Spacing="2">
               <TextBlock Text="Up Next" Style="{StaticResource AuroraTitleStyle}" FontSize="20"/>
@@ -239,16 +240,6 @@
                     Background="{StaticResource AuroraGlass}" CornerRadius="{StaticResource AuroraRadiusL}" ToolTipService.ToolTip="Remove every track from the queue"
                     AutomationProperties.Name="Clear queue" IsEnabled="False">
               <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE74D;" FontSize="12"/><TextBlock Text="Clear queue" FontSize="12"/></StackPanel>
-            </Button>
-            <Button x:Name="QueueSettingsButton" Grid.Column="3" Click="OnQueueSettingsClick" Style="{StaticResource AuroraButtonStyle}"
-                    Background="{StaticResource AuroraGlass}" CornerRadius="{StaticResource AuroraRadiusL}"
-                    ToolTipService.ToolTip="Autoplay, Smart Shuffle and crossfade settings" AutomationProperties.Name="Queue settings">
-              <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE713;" FontSize="12"/><TextBlock Text="Queue settings" FontSize="12"/></StackPanel>
-            </Button>
-            <Button x:Name="SleepButton" Grid.Column="4" Click="OnSleepClick" Style="{StaticResource AuroraButtonStyle}"
-                    Background="{StaticResource AuroraGlass}" CornerRadius="{StaticResource AuroraRadiusL}"
-                    ToolTipService.ToolTip="Set a sleep timer" AutomationProperties.Name="Sleep timer">
-              <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE823;" FontSize="12"/><TextBlock Text="Sleep timer" FontSize="12"/></StackPanel>
             </Button>
           </Grid>
 
@@ -269,7 +260,7 @@
                   BorderBrush="#559B8CFF" BorderThickness="1">
             <Grid ColumnSpacing="12">
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
               <FontIcon Glyph="&#xE767;" FontSize="16" Foreground="{StaticResource AuroraAccent}" VerticalAlignment="Center"/>
               <Border Grid.Column="1" Width="44" Height="44" CornerRadius="{StaticResource AuroraRadiusS}" Background="{StaticResource AuroraSurfaceRaised}">
@@ -281,6 +272,11 @@
                 <TextBlock x:Name="CurrentSub" Style="{StaticResource AuroraSubtitleStyle}" TextTrimming="CharacterEllipsis" MaxLines="1"/>
               </StackPanel>
               <TextBlock Grid.Column="3" Text="Now playing" FontSize="12" Foreground="{StaticResource AuroraAccent}" VerticalAlignment="Center"/>
+              <Button x:Name="CurrentDetailsButton" Grid.Column="4" Click="OnCurrentTrackDetailsClick"
+                      Style="{StaticResource AuroraIconButtonStyle}" ToolTipService.ToolTip="Open track details"
+                      AutomationProperties.Name="Open current track details" IsEnabled="False">
+                <FontIcon Glyph="&#xE946;" FontSize="16"/>
+              </Button>
             </Grid>
           </Border>
 

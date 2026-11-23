@@ -10,7 +10,7 @@ Grouping is not guaranteed for every combination of player providers. Music Assi
 
 ## Queue settings
 
-Open **Now Playing → Up Next → Queue settings** for the selected player.
+Open **Now Playing → More actions → Queue settings** for the selected player.
 
 - **Autoplay** continues the queue when it is nearing its end.
 - **Autoplay mode** chooses automatic selection, similar tracks, similar artists, a library mix, or a selected playlist. Similarity modes depend on providers that expose the corresponding feature.
@@ -21,15 +21,15 @@ Music Assistant enforces its own constraints; for example, it can reject enablin
 
 ## Sleep timer
 
-Open **Now Playing → Up Next → Sleep timer**. Presets are available alongside custom durations, end-of-item, end-of-chapter and clear timer actions. A custom duration can be between 1 and 1440 minutes.
+Open **Now Playing → More actions → Sleep timer**. Choose a preset, a custom duration, the end of the current item or the end of the current chapter. A custom duration can be between 1 and 1440 minutes.
 
 End-of-item and end-of-chapter timers require a supported active queue item. Chapter timers also require chapter metadata from the media provider.
 
 ## Podcasts, audiobooks and genres
 
-Use the **Audiobooks**, **Podcasts**, **Genres** and **Continue listening** destinations in the library sidebar. Open a podcast show to list its episodes; open an audiobook or genre where the provider exposes child items. Playable podcast episodes can be played directly.
+Use the **Audiobooks**, **Podcasts**, **Genres** and **Continue listening** destinations in the library sidebar. Track details open the same library detail page from Now Playing and queue item menus; tracks in playlist views can be opened directly or from their context menu. Open a podcast show to list its episodes; open an audiobook or genre where the provider exposes child items. Playable podcast episodes can be played directly.
 
-For a currently playing audiobook or podcast episode, a speed control appears on the Now Playing page; it is hidden for ordinary music tracks. Use it to request playback speed from 0.5× to 3.0×. The control reflects the speed last applied during the current session. Music Assistant may reject variable speed for other media types.
+For a currently playing audiobook or podcast episode, **Playback speed** appears under **Now Playing → More actions**; it is not shown for ordinary music tracks. Use it to request playback speed from 0.5× to 3.0×. The menu reflects the speed last applied during the current session. Music Assistant may reject variable speed for other media types.
 
 In-progress and resume metadata come from the server. Resume behaviour and availability depend on the media provider.
 

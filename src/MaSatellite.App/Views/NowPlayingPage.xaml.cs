@@ -57,6 +57,8 @@ public sealed partial class NowPlayingPage : UserControl
     private string? _album;
     private string? _trackUri;
     private int? _durationSeconds;
+    private bool _supportsVariableSpeed;
+    private double _playbackSpeed = 1.0;
     private Task _context = Task.CompletedTask;
     private CancellationTokenSource _trackCts = new();
 
@@ -159,7 +161,7 @@ public sealed partial class NowPlayingPage : UserControl
 
     internal void SetTint(Brush? tint) => HeroCard.Background = tint ?? R("AuroraHeroGradient");
 
-    internal void SetPlaybackSpeed(double speed) => SpeedButton.Content = $"{speed:0.##}×";
+    internal void SetPlaybackSpeed(double speed) => _playbackSpeed = speed;
 
     internal void SetTransport(TransportState t)
     {
@@ -320,12 +322,6 @@ public sealed partial class NowPlayingPage : UserControl
 
     private void OnTransferClick(object sender, RoutedEventArgs e) => TransferRequested?.Invoke(this, (FrameworkElement)sender);
 
-    private void OnQueueSettingsClick(object sender, RoutedEventArgs e) => QueueSettingsRequested?.Invoke(this, (FrameworkElement)sender);
-
-    private void OnSleepClick(object sender, RoutedEventArgs e) => SleepTimerRequested?.Invoke(this, (FrameworkElement)sender);
-
-    private void OnSpeedClick(object sender, RoutedEventArgs e) => PlaybackSpeedRequested?.Invoke(this, (FrameworkElement)sender);
-
     private void OnSeekChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
         if (_updating || !SeekSlider.IsEnabled)
@@ -378,12 +374,33 @@ public sealed partial class NowPlayingPage : UserControl
 
     private void OnMoreClick(object sender, RoutedEventArgs e)
     {
+        var anchor = (FrameworkElement)sender;
         var flyout = new MenuFlyout();
-        flyout.Items.Add(MenuEntry("Track details", () =>
+
+        var details = MenuEntry("Track details", OpenCurrentTrackDetailsAsync);
+        details.IsEnabled = !string.IsNullOrWhiteSpace(_trackUri);
+        flyout.Items.Add(details);
+        flyout.Items.Add(new MenuFlyoutSeparator());
+        flyout.Items.Add(MenuEntry("Queue settings…", () =>
         {
-            SelectTab("about", animate: true);
-            return EnsureTabLoadedAsync();
+            QueueSettingsRequested?.Invoke(this, anchor);
+            return Task.CompletedTask;
         }));
+        flyout.Items.Add(MenuEntry("Sleep timer…", () =>
+        {
+            SleepTimerRequested?.Invoke(this, anchor);
+            return Task.CompletedTask;
+        }));
+        if (_supportsVariableSpeed)
+        {
+            flyout.Items.Add(MenuEntry($"Playback speed · {_playbackSpeed:0.##}×…", () =>
+            {
+                PlaybackSpeedRequested?.Invoke(this, anchor);
+                return Task.CompletedTask;
+            }));
+        }
+
+        flyout.Items.Add(new MenuFlyoutSeparator());
         flyout.Items.Add(MenuEntry("Copy title and artist", () =>
         {
             var package = new global::Windows.ApplicationModel.DataTransfer.DataPackage();
@@ -391,8 +408,22 @@ public sealed partial class NowPlayingPage : UserControl
             global::Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
             return Task.CompletedTask;
         }));
-        flyout.ShowAt((FrameworkElement)sender);
+        flyout.ShowAt(anchor);
     }
+
+    private Task OpenCurrentTrackDetailsAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_trackUri))
+        {
+            InfoRaised?.Invoke(this, "Track details are not available for this playback source.");
+            return Task.CompletedTask;
+        }
+
+        return OpenItemByUriAsync(_trackUri);
+    }
+
+    private async void OnCurrentTrackDetailsClick(object sender, RoutedEventArgs e) =>
+        await OpenCurrentTrackDetailsAsync();
 
     private static MenuFlyoutItem MenuEntry(string text, Func<Task> action)
     {
@@ -515,10 +546,11 @@ public sealed partial class NowPlayingPage : UserControl
         _trackUri = null;
         _album = null;
         _durationSeconds = null;
+        _supportsVariableSpeed = false;
+        _playbackSpeed = 1.0;
         _lyricsFor = _relatedFor = _aboutFor = null;
         _favorite = false;
-        SpeedButton.Visibility = Visibility.Collapsed;
-        SpeedButton.Content = "1×";
+        CurrentDetailsButton.IsEnabled = false;
         ApplyFavorite();
         MetaText.Visibility = Visibility.Collapsed;
         ClearLyrics();
@@ -553,8 +585,7 @@ public sealed partial class NowPlayingPage : UserControl
             }
 
             _favorite = details.IsFavorite;
-            var supportsVariableSpeed = details.Item.Type is MaMediaType.Audiobook or MaMediaType.PodcastEpisode;
-            SpeedButton.Visibility = supportsVariableSpeed ? Visibility.Visible : Visibility.Collapsed;
+            _supportsVariableSpeed = details.Item.Type is MaMediaType.Audiobook or MaMediaType.PodcastEpisode;
             ApplyFavorite();
             var meta = new List<string>();
             if (!string.IsNullOrWhiteSpace(details.AlbumName))
@@ -635,6 +666,7 @@ public sealed partial class NowPlayingPage : UserControl
                 _trackUri = current.Uri;
                 _album = current.Album;
                 _durationSeconds ??= current.DurationSeconds;
+                CurrentDetailsButton.IsEnabled = !string.IsNullOrWhiteSpace(_trackUri);
             }
         }
         else
