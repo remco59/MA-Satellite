@@ -237,6 +237,13 @@
                          Foreground="{StaticResource AuroraMuted}" FontSize="12" TextTrimming="CharacterEllipsis"/>
             </StackPanel>
           </Border>
+          <Button Click="OnOpenAdvancedFeatures" Style="{StaticResource AuroraNavButtonStyle}"
+                  ToolTipService.ToolTip="More Music Assistant features" AutomationProperties.Name="Open advanced features">
+            <Grid ColumnSpacing="14">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+              <FontIcon Glyph="&#xE9CE;" FontSize="16"/><TextBlock Grid.Column="1" Tag="label" Text="More features" VerticalAlignment="Center"/>
+            </Grid>
+          </Button>
           <Button Click="OnOpenSettings" Style="{StaticResource AuroraNavButtonStyle}"
                   ToolTipService.ToolTip="Settings" AutomationProperties.Name="Open settings">
             <Grid ColumnSpacing="14">

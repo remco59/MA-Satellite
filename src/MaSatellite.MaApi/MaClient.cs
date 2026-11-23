@@ -8,7 +8,7 @@ namespace MaSatellite.MaApi;
 /// <summary>Typed access to the parts of Music Assistant's API this app uses: library, search, queues and players.</summary>
 public sealed class MaClient : IAsyncDisposable
 {
-    private static readonly string[] SearchMediaTypes = ["track", "artist", "album", "playlist", "radio"];
+    private static readonly string[] SearchMediaTypes = ["track", "artist", "album", "playlist", "radio", "podcast", "podcast_episode", "audiobook", "genre"];
     private static readonly string[] RecentlyPlayedMediaTypes = ["track", "album"];
 
     private readonly MaConnection _connection;
@@ -34,7 +34,7 @@ public sealed class MaClient : IAsyncDisposable
 
     public Task ConnectAsync(CancellationToken ct = default) => _connection.ConnectAsync(ct);
 
-    public async Task<MaSearchResults> SearchAsync(string query, int limit = 25, CancellationToken ct = default)
+    public async Task<MaSearchResults> SearchAsync(string query, int limit = 25, IReadOnlyList<string>? providers = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
@@ -47,12 +47,14 @@ public sealed class MaClient : IAsyncDisposable
             ["media_types"] = SearchMediaTypes,
             ["limit"] = limit,
             ["library_only"] = false,
+            ["providers"] = providers is { Count: > 0 } ? providers : null,
         }, cancellationToken: ct).ConfigureAwait(false);
 
         IReadOnlyList<MaItem> Items(string name) =>
             result.ValueKind == JsonValueKind.Object && result.TryGetProperty(name, out var arr) ? MaItemParser.ParseItems(arr, _baseUrl) : [];
 
-        return new MaSearchResults(Items("artists"), Items("albums"), Items("tracks"), Items("playlists"), Items("radio"));
+        return new MaSearchResults(Items("artists"), Items("albums"), Items("tracks"), Items("playlists"), Items("radio"),
+            Items("podcasts"), Items("podcast_episodes"), Items("audiobooks"), Items("genres"));
     }
 
     /// <summary>Returns recent library listening history; the server is the source of truth.</summary>
@@ -100,6 +102,9 @@ public sealed class MaClient : IAsyncDisposable
             MaMediaType.Track => "music/tracks/library_items",
             MaMediaType.Playlist => "music/playlists/library_items",
             MaMediaType.Radio => "music/radios/library_items",
+            MaMediaType.Podcast => "music/podcasts/library_items",
+            MaMediaType.Audiobook => "music/audiobooks/library_items",
+            MaMediaType.Genre => "music/genres/library_items",
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unsupported library type"),
         };
 
@@ -235,6 +240,138 @@ public sealed class MaClient : IAsyncDisposable
             ["provider_instance_id_or_domain"] = parent.Provider,
         }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
         return MaItemParser.ParseItems(result, _baseUrl);
+    }
+
+    /// <summary>Returns unfinished audiobooks and podcast episodes, preserving Music Assistant resume metadata.</summary>
+    public async Task<IReadOnlyList<MaItem>> GetInProgressItemsAsync(int limit = 30, CancellationToken ct = default)
+    {
+        var result = await _connection.SendCommandAsync("music/in_progress_items",
+            new Dictionary<string, object?> { ["limit"] = Math.Clamp(limit, 1, 200) }, cancellationToken: ct).ConfigureAwait(false);
+        return MaItemParser.ParseItems(result, _baseUrl);
+    }
+
+    /// <summary>Lists the episodes of a podcast.</summary>
+    public async Task<IReadOnlyList<MaItem>> GetPodcastEpisodesAsync(MaItem podcast, int limit = 100, int offset = 0, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(podcast);
+        if (podcast.Type != MaMediaType.Podcast) throw new ArgumentException("A podcast item is required.", nameof(podcast));
+        var result = await _connection.SendCommandAsync("music/podcasts/podcast_episodes", new Dictionary<string, object?>
+        {
+            ["item_id"] = podcast.ItemId,
+            ["provider_instance_id_or_domain"] = podcast.Provider,
+            ["limit"] = Math.Clamp(limit, 1, 500),
+            ["offset"] = Math.Max(0, offset),
+        }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
+        return MaItemParser.ParseItems(result, _baseUrl);
+    }
+
+    /// <summary>Adds or removes members from a Music Assistant sync/group player.</summary>
+    public Task SetGroupMembersAsync(string targetPlayerId, IReadOnlyList<string>? add = null, IReadOnlyList<string>? remove = null, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("players/cmd/set_members", new Dictionary<string, object?>
+        {
+            ["player_id"] = targetPlayerId,
+            ["target_player"] = targetPlayerId,
+            ["player_ids_to_add"] = add,
+            ["player_ids_to_remove"] = remove,
+        }, cancellationToken: ct);
+
+    public Task UngroupPlayerAsync(string playerId, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("players/cmd/ungroup", new Dictionary<string, object?> { ["player_id"] = playerId }, cancellationToken: ct);
+
+    public Task SetQueueAutoplayAsync(string queueId, bool enabled, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("player_queues/autoplay", new Dictionary<string, object?>
+        {
+            ["queue_id"] = queueId,
+            ["autoplay_enabled"] = enabled,
+        }, cancellationToken: ct);
+
+    public Task SetQueueCrossfadeAsync(string queueId, bool enabled, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("player_queues/crossfade", new Dictionary<string, object?>
+        {
+            ["queue_id"] = queueId,
+            ["crossfade_enabled"] = enabled,
+        }, cancellationToken: ct);
+
+    /// <summary>Stores per-queue options such as Smart Shuffle and the autoplay/crossfade mode.</summary>
+    public Task SaveQueueSettingsAsync(string queueId, IReadOnlyDictionary<string, object?> values, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("config/player_queues/save", new Dictionary<string, object?>
+        {
+            ["queue_id"] = queueId,
+            ["values"] = values,
+        }, cancellationToken: ct);
+
+    public Task<double?> SetSleepTimerAsync(string playerId, int? seconds, string? mode = null, CancellationToken ct = default) =>
+        SetSleepTimerCoreAsync(playerId, seconds, mode, ct);
+
+    private async Task<double?> SetSleepTimerCoreAsync(string playerId, int? seconds, string? mode, CancellationToken ct)
+    {
+        var args = new Dictionary<string, object?> { ["player_id"] = playerId };
+        if (seconds.HasValue) args["seconds"] = Math.Clamp(seconds.Value, 1, 86400);
+        if (!string.IsNullOrWhiteSpace(mode)) args["mode"] = mode;
+        var result = await _connection.SendCommandAsync("players/sleep_timer/set", args, cancellationToken: ct).ConfigureAwait(false);
+        return result.ValueKind == JsonValueKind.Number ? (double?)result.GetDouble() : null;
+    }
+
+    public Task ClearSleepTimerAsync(string playerId, CancellationToken ct = default) =>
+        _connection.SendCommandAsync("players/sleep_timer/clear", new Dictionary<string, object?> { ["player_id"] = playerId }, cancellationToken: ct);
+
+    /// <summary>Sets playback speed for the current audiobook or podcast episode (0.5x–3.0x).</summary>
+    public Task SetPlaybackSpeedAsync(string queueId, double speed, string? queueItemId = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(queueId)) throw new ArgumentException("A queue id is required.", nameof(queueId));
+        if (speed is < 0.5 or > 3.0) throw new ArgumentOutOfRangeException(nameof(speed), "Playback speed must be between 0.5x and 3.0x.");
+        var args = new Dictionary<string, object?> { ["queue_id"] = queueId, ["speed"] = speed };
+        if (!string.IsNullOrWhiteSpace(queueItemId)) args["queue_item_id"] = queueItemId;
+        return _connection.SendCommandAsync("player_queues/set_playback_speed", args, cancellationToken: ct);
+    }
+
+    public async Task<MaItem?> CreatePlaylistAsync(string name, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("A playlist name is required.", nameof(name));
+        // Omitting the provider selects Music Assistant's built-in playlist provider.
+        var result = await _connection.SendCommandAsync("music/playlists/create_playlist", new Dictionary<string, object?>
+        {
+            ["name"] = name.Trim(),
+        }, cancellationToken: ct).ConfigureAwait(false);
+        return result.ValueKind == JsonValueKind.Object ? MaItemParser.ParseItem(result, _baseUrl) : null;
+    }
+
+    public async Task<MaItem?> ImportPlaylistAsync(string m3uData, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(m3uData)) throw new ArgumentException("M3U playlist data is required.", nameof(m3uData));
+        var result = await _connection.SendCommandAsync("music/playlists/import_playlist", new Dictionary<string, object?>
+        {
+            ["m3u_data"] = m3uData,
+            ["library_matching"] = true,
+        }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
+        return result.ValueKind == JsonValueKind.Object ? MaItemParser.ParseItem(result, _baseUrl) : null;
+    }
+
+    public async Task<string> ExportPlaylistAsync(MaItem playlist, CancellationToken ct = default)
+    {
+        if (playlist.Type != MaMediaType.Playlist) throw new ArgumentException("A playlist is required.", nameof(playlist));
+        var result = await _connection.SendCommandAsync("music/playlists/export_playlist", new Dictionary<string, object?>
+        {
+            ["db_playlist_id"] = playlist.ItemId,
+        }, TimeSpan.FromSeconds(60), ct).ConfigureAwait(false);
+        return result.ValueKind == JsonValueKind.String ? result.GetString() ?? string.Empty : result.ToString();
+    }
+
+    public Task RemovePlaylistTracksAsync(MaItem playlist, IReadOnlyList<int> positions, IReadOnlyList<string>? expectedUris = null, CancellationToken ct = default)
+    {
+        if (playlist.Type != MaMediaType.Playlist) throw new ArgumentException("A playlist is required.", nameof(playlist));
+        if (positions.Count == 0) throw new ArgumentException("At least one playlist position is required.", nameof(positions));
+        if (expectedUris is not null && expectedUris.Count != positions.Count)
+            throw new ArgumentException("The URI list must match the selected playlist positions.", nameof(expectedUris));
+
+        var args = new Dictionary<string, object?>
+        {
+            ["db_playlist_id"] = playlist.ItemId,
+            ["positions_to_remove"] = positions,
+        };
+        // Music Assistant verifies these URIs against the listed positions before mutating the playlist.
+        if (expectedUris is { Count: > 0 }) args["uris"] = expectedUris;
+        return _connection.SendCommandAsync("music/playlists/remove_playlist_tracks", args, TimeSpan.FromSeconds(60), ct);
     }
 
     public async Task<IReadOnlyList<MaPlayer>> GetPlayersAsync(CancellationToken ct = default)

@@ -27,7 +27,7 @@ namespace MaSatellite.App.Shell;
 /// <summary>Owns the tray icon, the player host and the app's top-level windows. The app has no main window; it lives in the tray.</summary>
 internal sealed class SatelliteShell : IDisposable
 {
-    private const int CmdOpen = 1, CmdSettings = 2, CmdAutostart = 3, CmdLibrary = 4, CmdExit = 99;
+    private const int CmdOpen = 1, CmdSettings = 2, CmdAutostart = 3, CmdLibrary = 4, CmdFeatures = 5, CmdExit = 99;
 
     private readonly Action _exit;
     private readonly AppPaths _paths = new();
@@ -43,6 +43,7 @@ internal sealed class SatelliteShell : IDisposable
     private SettingsWindow? _settingsWindow;
     private MiniPlayerWindow? _miniPlayer;
     private LibraryWindow? _libraryWindow;
+    private AdvancedFeaturesWindow? _advancedFeaturesWindow;
     private MaLibraryService? _library;
     private LibraryController? _libraryController;
     private NowPlayingController? _nowPlaying;
@@ -123,6 +124,8 @@ internal sealed class SatelliteShell : IDisposable
         _miniPlayer = null;
         _libraryWindow?.Close();
         _libraryWindow = null;
+        _advancedFeaturesWindow?.Close();
+        _advancedFeaturesWindow = null;
         try
         {
             // Tells the server we are leaving (client/goodbye) and releases the audio device.
@@ -242,6 +245,7 @@ internal sealed class SatelliteShell : IDisposable
     [
         new TrayMenuItem(CmdOpen, "Open"),
         new TrayMenuItem(CmdLibrary, "Library…"),
+        new TrayMenuItem(CmdFeatures, "More features…"),
         new TrayMenuItem(CmdSettings, "Settings…"),
         TrayMenuItem.Separator,
         new TrayMenuItem(CmdAutostart, "Start with Windows", Checked: _autostartState.IsEnabled(), Enabled: _autostartState.CanBeChangedByApp()),
@@ -258,6 +262,9 @@ internal sealed class SatelliteShell : IDisposable
                 break;
             case CmdLibrary:
                 ShowLibrary();
+                break;
+            case CmdFeatures:
+                ShowAdvancedFeatures();
                 break;
             case CmdSettings:
                 ShowSettings();
@@ -382,11 +389,27 @@ internal sealed class SatelliteShell : IDisposable
 
         if (_libraryWindow is null)
         {
-            _libraryWindow = new LibraryWindow(_libraryController, _nowPlaying, _host, ShowSettings);
+            _libraryWindow = new LibraryWindow(_libraryController, _nowPlaying, _host, ShowSettings, ShowAdvancedFeatures);
             _libraryWindow.Closed += (_, _) => _libraryWindow = null;
         }
 
         _libraryWindow.Activate();
+    }
+
+    private void ShowAdvancedFeatures()
+    {
+        if (_library is null)
+        {
+            return;
+        }
+
+        if (_advancedFeaturesWindow is null)
+        {
+            _advancedFeaturesWindow = new AdvancedFeaturesWindow(_library);
+            _advancedFeaturesWindow.Closed += (_, _) => _advancedFeaturesWindow = null;
+        }
+
+        _advancedFeaturesWindow.Activate();
     }
 
     private void ShowSettings()

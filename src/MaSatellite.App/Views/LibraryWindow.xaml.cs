@@ -27,6 +27,7 @@ public sealed partial class LibraryWindow : Window
     private readonly LibraryController _controller;
     private readonly SatelliteHost _host;
     private readonly Action _openSettings;
+    private readonly Action _openAdvancedFeatures;
     private readonly DispatcherQueueTimer _queueRefresh;
     private readonly NavigationHistory<NavState> _nav = new(new NavState("home"));
     private PlayTarget? _selectedTarget;
@@ -80,11 +81,12 @@ public sealed partial class LibraryWindow : Window
     private Brush? _tintedBrush;
     private IReadOnlyList<MaItem> _discoverAlbums = [];
 
-    internal LibraryWindow(LibraryController controller, NowPlayingController nowPlaying, SatelliteHost host, Action openSettings)
+    internal LibraryWindow(LibraryController controller, NowPlayingController nowPlaying, SatelliteHost host, Action openSettings, Action openAdvancedFeatures)
     {
         _controller = controller;
         _host = host;
         _openSettings = openSettings;
+        _openAdvancedFeatures = openAdvancedFeatures;
         InitializeComponent();
         WireNowPage(nowPlaying);
         // Every shelf uses the shared card template; the "Recently played" row uses the compact size.
@@ -2164,6 +2166,8 @@ public sealed partial class LibraryWindow : Window
     }
 
     private void OnOpenSettings(object sender, RoutedEventArgs e) => _openSettings();
+
+    private void OnOpenAdvancedFeatures(object sender, RoutedEventArgs e) => _openAdvancedFeatures();
 
     /// <summary>A listening mode plays the playlist it was matched to, on the selected player.</summary>
     private async void OnModeClick(object sender, RoutedEventArgs e)

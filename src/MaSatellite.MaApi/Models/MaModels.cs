@@ -7,6 +7,10 @@ public enum MaMediaType
     Track,
     Playlist,
     Radio,
+    Podcast,
+    PodcastEpisode,
+    Audiobook,
+    Genre,
     Other,
 }
 
@@ -28,7 +32,9 @@ public sealed record MaItem(
     DateTimeOffset? AddedAt = null,
     DateTimeOffset? LastPlayed = null,
     int? PlayCount = null,
-    bool Favorite = false)
+    bool Favorite = false,
+    int? ResumePositionMs = null,
+    bool? FullyPlayed = null)
 {
     /// <summary>"Artist · Album" style one-liner for lists.</summary>
     public string Description => string.Join(" · ", new[] { Subtitle, AlbumName, Year?.ToString() }.Where(s => !string.IsNullOrWhiteSpace(s)));
@@ -39,14 +45,20 @@ public sealed record MaSearchResults(
     IReadOnlyList<MaItem> Albums,
     IReadOnlyList<MaItem> Tracks,
     IReadOnlyList<MaItem> Playlists,
-    IReadOnlyList<MaItem> Radios)
+    IReadOnlyList<MaItem> Radios,
+    IReadOnlyList<MaItem>? Podcasts = null,
+    IReadOnlyList<MaItem>? PodcastEpisodes = null,
+    IReadOnlyList<MaItem>? Audiobooks = null,
+    IReadOnlyList<MaItem>? Genres = null)
 {
     public static MaSearchResults Empty { get; } = new([], [], [], [], []);
 
-    public bool IsEmpty => Artists.Count + Albums.Count + Tracks.Count + Playlists.Count + Radios.Count == 0;
+    public bool IsEmpty => Artists.Count + Albums.Count + Tracks.Count + Playlists.Count + Radios.Count
+        + (Podcasts?.Count ?? 0) + (PodcastEpisodes?.Count ?? 0) + (Audiobooks?.Count ?? 0) + (Genres?.Count ?? 0) == 0;
 
-    /// <summary>All results in the order Music Assistant's own search shows them: tracks, artists, albums, playlists, radio.</summary>
-    public IEnumerable<MaItem> InDisplayOrder => Tracks.Concat(Artists).Concat(Albums).Concat(Playlists).Concat(Radios);
+    /// <summary>All results in the order Music Assistant's library search returns them.</summary>
+    public IEnumerable<MaItem> InDisplayOrder => Tracks.Concat(Artists).Concat(Albums).Concat(Playlists)
+        .Concat(Radios).Concat(Podcasts ?? []).Concat(PodcastEpisodes ?? []).Concat(Audiobooks ?? []).Concat(Genres ?? []);
 }
 
 public sealed record MaPlayer(string PlayerId, string Name, bool Available, bool? Powered, string PlaybackState, string Type, int? Volume);
@@ -62,7 +74,11 @@ public sealed record MaQueueInfo(
     bool Shuffle,
     string Repeat,
     double ElapsedSeconds,
-    MaQueueItem? CurrentItem);
+    MaQueueItem? CurrentItem,
+    bool Autoplay = false,
+    bool SmartShuffleActive = false,
+    bool CrossfadeEnabled = false,
+    bool SmartFadesActive = false);
 
 public sealed record MaQueueItem(
     string QueueItemId,
