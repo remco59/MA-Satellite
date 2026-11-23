@@ -35,33 +35,73 @@ public sealed partial class LibraryWindow
                 DisplayMemberPath = nameof(MaPlayer.Name),
                 ItemsSource = players,
                 SelectedItem = players.FirstOrDefault(p => p.PlayerId == SelectedTarget?.QueueId) ?? players[0],
-                MinWidth = 340
+                MinWidth = 340,
+                Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraSurfaceRaised"],
+                Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraText"],
+                BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraBorder"]
             };
-            var members = new ListView
-            {
-                Header = "Speakers to add",
-                DisplayMemberPath = nameof(MaPlayer.Name),
-                SelectionMode = ListViewSelectionMode.Multiple,
-                Height = 190,
-                MinWidth = 340
-            };
+
+            var selectedIds = new HashSet<string>(StringComparer.Ordinal);
+            var memberButtons = new StackPanel { Spacing = 8 };
+            var selectionCount = new TextBlock { Style = (Style)Application.Current.Resources["AuroraSubtitleStyle"] };
+            void UpdateSelectionCount() => selectionCount.Text = $"{selectedIds.Count} speaker(s) selected";
             void RefreshMembers()
             {
                 var currentLeader = leader.SelectedItem as MaPlayer;
-                members.ItemsSource = players.Where(p => p.PlayerId != currentLeader?.PlayerId).ToList();
+                if (currentLeader is not null)
+                    selectedIds.Remove(currentLeader.PlayerId);
+
+                memberButtons.Children.Clear();
+                foreach (var player in players.Where(p => p.PlayerId != currentLeader?.PlayerId))
+                {
+                    var option = new ToggleButton
+                    {
+                        Content = player.Name,
+                        Tag = player.PlayerId,
+                        IsChecked = selectedIds.Contains(player.PlayerId),
+                        Style = (Style)Application.Current.Resources["AuroraSelectionToggleStyle"],
+                        HorizontalAlignment = HorizontalAlignment.Stretch
+                    };
+                    option.Checked += (_, _) => { selectedIds.Add(player.PlayerId); UpdateSelectionCount(); };
+                    option.Unchecked += (_, _) => { selectedIds.Remove(player.PlayerId); UpdateSelectionCount(); };
+                    memberButtons.Children.Add(option);
+                }
+                UpdateSelectionCount();
             }
             leader.SelectionChanged += (_, _) => RefreshMembers();
             RefreshMembers();
 
-            var content = new StackPanel { Spacing = 10, MinWidth = 360 };
+            var memberSurface = new Border
+            {
+                Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraSurface"],
+                BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraBorder"],
+                BorderThickness = new Thickness(1),
+                CornerRadius = (CornerRadius)Application.Current.Resources["AuroraRadiusM"],
+                Padding = new Thickness(10),
+                Child = new ScrollViewer
+                {
+                    Content = memberButtons,
+                    MaxHeight = 240,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+                }
+            };
+
+            var content = new StackPanel { Spacing = 12, MinWidth = 360 };
             content.Children.Add(new TextBlock
             {
-                Text = "Choose the player that will lead the synchronized group, then select the speakers to add.",
-                TextWrapping = TextWrapping.Wrap,
-                Opacity = 0.82
+                Text = "Choose the speaker that leads the group, then select the rooms to synchronize with it.",
+                Style = (Style)Application.Current.Resources["AuroraStatusTextStyle"]
             });
             content.Children.Add(leader);
-            content.Children.Add(members);
+            content.Children.Add(new TextBlock
+            {
+                Text = "SPEAKERS TO ADD",
+                Style = (Style)Application.Current.Resources["AuroraSectionLabelStyle"],
+                Margin = new Thickness(0, 4, 0, 0)
+            });
+            content.Children.Add(memberSurface);
+            content.Children.Add(selectionCount);
 
             var dialog = FeatureDialog("Group speakers", content, "Create group");
             if (await dialog.ShowAsync() != ContentDialogResult.Primary)
@@ -69,8 +109,7 @@ public sealed partial class LibraryWindow
 
             if (leader.SelectedItem is not MaPlayer selectedLeader)
                 throw new MaException("Choose a group leader.");
-            var selectedMembers = members.SelectedItems.Cast<MaPlayer>()
-                .Select(p => p.PlayerId).Distinct().ToList();
+            var selectedMembers = selectedIds.ToList();
             if (selectedMembers.Count == 0)
                 throw new MaException("Select at least one speaker to add.");
 
@@ -196,42 +235,68 @@ public sealed partial class LibraryWindow
         }
     }
 
-    private void ShowSleepTimerFlyout(FrameworkElement anchor)
+    private async Task OpenSleepTimerDialogAsync()
     {
-        var flyout = new MenuFlyout();
-        foreach (var minutes in new[] { 15, 30, 45, 60 })
-            flyout.Items.Add(MenuItem($"{minutes} minutes", () => SetSleepTimerAsync(minutes)));
-        flyout.Items.Add(new MenuFlyoutSeparator());
-        flyout.Items.Add(MenuItem("At the end of this item", () => SetSleepTimerAsync(null, "end_of_item")));
-        flyout.Items.Add(MenuItem("At the end of this chapter", () => SetSleepTimerAsync(null, "end_of_chapter")));
-        flyout.Items.Add(MenuItem("Custom duration…", OpenCustomSleepTimerAsync));
-        flyout.Items.Add(new MenuFlyoutSeparator());
-        flyout.Items.Add(MenuItem("Clear sleep timer", ClearSleepTimerAsync));
-        flyout.ShowAt(anchor);
-    }
+        if (SelectedTarget is null)
+        {
+            ShowInfo("Choose a player before setting a sleep timer.");
+            return;
+        }
 
-    private async Task OpenCustomSleepTimerAsync()
-    {
-        var minutes = new TextBox
+        var mode = ChoiceBox(
+            ("15 minutes", "15"),
+            ("30 minutes", "30"),
+            ("45 minutes", "45"),
+            ("60 minutes", "60"),
+            ("At the end of this item", "end_of_item"),
+            ("At the end of this chapter", "end_of_chapter"),
+            ("Custom duration…", "custom"));
+        mode.SelectedIndex = 1;
+
+        var customMinutes = new TextBox
         {
             Header = "Minutes",
             Text = "30",
             PlaceholderText = "1–1440",
-            Width = 180
+            Width = 220,
+            Visibility = Visibility.Collapsed,
+            Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraSurfaceRaised"],
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraText"]
         };
-        var content = new StackPanel { Spacing = 8 };
-        content.Children.Add(new TextBlock { Text = "Choose when Music Assistant should stop playback." });
-        content.Children.Add(minutes);
-        var dialog = FeatureDialog("Custom sleep timer", content, "Start timer");
+        mode.SelectionChanged += (_, _) =>
+            customMinutes.Visibility = SelectedTag(mode) == "custom" ? Visibility.Visible : Visibility.Collapsed;
+
+        var content = new StackPanel { Spacing = 12, MinWidth = 340 };
+        content.Children.Add(new TextBlock
+        {
+            Text = $"Choose when playback should stop on {SelectedTarget.Name}.",
+            Style = (Style)Application.Current.Resources["AuroraStatusTextStyle"]
+        });
+        content.Children.Add(mode);
+        content.Children.Add(customMinutes);
+
+        var dialog = FeatureDialog("Sleep timer", content, "Set timer");
         if (await dialog.ShowAsync() != ContentDialogResult.Primary)
             return;
 
-        if (!int.TryParse(minutes.Text, out var value) || value < 1 || value > 1440)
+        var selected = SelectedTag(mode);
+        if (selected == "custom")
         {
-            ShowInfo("Enter a sleep timer between 1 and 1440 minutes.");
-            return;
+            if (!int.TryParse(customMinutes.Text, out var minutes) || minutes < 1 || minutes > 1440)
+            {
+                ShowInfo("Enter a sleep timer between 1 and 1440 minutes.");
+                return;
+            }
+            await SetSleepTimerAsync(minutes);
         }
-        await SetSleepTimerAsync(value);
+        else if (int.TryParse(selected, out var presetMinutes))
+        {
+            await SetSleepTimerAsync(presetMinutes);
+        }
+        else
+        {
+            await SetSleepTimerAsync(null, selected);
+        }
     }
 
     private async Task SetSleepTimerAsync(int? minutes, string? mode = null)
@@ -492,7 +557,14 @@ public sealed partial class LibraryWindow
 
     private static ComboBox ChoiceBox(params (string Label, string Tag)[] choices)
     {
-        var combo = new ComboBox { MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var combo = new ComboBox
+        {
+            MinWidth = 320,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraSurfaceRaised"],
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraText"],
+            BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraBorder"]
+        };
         foreach (var (label, tag) in choices)
             combo.Items.Add(new ComboBoxItem { Content = label, Tag = tag });
         return combo;
@@ -509,7 +581,11 @@ public sealed partial class LibraryWindow
         CloseButtonText = "Cancel",
         DefaultButton = ContentDialogButton.Primary,
         XamlRoot = LibraryRoot.XamlRoot,
-        RequestedTheme = ElementTheme.Dark
+        RequestedTheme = ElementTheme.Dark,
+        Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraSurface"],
+        Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AuroraText"],
+        PrimaryButtonStyle = (Style)Application.Current.Resources["AuroraPrimaryButtonStyle"],
+        CloseButtonStyle = (Style)Application.Current.Resources["AuroraButtonStyle"]
     };
 
     private void ShowFeatureError(Exception ex) =>
