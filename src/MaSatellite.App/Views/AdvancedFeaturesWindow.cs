@@ -18,16 +18,16 @@ public sealed class AdvancedFeaturesWindow : Window
     private readonly MaLibraryService _library;
     private readonly TextBlock _status = new() { Text = "Connect to Music Assistant to load players and media." };
 
-    private readonly ComboBox _groupLeader = new() { Width = 280, PlaceholderText = "Choose a group leader" };
+    private readonly ComboBox _groupLeader = new() { Width = 280, PlaceholderText = "Choose a group leader", DisplayMemberPath = nameof(MaPlayer.Name) };
     private readonly ListView _groupMembers = new() { Height = 126, SelectionMode = ListViewSelectionMode.Multiple, DisplayMemberPath = nameof(MaPlayer.Name) };
-    private readonly ComboBox _ungroupPlayer = new() { Width = 280, PlaceholderText = "Choose a player to ungroup" };
+    private readonly ComboBox _ungroupPlayer = new() { Width = 280, PlaceholderText = "Choose a player to ungroup", DisplayMemberPath = nameof(MaPlayer.Name) };
 
-    private readonly ComboBox _queuePlayer = new() { Width = 280, PlaceholderText = "Choose a player" };
+    private readonly ComboBox _queuePlayer = new() { Width = 280, PlaceholderText = "Choose a player", DisplayMemberPath = nameof(MaPlayer.Name) };
     private readonly CheckBox _autoplay = new() { Content = "Autoplay" };
     private readonly CheckBox _smartShuffle = new() { Content = "Smart Shuffle" };
     private readonly CheckBox _crossfade = new() { Content = "Crossfade" };
     private readonly ComboBox _autoplayMode = new() { Width = 220, PlaceholderText = "Autoplay mode" };
-    private readonly ComboBox _autoplayPlaylist = new() { Width = 250, PlaceholderText = "Autoplay playlist" };
+    private readonly ComboBox _autoplayPlaylist = new() { Width = 250, PlaceholderText = "Autoplay playlist", DisplayMemberPath = nameof(MaItem.Name) };
     private readonly ComboBox _crossfadeMode = new() { Width = 220, PlaceholderText = "Crossfade mode" };
 
     private readonly TextBox _sleepMinutes = new() { Width = 100, Text = "30", PlaceholderText = "Minutes" };
@@ -41,7 +41,7 @@ public sealed class AdvancedFeaturesWindow : Window
     private readonly TextBox _searchProviders = new() { Width = 230, PlaceholderText = "Provider IDs (comma separated)" };
     private readonly ListView _searchResults = new() { Height = 180, DisplayMemberPath = nameof(MaItem.Name) };
 
-    private readonly ComboBox _playlistPicker = new() { Width = 280, PlaceholderText = "Choose a playlist" };
+    private readonly ComboBox _playlistPicker = new() { Width = 280, PlaceholderText = "Choose a playlist", DisplayMemberPath = nameof(MaItem.Name) };
     private readonly ListView _playlistTracks = new() { Height = 150, SelectionMode = ListViewSelectionMode.Multiple, DisplayMemberPath = nameof(MaItem.Name) };
     private readonly TextBox _playlistName = new() { Width = 260, PlaceholderText = "New playlist name" };
     private readonly TextBox _m3uData = new()
@@ -56,7 +56,6 @@ public sealed class AdvancedFeaturesWindow : Window
     private IReadOnlyList<MaItem> _currentMedia = [];
     private IReadOnlyList<MaItem> _currentSearch = [];
     private IReadOnlyList<MaItem> _currentPlaylistTracks = [];
-    private MaItem? _showingPodcast;
     private string? _serverUrl;
     private bool _loading;
 
@@ -440,7 +439,6 @@ public sealed class AdvancedFeaturesWindow : Window
         {
             var client = await _library.GetClientAsync();
             var kind = (_mediaKind.SelectedItem as ComboBoxItem)?.Tag?.ToString();
-            _showingPodcast = null;
             _currentMedia = kind switch
             {
                 "audiobooks" => await client.GetLibraryAsync(MaMediaType.Audiobook, limit: 250),
@@ -462,7 +460,6 @@ public sealed class AdvancedFeaturesWindow : Window
         {
             if (_mediaItems.SelectedItem is not MaItem { Type: MaMediaType.Podcast } podcast)
                 throw new MaException("Select a podcast first.");
-            _showingPodcast = podcast;
             _currentMedia = await (await _library.GetClientAsync()).GetPodcastEpisodesAsync(podcast);
             _mediaItems.ItemsSource = _currentMedia;
             _mediaDetails.Text = $"{_currentMedia.Count} episode(s) from {podcast.Name}.";
@@ -572,20 +569,12 @@ public sealed class AdvancedFeaturesWindow : Window
             if (_playlistPicker.SelectedItem is not MaItem playlist) throw new MaException("Choose a playlist first.");
             var selected = _playlistTracks.SelectedItems.Cast<MaItem>().ToList();
             if (selected.Count == 0) throw new MaException("Select one or more playlist tracks to remove.");
-            var remaining = new List<MaItem>(_currentPlaylistTracks);
-            var positions = new List<int>();
-            foreach (var item in selected)
-            {
-                var index = remaining.FindIndex(candidate => ReferenceEquals(candidate, item));
-                if (index < 0) index = remaining.FindIndex(candidate => candidate == item);
-                if (index >= 0)
-                {
-                    positions.Add(index);
-                    remaining.RemoveAt(index);
-                }
-            }
+            var positions = Enumerable.Range(0, _currentPlaylistTracks.Count)
+                .Where(index => selected.Any(item => ReferenceEquals(item, _currentPlaylistTracks[index])))
+                .ToList();
             if (positions.Count == 0) throw new MaException("The selected tracks could not be matched to playlist positions.");
-            await (await _library.GetClientAsync()).RemovePlaylistTracksAsync(playlist, positions);
+            var expectedUris = positions.Select(index => _currentPlaylistTracks[index].Uri).ToList();
+            await (await _library.GetClientAsync()).RemovePlaylistTracksAsync(playlist, positions, expectedUris);
             await LoadPlaylistTracksAsync();
             _status.Text = $"Removed {positions.Count} track(s) from {playlist.Name}.";
         }
