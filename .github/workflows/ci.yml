@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "claude/**"]
+    branches: [main, "claude/**", "release/**"]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
@@ -101,9 +101,10 @@ jobs:
           name: test-results
           path: artifacts/test-results/**
 
-  # Pushing a tag like v0.1.0 publishes the installer and the MSIX bundle as a GitHub Release.
+  # Pushing a v* tag, or a release/v* branch, builds and publishes a GitHub Release.
+  # The release branch path is a fallback for environments where tags cannot be created directly.
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/release/')
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -119,9 +120,18 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REF: ${{ github.ref }}
+        shell: bash
         run: |
           ls -l release
+          # A release/v1.2.0 branch is also supported when a tag cannot be pushed directly.
+          if [[ "$REF" == refs/heads/release/* ]]; then
+            TAG="v${REF_NAME#release/}"
+          else
+            TAG="$REF_NAME"
+          fi
+          VERSION="${TAG#v}"
           # The tag must match the app version baked into the installer file name (Directory.Build.props).
-          test -f "release/ma-satellite-setup-${TAG#v}.exe" || { echo "::error::Tag $TAG does not match the built installer version"; exit 1; }
-          gh release create "$TAG" release/* --repo "$GITHUB_REPOSITORY" --title "ma-satellite ${TAG#v}" --generate-notes
+          test -f "release/ma-satellite-setup-$VERSION.exe" || { echo "::error::Tag $TAG does not match the built installer version"; exit 1; }
+          gh release create "$TAG" release/* --repo "$GITHUB_REPOSITORY" --title "ma-satellite $VERSION" --generate-notes --target "$GITHUB_SHA"
