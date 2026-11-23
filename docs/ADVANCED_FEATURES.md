@@ -29,7 +29,7 @@ End-of-item and end-of-chapter timers require a supported active queue item. Cha
 
 Use the **Audiobooks**, **Podcasts**, **Genres** and **Continue listening** destinations in the library sidebar. Open a podcast show to list its episodes; open an audiobook or genre where the provider exposes child items. Playable podcast episodes can be played directly.
 
-For a currently playing audiobook or podcast episode, use the speed control on the Now Playing page to request playback speed from 0.5× to 3.0×. Music Assistant may reject variable speed for other media types.
+For a currently playing audiobook or podcast episode, a speed control appears on the Now Playing page; it is hidden for ordinary music tracks. Use it to request playback speed from 0.5× to 3.0×. The control reflects the speed last applied during the current session. Music Assistant may reject variable speed for other media types.
 
 In-progress and resume metadata come from the server. Resume behaviour and availability depend on the media provider.
 
