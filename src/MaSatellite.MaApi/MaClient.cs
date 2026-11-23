@@ -34,7 +34,7 @@ public sealed class MaClient : IAsyncDisposable
 
     public Task ConnectAsync(CancellationToken ct = default) => _connection.ConnectAsync(ct);
 
-    public async Task<MaSearchResults> SearchAsync(string query, int limit = 25, CancellationToken ct = default, IReadOnlyList<string>? providers = null)
+    public async Task<MaSearchResults> SearchAsync(string query, int limit = 25, IReadOnlyList<string>? providers = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query))
         {
