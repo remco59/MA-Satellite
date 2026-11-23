@@ -80,7 +80,9 @@ public static class MaItemParser
             UnixTime(e, "timestamp_added"),
             UnixTime(e, "last_played"),
             e.TryGetProperty("play_count", out var pc) && pc.ValueKind == JsonValueKind.Number && pc.TryGetInt32(out var pcv) ? pcv : null,
-            Bool(e, "favorite") ?? false);
+            Bool(e, "favorite") ?? false,
+            e.TryGetProperty("resume_position_ms", out var resume) && resume.ValueKind == JsonValueKind.Number ? (int?)resume.GetInt32() : null,
+            Bool(e, "fully_played"));
     }
 
     /// <summary>Music Assistant reports dates as Unix seconds; 0 or missing means "unknown".</summary>
@@ -127,7 +129,11 @@ public static class MaItemParser
             Bool(e, "shuffle_enabled") ?? false,
             Str(e, "repeat_mode") ?? "off",
             e.TryGetProperty("elapsed_time", out var el) && el.ValueKind == JsonValueKind.Number ? el.GetDouble() : 0,
-            current);
+            current,
+            Bool(e, "autoplay_enabled") ?? false,
+            Bool(e, "smart_shuffle_active") ?? false,
+            Bool(e, "crossfade_enabled") ?? false,
+            Bool(e, "smart_fades_active") ?? false);
     }
 
     public static MaQueueItem ParseQueueItem(JsonElement e, string baseUrl, int imageSize = 128)
@@ -356,6 +362,10 @@ public static class MaItemParser
         "track" => MaMediaType.Track,
         "playlist" => MaMediaType.Playlist,
         "radio" => MaMediaType.Radio,
+        "podcast" => MaMediaType.Podcast,
+        "podcast_episode" => MaMediaType.PodcastEpisode,
+        "audiobook" => MaMediaType.Audiobook,
+        "genre" => MaMediaType.Genre,
         _ => MaMediaType.Other,
     };
 
