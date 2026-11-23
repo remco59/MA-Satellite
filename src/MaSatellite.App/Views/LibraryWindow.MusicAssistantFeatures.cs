@@ -5,6 +5,7 @@ using MaSatellite.MaApi.Models;
 using MaSatellite.Host.Presentation;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
 using Windows.ApplicationModel.DataTransfer;
 
 namespace MaSatellite.App.Views;
