@@ -127,7 +127,8 @@ jobs:
           ls -l release
           # A release/v1.2.0 branch is also supported when a tag cannot be pushed directly.
           if [[ "$REF" == refs/heads/release/* ]]; then
-            TAG="v${REF_NAME#release/}"
+            TAG="${REF_NAME#release/}"
+            if [[ "$TAG" != v* ]]; then TAG="v$TAG"; fi
           else
             TAG="$REF_NAME"
           fi
