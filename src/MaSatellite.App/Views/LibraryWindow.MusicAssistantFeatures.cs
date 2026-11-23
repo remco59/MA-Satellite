@@ -251,7 +251,8 @@ public sealed partial class LibraryWindow
             ("60 minutes", "60"),
             ("At the end of this item", "end_of_item"),
             ("At the end of this chapter", "end_of_chapter"),
-            ("Custom duration…", "custom"));
+            ("Custom duration…", "custom"),
+            ("Clear sleep timer", "clear"));
         mode.SelectedIndex = 1;
 
         var customMinutes = new TextBox
@@ -281,7 +282,11 @@ public sealed partial class LibraryWindow
             return;
 
         var selected = SelectedTag(mode);
-        if (selected == "custom")
+        if (selected == "clear")
+        {
+            await ClearSleepTimerAsync();
+        }
+        else if (selected == "custom")
         {
             if (!int.TryParse(customMinutes.Text, out var minutes) || minutes < 1 || minutes > 1440)
             {
