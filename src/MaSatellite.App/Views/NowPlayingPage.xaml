@@ -115,7 +115,7 @@
               <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
               <TextBlock Text="NOW PLAYING" Style="{StaticResource AuroraSectionLabelStyle}" Foreground="{StaticResource AuroraTextOnArt}" VerticalAlignment="Center"/>
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
-                <Button x:Name="SpeedButton" Content="1×" Click="OnSpeedClick" Style="{StaticResource AuroraIconButtonStyle}"
+                <Button x:Name="SpeedButton" Content="1×" Visibility="Collapsed" Click="OnSpeedClick" Style="{StaticResource AuroraIconButtonStyle}"
                         ToolTipService.ToolTip="Playback speed for audiobooks and podcast episodes" AutomationProperties.Name="Playback speed"/>
                 <Button x:Name="FavoriteButton" Click="OnFavoriteClick" Style="{StaticResource AuroraIconButtonStyle}"
                         ToolTipService.ToolTip="Add to favourites" AutomationProperties.Name="Favourite">

@@ -303,6 +303,7 @@ public sealed partial class LibraryWindow
         try
         {
             await (await _controller.Service.GetClientAsync()).SetPlaybackSpeedAsync(target.QueueId, selectedSpeed);
+            NowPage.SetPlaybackSpeed(selectedSpeed);
             ShowInfo($"Requested {selectedSpeed:0.##}× speed on {target.Name}.");
         }
         catch (Exception ex)

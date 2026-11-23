@@ -515,6 +515,8 @@ public sealed partial class NowPlayingPage : UserControl
         _durationSeconds = null;
         _lyricsFor = _relatedFor = _aboutFor = null;
         _favorite = false;
+        SpeedButton.Visibility = Visibility.Collapsed;
+        SpeedButton.Content = "1×";
         ApplyFavorite();
         MetaText.Visibility = Visibility.Collapsed;
         ClearLyrics();
@@ -549,6 +551,8 @@ public sealed partial class NowPlayingPage : UserControl
             }
 
             _favorite = details.IsFavorite;
+            var supportsVariableSpeed = details.Item.Type is MaMediaType.Audiobook or MaMediaType.PodcastEpisode;
+            SpeedButton.Visibility = supportsVariableSpeed ? Visibility.Visible : Visibility.Collapsed;
             ApplyFavorite();
             var meta = new List<string>();
             if (!string.IsNullOrWhiteSpace(details.AlbumName))
