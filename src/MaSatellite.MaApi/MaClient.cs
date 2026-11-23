@@ -357,14 +357,21 @@ public sealed class MaClient : IAsyncDisposable
         return result.ValueKind == JsonValueKind.String ? result.GetString() ?? string.Empty : result.ToString();
     }
 
-    public Task RemovePlaylistTracksAsync(MaItem playlist, IReadOnlyList<int> positions, CancellationToken ct = default)
+    public Task RemovePlaylistTracksAsync(MaItem playlist, IReadOnlyList<int> positions, IReadOnlyList<string>? expectedUris = null, CancellationToken ct = default)
     {
         if (playlist.Type != MaMediaType.Playlist) throw new ArgumentException("A playlist is required.", nameof(playlist));
-        return _connection.SendCommandAsync("music/playlists/remove_playlist_tracks", new Dictionary<string, object?>
+        if (positions.Count == 0) throw new ArgumentException("At least one playlist position is required.", nameof(positions));
+        if (expectedUris is not null && expectedUris.Count != positions.Count)
+            throw new ArgumentException("The URI list must match the selected playlist positions.", nameof(expectedUris));
+
+        var args = new Dictionary<string, object?>
         {
             ["db_playlist_id"] = playlist.ItemId,
             ["positions_to_remove"] = positions,
-        }, TimeSpan.FromSeconds(60), ct);
+        };
+        // Music Assistant verifies these URIs against the listed positions before mutating the playlist.
+        if (expectedUris is { Count: > 0 }) args["uris"] = expectedUris;
+        return _connection.SendCommandAsync("music/playlists/remove_playlist_tracks", args, TimeSpan.FromSeconds(60), ct);
     }
 
     public async Task<IReadOnlyList<MaPlayer>> GetPlayersAsync(CancellationToken ct = default)
