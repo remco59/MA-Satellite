@@ -85,7 +85,7 @@ public class MaClientTests
 
         var req = server.Received.Last(r => r.Command == "music/search").Args;
         Assert.Equal("kid a", req.GetProperty("search_query").GetString());
-        Assert.Equal(["track", "artist", "album", "playlist", "radio"], req.GetProperty("media_types").EnumerateArray().Select(e => e.GetString()));
+        Assert.Equal(["track", "artist", "album", "playlist", "radio", "podcast", "podcast_episode", "audiobook", "genre"], req.GetProperty("media_types").EnumerateArray().Select(e => e.GetString()));
 
         var radio = Assert.Single(results.Radios);
         Assert.Equal(MaMediaType.Radio, radio.Type);
@@ -318,7 +318,7 @@ public class MaClientTests
         };
         server.Handlers["player_queues/all"] = _ => new object[]
         {
-            new { queue_id = "sendspin-abc", display_name = "Desk PC", active = true, available = true, items = 12, current_index = 3, state = "playing", shuffle_enabled = true, repeat_mode = "all", elapsed_time = 42.5,
+            new { queue_id = "sendspin-abc", display_name = "Desk PC", active = true, available = true, items = 12, current_index = 3, state = "playing", shuffle_enabled = true, repeat_mode = "all", elapsed_time = 42.5, autoplay_enabled = true, smart_shuffle_active = true, crossfade_enabled = true, smart_fades_active = true,
                   current_item = new { queue_id = "sendspin-abc", queue_item_id = "q1", name = "Idioteque", duration = 309, index = 3, image = new { type = "thumb", path = "/x.jpg", provider = "fs", proxy_id = "pid" } } },
         };
         await using var client = await ConnectAsync(server);
@@ -333,6 +333,10 @@ public class MaClientTests
         Assert.Equal(3, queue.CurrentIndex);
         Assert.True(queue.Shuffle);
         Assert.Equal("all", queue.Repeat);
+        Assert.True(queue.Autoplay);
+        Assert.True(queue.SmartShuffleActive);
+        Assert.True(queue.CrossfadeEnabled);
+        Assert.True(queue.SmartFadesActive);
         Assert.Equal("Idioteque", queue.CurrentItem!.Name);
         Assert.Equal($"http://127.0.0.1:{server.Port}/imageproxy/pid?size=128", queue.CurrentItem.ImageUrl);
     }
@@ -361,6 +365,113 @@ public class MaClientTests
         Assert.Equal("sendspin-abc", transfer.GetProperty("target_queue_id").GetString());
         Assert.True(transfer.GetProperty("auto_play").GetBoolean());
         Assert.Contains(server.Received, r => r.Command == "player_queues/next");
+    }
+
+    
+    [Fact]
+    public async Task Extended_search_includes_podcasts_audiobooks_genres_and_provider_filter()
+    {
+        await using var server = new FakeMaServer();
+        server.Handlers["music/search"] = _ => new
+        {
+            artists = Array.Empty<object>(),
+            albums = Array.Empty<object>(),
+            tracks = Array.Empty<object>(),
+            playlists = Array.Empty<object>(),
+            radio = Array.Empty<object>(),
+            podcasts = new[] { new { media_type = "podcast", item_id = "p1", provider = "podcast_provider", name = "Design Notes", uri = "podcast://show/p1" } },
+            podcast_episodes = new[] { new { media_type = "podcast_episode", item_id = "e1", provider = "podcast_provider", name = "Episode 1", uri = "podcast_episode://e1", resume_position_ms = 12000, fully_played = false } },
+            audiobooks = new[] { new { media_type = "audiobook", item_id = "a1", provider = "books", name = "The Pragmatic Programmer", uri = "audiobook://a1", resume_position_ms = 55000 } },
+            genres = new[] { new { media_type = "genre", item_id = "g1", provider = "library", name = "House", uri = "library://genre/g1" } },
+        };
+        await using var client = await ConnectAsync(server);
+
+        var results = await client.SearchAsync("design", providers: ["podcast_provider", "books"]);
+
+        Assert.Equal(["Design Notes", "Episode 1", "The Pragmatic Programmer", "House"], results.InDisplayOrder.Select(i => i.Name).ToArray());
+        Assert.Equal(MaMediaType.PodcastEpisode, Assert.Single(results.PodcastEpisodes!).Type);
+        Assert.Equal(12000, results.PodcastEpisodes![0].ResumePositionMs);
+        Assert.False(results.PodcastEpisodes![0].FullyPlayed);
+        Assert.Equal(55000, Assert.Single(results.Audiobooks!).ResumePositionMs);
+        var args = server.Received.Single(r => r.Command == "music/search").Args;
+        Assert.Equal(["podcast_provider", "books"], args.GetProperty("providers").EnumerateArray().Select(x => x.GetString()).ToArray());
+    }
+
+    [Fact]
+    public async Task Extended_library_and_in_progress_commands_use_music_assistant_endpoints()
+    {
+        await using var server = new FakeMaServer();
+        server.Handlers["music/podcasts/library_items"] = _ => new[] { new { media_type = "podcast", item_id = "p1", provider = "podcast_provider", name = "Design Notes", uri = "podcast://show/p1" } };
+        server.Handlers["music/audiobooks/library_items"] = _ => new[] { new { media_type = "audiobook", item_id = "a1", provider = "books", name = "Book", uri = "audiobook://a1" } };
+        server.Handlers["music/genres/library_items"] = _ => new[] { new { media_type = "genre", item_id = "g1", provider = "library", name = "House", uri = "library://genre/g1" } };
+        server.Handlers["music/in_progress_items"] = _ => new[] { new { media_type = "audiobook", item_id = "a1", provider = "books", name = "Book", uri = "audiobook://a1", resume_position_ms = 55000 } };
+        await using var client = await ConnectAsync(server);
+
+        Assert.Equal(MaMediaType.Podcast, Assert.Single(await client.GetLibraryAsync(MaMediaType.Podcast)).Type);
+        Assert.Equal(MaMediaType.Audiobook, Assert.Single(await client.GetLibraryAsync(MaMediaType.Audiobook)).Type);
+        Assert.Equal(MaMediaType.Genre, Assert.Single(await client.GetLibraryAsync(MaMediaType.Genre)).Type);
+        Assert.Equal(55000, Assert.Single(await client.GetInProgressItemsAsync()).ResumePositionMs);
+        Assert.Contains(server.Received, r => r.Command == "music/podcasts/library_items");
+        Assert.Contains(server.Received, r => r.Command == "music/audiobooks/library_items");
+        Assert.Contains(server.Received, r => r.Command == "music/genres/library_items");
+        Assert.Contains(server.Received, r => r.Command == "music/in_progress_items");
+    }
+
+    [Fact]
+    public async Task Advanced_playback_commands_use_the_music_assistant_contract()
+    {
+        await using var server = new FakeMaServer();
+        foreach (var command in new[] { "players/cmd/set_members", "players/cmd/ungroup", "player_queues/autoplay", "player_queues/crossfade", "config/player_queues/save", "players/sleep_timer/clear" })
+            server.Handlers[command] = _ => null;
+        server.Handlers["players/sleep_timer/set"] = _ => 1732.5;
+        await using var client = await ConnectAsync(server);
+
+        await client.SetGroupMembersAsync("living_room", ["desk", "kitchen"]);
+        await client.UngroupPlayerAsync("kitchen");
+        await client.SetQueueAutoplayAsync("living_room", true);
+        await client.SetQueueCrossfadeAsync("living_room", true);
+        await client.SaveQueueSettingsAsync("living_room", new Dictionary<string, object?>
+        {
+            ["smart_shuffle_enabled"] = "enabled",
+            ["autoplay_mode"] = "similar",
+            ["crossfade_mode"] = "smart_crossfade",
+        });
+        var expiry = await client.SetSleepTimerAsync("living_room", 600);
+        await client.ClearSleepTimerAsync("living_room");
+
+        Assert.Equal(1732.5, expiry);
+        var group = server.Received.Single(r => r.Command == "players/cmd/set_members").Args;
+        Assert.Equal("living_room", group.GetProperty("target_player").GetString());
+        Assert.Equal(["desk", "kitchen"], group.GetProperty("player_ids_to_add").EnumerateArray().Select(x => x.GetString()).ToArray());
+        var autoplay = server.Received.Single(r => r.Command == "player_queues/autoplay").Args;
+        Assert.True(autoplay.GetProperty("autoplay_enabled").GetBoolean());
+        var queueConfig = server.Received.Single(r => r.Command == "config/player_queues/save").Args.GetProperty("values");
+        Assert.Equal("enabled", queueConfig.GetProperty("smart_shuffle_enabled").GetString());
+        Assert.Equal("similar", queueConfig.GetProperty("autoplay_mode").GetString());
+        var sleep = server.Received.Single(r => r.Command == "players/sleep_timer/set").Args;
+        Assert.Equal(600, sleep.GetProperty("seconds").GetInt32());
+    }
+
+    [Fact]
+    public async Task Playlist_management_import_export_and_remove_use_expected_arguments()
+    {
+        await using var server = new FakeMaServer();
+        server.Handlers["music/playlists/create_playlist"] = _ => new { media_type = "playlist", item_id = "pl1", provider = "library", name = "New list", uri = "library://playlist/pl1" };
+        server.Handlers["music/playlists/import_playlist"] = _ => new { media_type = "playlist", item_id = "pl2", provider = "library", name = "Imported", uri = "library://playlist/pl2" };
+        server.Handlers["music/playlists/export_playlist"] = _ => "#EXTM3U\n";
+        server.Handlers["music/playlists/remove_playlist_tracks"] = _ => null;
+        await using var client = await ConnectAsync(server);
+        var playlist = new MaItem(MaMediaType.Playlist, "pl1", "library", "New list", "library://playlist/pl1", null, null, null, null, null);
+
+        Assert.Equal("New list", (await client.CreatePlaylistAsync("New list"))!.Name);
+        Assert.Equal("Imported", (await client.ImportPlaylistAsync("#EXTM3U\n"))!.Name);
+        Assert.Equal("#EXTM3U\n", await client.ExportPlaylistAsync(playlist));
+        await client.RemovePlaylistTracksAsync(playlist, [1, 4]);
+
+        var create = server.Received.Single(r => r.Command == "music/playlists/create_playlist").Args;
+        Assert.Equal("library", create.GetProperty("provider_instance_or_domain").GetString());
+        var remove = server.Received.Single(r => r.Command == "music/playlists/remove_playlist_tracks").Args;
+        Assert.Equal([1, 4], remove.GetProperty("positions_to_remove").EnumerateArray().Select(x => x.GetInt32()).ToArray());
     }
 
     [Fact]
