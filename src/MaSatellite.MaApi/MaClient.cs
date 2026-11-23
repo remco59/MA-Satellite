@@ -315,6 +315,16 @@ public sealed class MaClient : IAsyncDisposable
     public Task ClearSleepTimerAsync(string playerId, CancellationToken ct = default) =>
         _connection.SendCommandAsync("players/sleep_timer/clear", new Dictionary<string, object?> { ["player_id"] = playerId }, cancellationToken: ct);
 
+    /// <summary>Sets playback speed for the current audiobook or podcast episode (0.5x–3.0x).</summary>
+    public Task SetPlaybackSpeedAsync(string queueId, double speed, string? queueItemId = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(queueId)) throw new ArgumentException("A queue id is required.", nameof(queueId));
+        if (speed is < 0.5 or > 3.0) throw new ArgumentOutOfRangeException(nameof(speed), "Playback speed must be between 0.5x and 3.0x.");
+        var args = new Dictionary<string, object?> { ["queue_id"] = queueId, ["speed"] = speed };
+        if (!string.IsNullOrWhiteSpace(queueItemId)) args["queue_item_id"] = queueItemId;
+        return _connection.SendCommandAsync("player_queues/set_playback_speed", args, cancellationToken: ct);
+    }
+
     public async Task<MaItem?> CreatePlaylistAsync(string name, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("A playlist name is required.", nameof(name));
