@@ -18,7 +18,7 @@ Built with **.NET 8**, **WinUI 3**, and **WASAPI**. The **Aurora 3.0** interface
 | **Discover** | A page built only from your Music Assistant history, play counts and library tags: a music insight, similar artists, "Because you played…", new releases, genres you actually have, listening statistics and albums you haven't played yet. It is rule-based, not AI-generated, and sections disappear when the server has no data for them. |
 | **Now Playing** | An immersive page with large artwork, an atmosphere tinted by the cover, and Up next / Lyrics / Related tabs. Up next supports playing, reordering, removing and clearing queue entries. Lyrics and related artists are shown only when Music Assistant provides them. Favourite the playing track from the heart button. |
 | **Playback control** | Play now, play next, add to queue, choose a target player, control playback and seeking, and transfer a queue between players. A persistent player footer includes track info, transport, volume, shuffle/repeat, and queue access. |
-| **Advanced Music Assistant features** | Multi-room grouping, Autoplay modes, Smart Shuffle, Smart Crossfade, sleep timers, audiobook/podcast playback speed, provider-aware search, audiobook/podcast/genre libraries, in-progress media and playlist import/export. Open **More features** in the desktop app. |
+| **Music Assistant controls** | Group and ungroup rooms from the player selector; configure Autoplay, Smart Shuffle and Crossfade in **Now Playing → Up Next → Queue settings**; set sleep timers from the same queue toolbar; change spoken-word playback speed from the Now Playing controls. |
 | **Windows integration** | Tray mini-player, media-key and System Media Transport Controls (SMTC) integration, output-device selection, and optional startup with Windows. |
 | **Desktop widgets** | Loopback-only now-playing HTTP/WebSocket API and a ready-to-use [Lively Wallpaper widget](widgets/lively/README.md). |
 | **Connection security** | Encrypted Sendspin with pairing support, plus optional legacy compatibility for older servers. Long-lived credentials are encrypted for the Windows user. |
@@ -83,20 +83,18 @@ The token is stored encrypted using Windows DPAPI for your account, not in plain
 
 **Volume behavior:** The MA Satellite player's volume is the **Windows master volume for the selected output device**. Changing it from Music Assistant also affects other applications using that device.
 
-## More Music Assistant features
+## Music Assistant controls in the main interface
 
-The **More features** window adds controls for Music Assistant capabilities that are not part of the main library view:
+These capabilities are placed alongside the parts of the app they affect, rather than collected in a separate tools window:
 
-- **Multi-room:** add available players to a compatible sync/group leader and ungroup players.
-- **Intelligent queues:** configure Autoplay (automatic, similar tracks, similar artists, library mix or a selected playlist), Smart Shuffle and Smart/Standard Crossfade per queue.
-- **Sleep timers:** stop after a duration, the current item or the current chapter.
-- **Spoken-word media:** browse audiobooks, podcasts, genres and in-progress items; open podcast episodes; change the playback speed of the currently playing audiobook or podcast episode (0.5×–3×).
-- **Playlist tools:** create playlists, add/remove tracks, and import/export M3U/M3U8 data.
-- **Provider-aware search:** search across the additional media types and optionally restrict results to provider instance IDs.
+- **Multi-room grouping:** open the player selector in the top bar, choose **Group speakers…**, set a group leader and select the rooms to add. The same selector offers **Ungroup current player** when applicable.
+- **Queue intelligence:** open **Now Playing → Up Next → Queue settings** to configure Autoplay, its continuation mode, Smart Shuffle and Smart/Standard Crossfade for the selected player.
+- **Sleep timer:** use **Now Playing → Up Next → Sleep timer** to stop after a preset/custom duration, at the end of the current item or chapter, or clear the timer.
+- **Spoken-word library:** Audiobooks, Podcasts, Genres and Continue listening are dedicated sidebar destinations. Open a podcast for its episodes; supported audiobook and podcast playback can use the speed control on the Now Playing controls (0.5×–3×).
+- **Playlist management:** create or import playlists from the Playlists page. Use a playlist's item menu to export M3U8, add tracks to a playlist from a track menu, or remove tracks from the playlist currently open.
+- **Provider-aware search:** on the Search page, select **Providers** to restrict searches to provider instance IDs; search results include podcasts, podcast episodes, audiobooks and genres alongside music.
 
-These controls use Music Assistant's own API. The server remains responsible for provider compatibility and actual playback. Some controls depend on the Music Assistant version, the configured providers, and the selected player's capabilities. Smart Shuffle is only active while Shuffle is enabled.
-
-Optional server-side experiences such as AI Radio, Party Mode, Music Quiz and visualizer plugins remain installed/configured on the Music Assistant server; the feature window provides a shortcut to its web interface rather than reimplementing plugin logic. DSP/equalizer and other Audio Control Centre functionality are intentionally not included.
+Music Assistant remains responsible for provider compatibility and playback. Some controls depend on the server version, configured providers and player capabilities. Smart Shuffle only changes the queue while Shuffle is enabled. Server-side plugin experiences such as AI Radio, Party Mode, Music Quiz and visualizers remain configured on Music Assistant itself. DSP/equalizer and other Audio Control Centre functionality remain intentionally excluded.
 
 See [the advanced features guide](docs/ADVANCED_FEATURES.md) for details and compatibility notes.
 

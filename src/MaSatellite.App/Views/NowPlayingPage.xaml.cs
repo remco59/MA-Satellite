@@ -86,6 +86,12 @@ public sealed partial class NowPlayingPage : UserControl
 
     public event EventHandler<FrameworkElement>? DeviceRequested;
 
+    public event EventHandler<FrameworkElement>? QueueSettingsRequested;
+
+    public event EventHandler<FrameworkElement>? SleepTimerRequested;
+
+    public event EventHandler<FrameworkElement>? PlaybackSpeedRequested;
+
     /// <summary>Queue index to start playing.</summary>
     public event EventHandler<int>? PlayIndexRequested;
 
@@ -152,6 +158,8 @@ public sealed partial class NowPlayingPage : UserControl
     }
 
     internal void SetTint(Brush? tint) => HeroCard.Background = tint ?? R("AuroraHeroGradient");
+
+    internal void SetPlaybackSpeed(double speed) => SpeedButton.Content = $"{speed:0.##}×";
 
     internal void SetTransport(TransportState t)
     {
@@ -311,6 +319,12 @@ public sealed partial class NowPlayingPage : UserControl
     private void OnDeviceClick(object sender, RoutedEventArgs e) => DeviceRequested?.Invoke(this, (FrameworkElement)sender);
 
     private void OnTransferClick(object sender, RoutedEventArgs e) => TransferRequested?.Invoke(this, (FrameworkElement)sender);
+
+    private void OnQueueSettingsClick(object sender, RoutedEventArgs e) => QueueSettingsRequested?.Invoke(this, (FrameworkElement)sender);
+
+    private void OnSleepClick(object sender, RoutedEventArgs e) => SleepTimerRequested?.Invoke(this, (FrameworkElement)sender);
+
+    private void OnSpeedClick(object sender, RoutedEventArgs e) => PlaybackSpeedRequested?.Invoke(this, (FrameworkElement)sender);
 
     private void OnSeekChanged(object sender, RangeBaseValueChangedEventArgs e)
     {
@@ -503,6 +517,8 @@ public sealed partial class NowPlayingPage : UserControl
         _durationSeconds = null;
         _lyricsFor = _relatedFor = _aboutFor = null;
         _favorite = false;
+        SpeedButton.Visibility = Visibility.Collapsed;
+        SpeedButton.Content = "1×";
         ApplyFavorite();
         MetaText.Visibility = Visibility.Collapsed;
         ClearLyrics();
@@ -537,6 +553,8 @@ public sealed partial class NowPlayingPage : UserControl
             }
 
             _favorite = details.IsFavorite;
+            var supportsVariableSpeed = details.Item.Type is MaMediaType.Audiobook or MaMediaType.PodcastEpisode;
+            SpeedButton.Visibility = supportsVariableSpeed ? Visibility.Visible : Visibility.Collapsed;
             ApplyFavorite();
             var meta = new List<string>();
             if (!string.IsNullOrWhiteSpace(details.AlbumName))
