@@ -407,6 +407,48 @@ public sealed partial class LibraryWindow
         }
     }
 
+    private async Task AddTrackToPlaylistAsync(MaItem track)
+    {
+        try
+        {
+            var client = await _controller.Service.GetClientAsync();
+            var playlists = await client.GetLibraryAsync(MaMediaType.Playlist, limit: 250, sortField: "name");
+            if (playlists.Count == 0)
+            {
+                ShowInfo("Create a playlist before adding tracks to it.");
+                return;
+            }
+
+            var picker = new ComboBox
+            {
+                Header = "Destination playlist",
+                DisplayMemberPath = nameof(MaItem.Name),
+                ItemsSource = playlists,
+                SelectedIndex = 0,
+                MinWidth = 340
+            };
+            var content = new StackPanel { Spacing = 8, MinWidth = 360 };
+            content.Children.Add(new TextBlock
+            {
+                Text = $"Add “{track.Name}” to one of your Music Assistant playlists.",
+                TextWrapping = TextWrapping.Wrap
+            });
+            content.Children.Add(picker);
+            var dialog = FeatureDialog("Add to playlist", content, "Add track");
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+                return;
+            if (picker.SelectedItem is not MaItem playlist)
+                throw new MaException("Choose a destination playlist.");
+
+            await client.AddToPlaylistAsync(playlist.ItemId, [track.Uri]);
+            ShowInfo($"Added {track.Name} to {playlist.Name}.");
+        }
+        catch (Exception ex)
+        {
+            ShowFeatureError(ex);
+        }
+    }
+
     private async Task ExportPlaylistToClipboardAsync(MaItem playlist)
     {
         try

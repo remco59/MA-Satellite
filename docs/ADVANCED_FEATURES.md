@@ -1,55 +1,51 @@
-# Advanced Music Assistant features in MA-Satellite
+# Music Assistant controls in MA-Satellite
 
-MA-Satellite keeps the Music Assistant server as the source of truth. This window exposes selected server capabilities through the public WebSocket API; it does not duplicate the server's player/provider logic.
+MA-Satellite keeps the Music Assistant server as the source of truth. Its native controls are surfaced in the part of the interface where they are used, not in a separate feature/developer window.
 
 ## Multi-room grouping
 
-Choose an available player as the group leader, select one or more available players, and use **Group selected**. Music Assistant checks whether the player/provider combination can be synchronized. Use **Ungroup player** to remove an individual player from its current sync/group.
+Open the **playback target** selector in the top bar. Choose **Group speakers…**, select an available group leader, then select the players to add. Use **Ungroup current player** from the same selector to remove the selected player from its current group.
 
-Grouping is not guaranteed for every combination of player providers. The server decides whether a requested group is valid.
+Grouping is not guaranteed for every combination of player providers. Music Assistant decides whether a requested group is valid.
 
-## Intelligent playback
+## Queue settings
 
-Select a player, then load its queue state.
+Open **Now Playing → Up Next → Queue settings** for the selected player.
 
 - **Autoplay** continues the queue when it is nearing its end.
 - **Autoplay mode** chooses automatic selection, similar tracks, similar artists, a library mix, or a selected playlist. Similarity modes depend on providers that expose the corresponding feature.
-- **Smart Shuffle** is a per-queue setting. It only becomes active while Shuffle is enabled. The existing player bar remains the place to turn Shuffle on/off.
+- **Smart Shuffle** is a per-queue setting. It only becomes active while Shuffle is enabled; use the regular Shuffle control in the player bar to turn Shuffle on or off.
 - **Crossfade** can be enabled per queue, with Smart Crossfade or Standard Crossfade selected as the server-side mode.
 
-Music Assistant enforces its own constraints; for example, it can reject enabling Autoplay while Repeat is active. A failed operation is shown in the window status text.
+Music Assistant enforces its own constraints; for example, it can reject enabling Autoplay while Repeat is active. Errors are surfaced in the main window.
 
 ## Sleep timer
 
-Select a player in the Intelligent playback section and choose:
-- A duration (1–1440 minutes).
-- End of the current item.
-- End of the current chapter.
-- Clear timer.
+Open **Now Playing → Up Next → Sleep timer**. Presets are available alongside custom durations, end-of-item, end-of-chapter and clear timer actions. A custom duration can be between 1 and 1440 minutes.
 
 End-of-item and end-of-chapter timers require a supported active queue item. Chapter timers also require chapter metadata from the media provider.
 
-## Podcasts and audiobooks
+## Podcasts, audiobooks and genres
 
-The library selector can load Audiobooks, Podcasts, Genres and In progress items. Choose a podcast and use **Load podcast episodes** to list its episodes. Select any playable item and choose **Play selected** to start it on the selected player.
+Use the **Audiobooks**, **Podcasts**, **Genres** and **Continue listening** destinations in the library sidebar. Open a podcast show to list its episodes; open an audiobook or genre where the provider exposes child items. Playable podcast episodes can be played directly.
 
-For the current audiobook or podcast episode, the playback speed control supports 0.5× to 3.0×. Music Assistant rejects this command when the selected queue is not playing an audiobook or podcast episode.
+For a currently playing audiobook or podcast episode, use the speed control on the Now Playing page to request playback speed from 0.5× to 3.0×. Music Assistant may reject variable speed for other media types.
 
-In-progress and resume metadata are returned by the server. Resume behaviour and availability depend on the media provider.
+In-progress and resume metadata come from the server. Resume behaviour and availability depend on the media provider.
 
 ## Provider-aware search
 
-Search includes tracks, artists, albums, playlists, radio, podcasts, podcast episodes, audiobooks and genres. The optional provider field accepts comma-separated Music Assistant provider instance IDs. Leave it blank to search every provider included by Music Assistant.
+Search includes tracks, artists, albums, playlists, radio, podcasts, podcast episodes, audiobooks and genres. Select **Providers** in the search filter row and enter comma-separated Music Assistant provider instance IDs. Leave the provider field empty to search every provider included by Music Assistant.
 
 ## Playlist management
 
-The window supports creating a library playlist, adding a selected track from search, removing selected playlist entries, importing M3U/M3U8 text and exporting a playlist as M3U8 text.
+On the **Playlists** page, choose **New playlist** or **Import M3U / M3U8**. A playlist item's context menu exports M3U8 text to the clipboard. A track's context menu can add it to any playlist; when viewing a playlist, its track menu also offers **Remove from this playlist**.
 
-Import/export uses the server's playlist endpoints. The server determines which external playlist formats and provider-backed playlists are editable.
+Import/export and editing use the server's playlist endpoints. The server determines which external playlist formats and provider-backed playlists are editable.
 
 ## Server-side plugins
 
-AI Radio, Party Mode, Music Quiz, visualizers and other plugins remain server-side features. Install and configure those in Music Assistant. The **Open Music Assistant** shortcut opens the server's web interface; MA-Satellite does not install plugins or duplicate their screens.
+AI Radio, Party Mode, Music Quiz, visualizers and other plugins remain server-side features. Install and configure those in Music Assistant. MA-Satellite does not install plugins or duplicate their screens.
 
 ## Intentionally excluded
 

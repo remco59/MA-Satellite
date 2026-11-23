@@ -1470,7 +1470,7 @@ public sealed partial class LibraryWindow : Window
         // Clicking opens a detail page for every media type. The cover play button
         // and the row menu still offer immediate playback without navigating.
         if (item.Type is MaMediaType.Album or MaMediaType.Artist or MaMediaType.Playlist or MaMediaType.Track
-            or MaMediaType.Podcast or MaMediaType.Genre)
+            or MaMediaType.Podcast or MaMediaType.Audiobook or MaMediaType.Genre)
         {
             await GoToAsync(new NavState(_tab, item, QueryFor(_tab)));
         }
@@ -1504,6 +1504,10 @@ public sealed partial class LibraryWindow : Window
         {
             flyout.Items.Add(new MenuFlyoutSeparator());
             flyout.Items.Add(MenuItem("Copy playlist as M3U8", () => ExportPlaylistToClipboardAsync(item)));
+        }
+        if (item.Type == MaMediaType.Track && !string.IsNullOrWhiteSpace(item.Uri))
+        {
+            flyout.Items.Add(MenuItem("Add to playlist…", () => AddTrackToPlaylistAsync(item)));
         }
         if (_openedItem is { Type: MaMediaType.Playlist } playlist && item.Type == MaMediaType.Track)
         {
