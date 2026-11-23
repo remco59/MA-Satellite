@@ -453,6 +453,22 @@ public class MaClientTests
     }
 
     [Fact]
+    public async Task Playback_speed_is_sent_for_the_selected_queue_and_validated()
+    {
+        await using var server = new FakeMaServer();
+        server.Handlers["player_queues/set_playback_speed"] = _ => null;
+        await using var client = await ConnectAsync(server);
+
+        await client.SetPlaybackSpeedAsync("living_room", 1.25, "queue-item-7");
+
+        var args = server.Received.Single(r => r.Command == "player_queues/set_playback_speed").Args;
+        Assert.Equal("living_room", args.GetProperty("queue_id").GetString());
+        Assert.Equal(1.25, args.GetProperty("speed").GetDouble());
+        Assert.Equal("queue-item-7", args.GetProperty("queue_item_id").GetString());
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => client.SetPlaybackSpeedAsync("living_room", 3.5));
+    }
+
+    [Fact]
     public async Task Playlist_management_import_export_and_remove_use_expected_arguments()
     {
         await using var server = new FakeMaServer();
