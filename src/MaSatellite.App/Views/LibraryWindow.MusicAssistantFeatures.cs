@@ -237,7 +237,8 @@ public sealed partial class LibraryWindow
 
     private async Task OpenSleepTimerDialogAsync()
     {
-        if (SelectedTarget is null)
+        var target = SelectedTarget;
+        if (target is null)
         {
             ShowInfo("Choose a player before setting a sleep timer.");
             return;
@@ -269,7 +270,7 @@ public sealed partial class LibraryWindow
         var content = new StackPanel { Spacing = 12, MinWidth = 340 };
         content.Children.Add(new TextBlock
         {
-            Text = $"Choose when playback should stop on {SelectedTarget.Name}.",
+            Text = $"Choose when playback should stop on {target.Name}.",
             Style = (Style)Application.Current.Resources["AuroraStatusTextStyle"]
         });
         content.Children.Add(mode);
